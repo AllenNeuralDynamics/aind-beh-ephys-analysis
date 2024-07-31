@@ -5,105 +5,100 @@ import re
 from PyPDF2 import PdfMerger
 import pandas as pd
 import os
+from aind_dynamic_foraging_basic_analysis.lick_analysis import load_nwb
 
-def test():
-    print('test success!')
-
-def get_barcode(harp_events, index):
-    """
-    Returns a subset of original DataFrame corresponding to a specific 
-    barcode
-
-    Parameter
-    ---------
-    index : int
-        The index of the barcode being requested
-
-    Returns
-    -------
-    sample_numbers : np.array
-        Array of integer sample numbers for each barcode event
-    states : np.array
-        Array of states (1 or 0) for each barcode event
+def parseSessionID(file_name):
+    if len(re.split('[_.]', file_name)[0]) == 6 & re.split('[_.]', file_name)[0].isdigit():
+        aniID = re.split('[_.]', file_name)[0]
+        date = re.split('[_.]', file_name)[1]
+        dateObj = datetime.strptime(date, "%Y-%m-%d")
+        raw_id= session_id
+    elif re.split('[_.]', file_name)[0] == 'behavior' or re.split('[_.]', file_name)[0] == 'ecephys':
+        aniID = re.split('[_.]', file_name)[1]
+        date = re.split('[_.]', file_name)[2]
+        dateObj = datetime.strptime(date, "%Y-%m-%d")
+        raw_id = '_'.join(re.split('[_.]', file_name)[1:])
+    else:
+        aniID = None
+        dateObj = None
+        raw_id = None
     
-    """
+    return aniID, dateObj, raw_id
 
-    splits = np.where(np.diff(harp_events.timestamp) > 0.5)[0]
+def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
+    # parse session_id
+    aniID, _, raw_id = parseSessionID(session_id)
+    # raw dirs
+    raw_dir = os.path.join(data_dir, session_id+'_raw_data')
+    session_dir = os.path.join(raw_dir, 'ecephys_clipped')
+    if not os.path.exists(session_dir):
+        session_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
+    sorted_dir = os.path.join(data_dir, session_id+'_sorted_curated')
+    nwb_dir = os.path.join(sorted_dir, 'nwb')
+    postprocessed_dir = os.path.join(sorted_dir, 'postprocessed')
+    curated_dir = os.path.join(sorted_dir, 'curated')
+    models_dir = os.path.join(data_dir, session_id+'_model_stan')
 
-    barcode = harp_events.iloc[splits[index]+1:splits[index+1]+1]
-
-    return barcode.sample_number.values, barcode.state.values
-
-
-def convert_barcode_to_time(sample_numbers, 
-        states, 
-        baud_rate=1000.0, 
-        sample_rate=30000.0):
-    """
-    Converts event sample numbers and states to
-    a Harp timestamp in seconds.
-
-    Harp timestamp is encoded as 32 bits, with
-    the least significant bit coming first, and 2 bits 
-    between each byte.
-    """
-
-    samples_per_bit = int(sample_rate / baud_rate)
-    middle_sample = int(samples_per_bit / 2)
+    # model dir
     
-    intervals = np.diff(sample_numbers)
+    if model_name is not None:
+        model_dir = os.path.join(models_dir, model_name)
+        model_file = os.path.join(model_dir, model_name, raw_id+'_session_model_dv.csv')
+        session_curation_file = os.path.join(model_dir, model_name, 'ani_session_data.csv')
+    else:
+        model_dir = None
+        model_file = None
+        session_curation_file = os.path.join(models_dir, raw_id+'_session_data.csv')
+    
+    # processed dirs
+    processed_dir = os.path.join(scratch_dir, session_id)
+    alignment_dir = os.path.join(processed_dir, 'alignment')
+    beh_fig_dir = os.path.join(processed_dir, 'behavior')
+    ephys_fig_dir = os.path.join(processed_dir, 'ephys')
+    opto_fig_dir = os.path.join(processed_dir, 'opto')
 
-    barcode = np.concatenate([np.ones((count,)) * state 
-                    for state, count in 
-                    zip(states[:-1], intervals)]).astype("int")
+    dir_dict = {'aniID': aniID,
+                'raw_id': raw_id,
+                'datetime': dateObj,
+                'raw_dir': raw_dir,
+                'session_dir': session_dir,
+                'processed_dir': processed_dir,
+                'alignment_dir': alignment_dir,
+                'beh_fig_dir': beh_fig_dir,
+                'ephys_fig_dir': ephys_fig_dir,
+                'opto_fig_dir': opto_fig_dir,
+                'nwb_dir': nwb_dir,
+                'postprocessed_dir': postprocessed_dir,
+                'curated_dir': curated_dir,
+                'models_dir': models_dir,
+                'model_dir': model_dir,
+                'model_file': model_file,
+                'session_curation_file': session_curation_file}
 
-    val = np.concatenate([
-        np.arange(samples_per_bit + middle_sample + samples_per_bit * 10 * i, 
-                  samples_per_bit * 10 * i - middle_sample + samples_per_bit * 10, 
-                  samples_per_bit) 
-                  for i in range(4)])
-    s = np.flip(barcode[val])
-    harp_time = s.dot(2**np.arange(s.size)[::-1])
+    # make directories
+    makedirs(dir_dict)
 
-    return harp_time
+    return dir_dict
 
+def load_model_dv(model_dirs):
+    
+    if model_dirs['model_file'] is not None:
+        model_dv_temp = pd.read_csv(model_dirs['model_file'])
+        nwb = load_nwb(model_dirs['nwb_dir'])
+        trial_df = nwb.trials.to_dataframe()
+        model_dv = pd.DataFrame(np.nan, index=range(len(trial_df)), columns=model_dv_temp.columns)
+        session_curation = pd.read_csv(model_dirs['session_curation_file'])
+        curr_cut = session_curation.iloc[session_curation['session_id'] == model_dirs['raw_id'], ['cut']].values[0]
+        curr_cut = ast.literal_eval(curr_cut)
+        model_dv[]
+    else:
+        model_dv = None
+    return session_dv
 
-def rescale_times(times, t1_harp, t2_harp, t1_oe, t2_oe):
-    new_times = np.copy(times)
-    scaling = (t2_harp - t1_harp) / (t2_oe - t1_oe)
-    new_times -= t1_oe
-    new_times *= scaling
-    new_times += t1_harp
-    return new_times
-
-def filter_spikes(spk_units_cond, n_points = 300, tau_ker = .15):
-    time = np.linspace(-t_min , t_max , n_points)
-    dt = (t_max + t_min)/n_points
-    filt_spk_cond= []
-    s=0
-    for spk_units in spk_units_cond:
-        if s%100==0:
-            print('Neuron', s)
-        s+=1
-        spikes_to_exp = []
-        for spikes_trials in spk_units:
-            convolve  = np.zeros(n_points)  
-            for time_spike in spikes_trials:
-                if time_spike < -t_min:
-                    continue
-                else:
-                    t = (time - time_spike)/tau_ker
-                    conv = np.exp(-t)
-                    conv[t<0] = 0
-                    conv = conv/sum(conv)
-                    convolve = convolve + conv
-            spikes_to_exp.append(convolve)
-        filt_spk_cond.append(spikes_to_exp)
-    filt_spk_cond = np.array(filt_spk_cond) * (1/dt)
-    return filt_spk_cond, time
-
-
-
+def makedirs(directories):
+    for directory_name, directory in directories.items():
+        if not os.path.exists(directory) and 'dir' in directory_name:
+            os.makedirs(directory)
 
 def merge_pdfs(input_dir, output_filename='merged.pdf'):
     merger = PdfMerger()
@@ -138,133 +133,12 @@ def delete_files_without_name(folder_path, name):
                 # Delete the file
                 os.remove(file_path)
 
-
-def build_time_window_domain(bin_edges, offsets, callback=None):
-    callback = (lambda x: x) if callback is None else callback
-    domain = np.tile(bin_edges[None, :], (len(offsets), 1))
-    domain += offsets[:, None]
-    return callback(domain)
-
-def build_spike_histogram(time_domain,
-                          spike_times,
-                          dtype=None,
-                          binarize=False):
-
-    time_domain = np.array(time_domain)
-
-    tiled_data = np.zeros(
-        (time_domain.shape[0], time_domain.shape[1] - 1, len(spike_times)),
-        dtype=(np.uint8 if binarize else np.uint16) if dtype is None else dtype
-    )
-
-    starts = time_domain[:, :-1]
-    ends = time_domain[:, 1:]
-        
-    for ii in range(len(spike_times)):
-        data = np.array(spike_times[ii])
-
-        start_positions = np.searchsorted(data, starts.flat)
-        end_positions = np.searchsorted(data, ends.flat, side="right")
-        counts = (end_positions - start_positions)
-
-        tiled_data[:, :, ii].flat = counts > 0 if binarize else counts
-    
-    time = 0.5*(starts + ends)
-    return time, tiled_data
-    
-# Make xarray functions
-def build_spike_histogram_overlap(time_domain,
-                          binSize,
-                          spike_times,
-                          dtype=None,
-                          binarize=False):
-
-    time_domain = np.array(time_domain)
-
-    tiled_data = np.zeros(
-        (time_domain.shape[0], time_domain.shape[1] - 1, len(spike_times)),
-        dtype=(np.uint8 if binarize else np.uint16) if dtype is None else dtype
-    )
-
-    starts = time_domain[:, :-1]
-    ends = time_domain[:, :-1]  + binSize
-        
-    for ii in range(len(spike_times)):
-        data = np.array(spike_times[ii])
-
-        start_positions = np.searchsorted(data, starts.flat)
-        end_positions = np.searchsorted(data, ends.flat, side="right")
-        counts = (end_positions - start_positions)
-
-        tiled_data[:, :, ii].flat = counts > 0 if binarize else counts
-
-    time = starts + 0.5*binSize
-    return time, tiled_data
-
-def fitSpikeModelG(dfTrial, matSpikes, formula):
-    TvCurrU = np.array([])
-    PvCurrU = np.array([])
-    EvCurrU = np.array([])
-    for i in range(np.shape(matSpikes)[1]):
-        currSpikes = np.squeeze(matSpikes[:,i])
-        currData = dfTrial.copy()
-        currData['spikes'] = currSpikes
-        # Fit the GLM
-        model = sm.GLM.from_formula(formula=formula, data=currData, family=sm.families.Gaussian()).fit()
-        # t value
-        regressors = [re.sub(r'\[.*?\]', '', x) for x in model.tvalues.index]
-        tv = model.tvalues.values.reshape(1,-1)
-        # p value
-        pv = model.pvalues.values.reshape(1,-1)
-        # t value
-        ev = model.params.values.reshape(1,-1)
-        # concatenate
-        # initialize shape if not
-        if np.shape(TvCurrU)[0] == 0:
-            TvCurrU = np.empty((0, len(regressors)))
-            PvCurrU = np.empty((0, len(regressors)))
-            EvCurrU = np.empty((0, len(regressors)))
-
-        TvCurrU = np.concatenate((TvCurrU, tv), axis = 0)
-        PvCurrU = np.concatenate((PvCurrU, pv), axis = 0)
-        EvCurrU = np.concatenate((EvCurrU, ev), axis = 0)
-
-    return regressors, TvCurrU, PvCurrU, EvCurrU
-
-
-def fitSpikeModelP(dfTrial, matSpikes, formula):
-    TvCurrU = np.array([])
-    PvCurrU = np.array([])
-    EvCurrU = np.array([])
-    for i in range(np.shape(matSpikes)[1]):
-        currSpikes = np.squeeze(matSpikes[:,i])
-        currData = dfTrial.copy()
-        currData['spikes'] = currSpikes
-        # Fit the GLM
-        model = sm.GLM.from_formula(formula=formula, data=currData, family=sm.families.Poisson()).fit()
-        # t value
-        regressors = [re.sub(r'\[.*?\]', '', x) for x in model.tvalues.index]
-        tv = model.tvalues.values.reshape(1,-1)
-        # p value
-        pv = model.pvalues.values.reshape(1,-1)
-        # t value
-        ev = model.params.values.reshape(1,-1)
-        # concatenate
-        # initialize shape if not
-        if np.shape(TvCurrU)[0] == 0:
-            TvCurrU = np.empty((0, len(regressors)))
-            PvCurrU = np.empty((0, len(regressors)))
-            EvCurrU = np.empty((0, len(regressors)))
-
-        TvCurrU = np.concatenate((TvCurrU, tv), axis = 0)
-        PvCurrU = np.concatenate((PvCurrU, pv), axis = 0)
-        EvCurrU = np.concatenate((EvCurrU, ev), axis = 0)
-
-    return regressors, TvCurrU, PvCurrU, EvCurrU
-
-def makeSessionDF(nwb, cut):
+def makeSessionDF(nwb, cut = [0, np.nan]):
     tblTrials = nwb.trials.to_dataframe()
-    tblTrials = tblTrials.iloc[cut[0]:cut[1]+1].copy()
+    if cut[1] == np.nan:
+        tblTrials = tblTrials.iloc[cut[0]:].copy()
+    else:
+        tblTrials = tblTrials.iloc[cut[0]:cut[1]].copy()
     trialStarts = tblTrials.loc[tblTrials['animal_response']!=2, 'goCue_start_time'].values
     responseTimes = tblTrials[tblTrials['animal_response']!=2]
     responseTimes = responseTimes['reward_outcome_time'].values
