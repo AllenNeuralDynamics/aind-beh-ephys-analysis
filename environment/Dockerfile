@@ -15,7 +15,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential=12.8ubuntu1.1 \
         libgl1-mesa-glx=21.2.6-0ubuntu0.1~20.04.2 \
-        libssl-dev=1.1.1f-1ubuntu2.22 \
+        libssl-dev=1.1.1f-1ubuntu2.23 \
         pandoc=2.5-3build2 \
         pkg-config=0.29.1-0ubuntu4 \
     && rm -rf /var/lib/apt/lists/*
@@ -26,6 +26,7 @@ RUN conda install -y \
 
 RUN pip install -U --no-cache-dir \
     aind-ephys-utils==0.0.15 \
+    aind-dynamic-foraging-basic-analysis==0.2.3 \
     hdmf-zarr==0.6.0 \
     ipympl==0.9.3 \
     matplotlib==3.9.1 \
@@ -39,7 +40,8 @@ RUN pip install -U --no-cache-dir \
     statsmodels==0.14.2 \
     wavpack-numcodecs==0.1.5 \
     zarr==2.18.2 \
-    harp-python@git+https://github.com/jsiegle/harp-python@decode-clock
+    harp-python@git+https://github.com/jsiegle/harp-python@decode-clock \
+    aind-ephys-rig-qc@git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO
 
 COPY postInstall /
 RUN /postInstall

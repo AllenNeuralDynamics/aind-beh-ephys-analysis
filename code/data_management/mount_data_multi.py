@@ -3,7 +3,6 @@ from codeocean.data_asset import DataAssetParams, DataAssetSearchParams,DataAsse
 import pandas as pd
 import os, sys
 from codeocean import CodeOcean
-from codeocean.data_asset import DataAssetParams, DataAssetSearchParams,DataAssetAttachParams, Source, AWSS3Source
 client = CodeOcean(domain="https://codeocean.allenneuraldynamics.org", token=os.getenv("API_SECRET"))
 
 # %%

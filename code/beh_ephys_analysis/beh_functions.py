@@ -6,6 +6,8 @@ from PyPDF2 import PdfMerger
 import pandas as pd
 import os
 from aind_dynamic_foraging_basic_analysis.lick_analysis import load_nwb
+from scipy.stats import norm
+from datetime import datetime
 
 def parseSessionID(file_name):
     if len(re.split('[_.]', file_name)[0]) == 6 & re.split('[_.]', file_name)[0].isdigit():
@@ -27,14 +29,21 @@ def parseSessionID(file_name):
 
 def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
     # parse session_id
-    aniID, _, raw_id = parseSessionID(session_id)
+    aniID, date_obj, raw_id = parseSessionID(session_id)
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
     session_dir = os.path.join(raw_dir, 'ecephys_clipped')
     if not os.path.exists(session_dir):
         session_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
     sorted_dir = os.path.join(data_dir, session_id+'_sorted_curated')
-    nwb_dir = os.path.join(sorted_dir, 'nwb')
+    nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
+    recordings = os.listdir(nwb_dir_temp)
+    if len(recordings) == 1:
+        nwb_dir = os.path.join(nwb_dir_temp, recordings[0])
+    else:
+        nwb_dir = None
+        print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+
     postprocessed_dir = os.path.join(sorted_dir, 'postprocessed')
     curated_dir = os.path.join(sorted_dir, 'curated')
     models_dir = os.path.join(data_dir, session_id+'_model_stan')
@@ -43,7 +52,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     
     if model_name is not None:
         model_dir = os.path.join(models_dir, model_name)
-        model_file = os.path.join(model_dir, model_name, raw_id+'_session_model_dv.csv')
+        model_file = os.path.join(model_dir, raw_id+'_session_model_dv.csv')
         session_curation_file = os.path.join(model_dir, model_name, 'ani_session_data.csv')
     else:
         model_dir = None
@@ -59,7 +68,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
-                'datetime': dateObj,
+                'datetime': date_obj,
                 'raw_dir': raw_dir,
                 'session_dir': session_dir,
                 'processed_dir': processed_dir,
@@ -90,15 +99,17 @@ def load_model_dv(model_dirs):
         session_curation = pd.read_csv(model_dirs['session_curation_file'])
         curr_cut = session_curation.iloc[session_curation['session_id'] == model_dirs['raw_id'], ['cut']].values[0]
         curr_cut = ast.literal_eval(curr_cut)
-        model_dv[]
+        model_dv[curr_cut[0]:curr_cut[1]] = model_dv_temp
     else:
         model_dv = None
-    return session_dv
+        curr_cut = None
+    return model_dv, curr_cut
 
 def makedirs(directories):
     for directory_name, directory in directories.items():
-        if not os.path.exists(directory) and 'dir' in directory_name:
-            os.makedirs(directory)
+        if 'dir' in directory_name and directory is not None:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
 
 def merge_pdfs(input_dir, output_filename='merged.pdf'):
     merger = PdfMerger()

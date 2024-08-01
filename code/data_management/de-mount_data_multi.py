@@ -3,7 +3,6 @@ from codeocean.data_asset import DataAssetParams, DataAssetSearchParams,DataAsse
 import pandas as pd
 import os, sys
 from codeocean import CodeOcean
-from codeocean.data_asset import DataAssetParams, DataAssetSearchParams,DataAssetAttachParams, Source, AWSS3Source
 client = CodeOcean(domain="https://codeocean.allenneuraldynamics.org", token=os.getenv("API_SECRET"))
 
 # %%
@@ -29,7 +28,6 @@ for curr_col in col_to_remove:
 
 
 # Generate the list of DataAssetAttachParams objects
-data_assets = [DataAssetAttachParams(id, mount) for id, mount in zip(all_ids, all_mounts)]
 data_assets_id = all_ids
 
 # %%
