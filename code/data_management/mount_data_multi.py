@@ -25,7 +25,9 @@ for curr_col in col_to_attach:
     curr_mount = [session_curr + '_' + curr_col for session_curr in session_ids]
     all_ids.extend(curr_ids)
     all_mounts.extend(curr_mount)
-
+#%%
+all_ids = all_ids + ['f908dd4d-d7ed-4d52-97cf-ccd0e167c659']
+all_mounts = all_mounts + ['all_behavior']
 
 # Generate the list of DataAssetAttachParams objects
 data_assets = [DataAssetAttachParams(id, mount) for id, mount in zip(all_ids, all_mounts)]

@@ -8,6 +8,7 @@ import os
 from aind_dynamic_foraging_basic_analysis.lick_analysis import load_nwb
 from scipy.stats import norm
 from datetime import datetime
+import ast
 
 def parseSessionID(file_name):
     if len(re.split('[_.]', file_name)[0]) == 6 & re.split('[_.]', file_name)[0].isdigit():
@@ -43,6 +44,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     else:
         nwb_dir = None
         print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+    beh_nwb_dir = os.path.join('/root/capsule/data/all_behavior', raw_id+'.nwb')
 
     postprocessed_dir = os.path.join(sorted_dir, 'postprocessed')
     curated_dir = os.path.join(sorted_dir, 'curated')
@@ -53,7 +55,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     if model_name is not None:
         model_dir = os.path.join(models_dir, model_name)
         model_file = os.path.join(model_dir, raw_id+'_session_model_dv.csv')
-        session_curation_file = os.path.join(model_dir, model_name, 'ani_session_data.csv')
+        session_curation_file = os.path.join(model_dir, 'ani_session_data.csv')
     else:
         model_dir = None
         model_file = None
@@ -82,28 +84,30 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'models_dir': models_dir,
                 'model_dir': model_dir,
                 'model_file': model_file,
-                'session_curation_file': session_curation_file}
+                'session_curation_file': session_curation_file,
+                'beh_nwb_dir': beh_nwb_dir}
 
     # make directories
     makedirs(dir_dict)
 
     return dir_dict
 
-def load_model_dv(model_dirs):
-    
+def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule'):
+    model_dirs = session_dirs(session_id, model_name, data_dir=data_dir, scratch_dir=scratch_dir)
     if model_dirs['model_file'] is not None:
-        model_dv_temp = pd.read_csv(model_dirs['model_file'])
+        model_dv_temp = pd.read_csv(model_dirs['model_file'], index_col=0)
         nwb = load_nwb(model_dirs['nwb_dir'])
         trial_df = nwb.trials.to_dataframe()
         model_dv = pd.DataFrame(np.nan, index=range(len(trial_df)), columns=model_dv_temp.columns)
         session_curation = pd.read_csv(model_dirs['session_curation_file'])
-        curr_cut = session_curation.iloc[session_curation['session_id'] == model_dirs['raw_id'], ['cut']].values[0]
-        curr_cut = ast.literal_eval(curr_cut)
-        model_dv[curr_cut[0]:curr_cut[1]] = model_dv_temp
+        session_cut = session_curation.loc[session_curation['session_id'] == model_dirs['raw_id'], 'session_cut'].values[0]
+        session_cut = ast.literal_eval(session_cut)
+        # model_dv[curr_cut[0]:curr_cut[1]] = model_dv_temp
+        model_dv = model_dv_temp.copy()
     else:
         model_dv = None
-        curr_cut = None
-    return model_dv, curr_cut
+        session_cut = None
+    return model_dv, session_cut
 
 def makedirs(directories):
     for directory_name, directory in directories.items():
@@ -167,17 +171,30 @@ def makeSessionDF(nwb, cut = [0, np.nan]):
     # choices
     choices = tblTrials.loc[tblTrials['animal_response']!=2, 'animal_response'] == 1
     choicesPrev = np.concatenate((np.full((1), np.nan), choices[:-1]))
+
+    # go_cue_time
+    go_cue_time = tblTrials.loc[tblTrials['animal_response']!=2, 'goCue_start_time']
+
+    # choice_time
+    choice_time = tblTrials.loc[tblTrials['animal_response']!=2, 'reward_outcome_time']
+
+    # outcome_time
+    outcome_time = tblTrials.loc[tblTrials['animal_response']!=2, 'reward_outcome_time'] + tblTrials.loc[tblTrials['animal_response']!=2, 'reward_delay']
+
     
     # laser
     laserChoice = tblTrials.loc[tblTrials['animal_response']!=2, 'laser_on_trial'] == 1
     laser = tblTrials['laser_on_trial'] == 1
     laserPrev = np.concatenate((np.full((1), np.nan), laserChoice[:-1]))
     trialData = pd.DataFrame({
-        'outcomes': outcomes.values.astype(float), 
-        'choices': choices.values.astype(float),
+        'outcome': outcomes.values.astype(float), 
+        'choice': choices.values.astype(float),
         'laser': laserChoice.values.astype(float),
-        'outcomePrev': outcomePrev,
-        'laserPrev': laserPrev,
-        'choicesPrev': choicesPrev,
+        'outcome_prev': outcomePrev,
+        'laser_prev': laserPrev,
+        'choices_prev': choicesPrev,
+        'go_cue_time': go_cue_time.values,
+        'choice_time': choice_time.values,
+        'outcome_time': outcome_time.values,
         })
     return trialData
