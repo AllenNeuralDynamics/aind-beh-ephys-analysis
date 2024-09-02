@@ -98,7 +98,7 @@ def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scrat
         model_dv_temp = pd.read_csv(model_dirs['model_file'], index_col=0)
         nwb = load_nwb(model_dirs['nwb_dir'])
         trial_df = nwb.trials.to_dataframe()
-        model_dv = pd.DataFrame(np.nan, index=range(len(trial_df)), columns=model_dv_temp.columns)
+        # model_dv = pd.DataFrame(np.nan, index=range(len(trial_df)), columns=model_dv_temp.columns)
         session_curation = pd.read_csv(model_dirs['session_curation_file'])
         session_cut = session_curation.loc[session_curation['session_id'] == model_dirs['raw_id'], 'session_cut'].values[0]
         session_cut = ast.literal_eval(session_cut)
@@ -154,6 +154,7 @@ def makeSessionDF(nwb, cut = [0, np.nan]):
         tblTrials = tblTrials.iloc[cut[0]:].copy()
     else:
         tblTrials = tblTrials.iloc[cut[0]:cut[1]].copy()
+    # tblTrials.reset_index(inplace=True)
     trialStarts = tblTrials.loc[tblTrials['animal_response']!=2, 'goCue_start_time'].values
     responseTimes = tblTrials[tblTrials['animal_response']!=2]
     responseTimes = responseTimes['reward_outcome_time'].values
@@ -186,7 +187,9 @@ def makeSessionDF(nwb, cut = [0, np.nan]):
     laserChoice = tblTrials.loc[tblTrials['animal_response']!=2, 'laser_on_trial'] == 1
     laser = tblTrials['laser_on_trial'] == 1
     laserPrev = np.concatenate((np.full((1), np.nan), laserChoice[:-1]))
+    # trial_id = tblTrials.loc[tblTrials['animal_response']!=2, 'id']
     trialData = pd.DataFrame({
+        # 'trial_id': trial_id,
         'outcome': outcomes.values.astype(float), 
         'choice': choices.values.astype(float),
         'laser': laserChoice.values.astype(float),

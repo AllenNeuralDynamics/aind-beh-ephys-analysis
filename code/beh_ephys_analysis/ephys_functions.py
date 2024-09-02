@@ -6,72 +6,6 @@ from PyPDF2 import PdfMerger
 import pandas as pd
 import os
 
-def get_barcode(harp_events, index):
-    """
-    Returns a subset of original DataFrame corresponding to a specific 
-    barcode
-
-    Parameter
-    ---------
-    index : int
-        The index of the barcode being requested
-
-    Returns
-    -------
-    sample_numbers : np.array
-        Array of integer sample numbers for each barcode event
-    states : np.array
-        Array of states (1 or 0) for each barcode event
-    
-    """
-
-    splits = np.where(np.diff(harp_events.timestamp) > 0.5)[0]
-
-    barcode = harp_events.iloc[splits[index]+1:splits[index+1]+1]
-
-    return barcode.sample_number.values, barcode.state.values
-
-
-def convert_barcode_to_time(sample_numbers, 
-        states, 
-        baud_rate=1000.0, 
-        sample_rate=30000.0):
-    """
-    Converts event sample numbers and states to
-    a Harp timestamp in seconds.
-
-    Harp timestamp is encoded as 32 bits, with
-    the least significant bit coming first, and 2 bits 
-    between each byte.
-    """
-
-    samples_per_bit = int(sample_rate / baud_rate)
-    middle_sample = int(samples_per_bit / 2)
-    
-    intervals = np.diff(sample_numbers)
-
-    barcode = np.concatenate([np.ones((count,)) * state 
-                    for state, count in 
-                    zip(states[:-1], intervals)]).astype("int")
-
-    val = np.concatenate([
-        np.arange(samples_per_bit + middle_sample + samples_per_bit * 10 * i, 
-                  samples_per_bit * 10 * i - middle_sample + samples_per_bit * 10, 
-                  samples_per_bit) 
-                  for i in range(4)])
-    s = np.flip(barcode[val])
-    harp_time = s.dot(2**np.arange(s.size)[::-1])
-
-    return harp_time
-
-
-def rescale_times(times, t1_harp, t2_harp, t1_oe, t2_oe):
-    new_times = np.copy(times)
-    scaling = (t2_harp - t1_harp) / (t2_oe - t1_oe)
-    new_times -= t1_oe
-    new_times *= scaling
-    new_times += t1_harp
-    return new_times
 
 def filter_spikes(spk_units_cond, n_points = 300, tau_ker = .15):
     time = np.linspace(-t_min , t_max , n_points)
@@ -98,43 +32,6 @@ def filter_spikes(spk_units_cond, n_points = 300, tau_ker = .15):
         filt_spk_cond.append(spikes_to_exp)
     filt_spk_cond = np.array(filt_spk_cond) * (1/dt)
     return filt_spk_cond, time
-
-
-
-
-def merge_pdfs(input_dir, output_filename='merged.pdf'):
-    merger = PdfMerger()
-    files = os.listdir(input_dir)
-    files = sorted(files)
-    # Iterate through all PDF files in the input directory
-    for i, filename in enumerate(files):
-        if filename.endswith('.pdf'):
-            if i%50 == 0:
-                print(f'Merging file {i} out of {len(os.listdir(input_dir))}')
-            filepath = os.path.join(input_dir, filename)
-            merger.append(filepath)
-
-    # Write the merged PDF to the output file
-    with open(output_filename, 'wb') as output_file:
-        merger.write(output_file)
-
-    print(f"PDF files in '{input_dir}' merged into '{output_filename}' successfully.")
-
-    
-def delete_files_without_name(folder_path, name):
-    # Iterate through all files in the folder
-    for i, filename in enumerate(os.listdir(folder_path)):
-        # Check if the filename does not contain 'combined'
-        if i%50 == 0:
-            print(f'Deleting file {i} out of {len(os.listdir(folder_path))}')
-        if name not in filename:
-            # Construct the full file path
-            file_path = os.path.join(folder_path, filename)
-            # Check if the path is a file
-            if os.path.isfile(file_path):
-                # Delete the file
-                os.remove(file_path)
-
 
 def build_time_window_domain(bin_edges, offsets, callback=None):
     callback = (lambda x: x) if callback is None else callback
@@ -293,3 +190,39 @@ def makeSessionDF(nwb, cut):
         'choicesPrev': choicesPrev,
         })
     return trialData
+
+def plot_raster_rate_colormap(
+    events,
+    align_events, # sorted by certain value
+    fig,
+    subplot_spec,
+    title,
+    tb=-5,
+    tf=10,
+    bin_size=100 / 1000,
+    step_size=50 / 1000,
+):
+    """Plot raster and rate aligned to events"""
+    edges = np.arange(tb + 0.5 * bin_size, tf - 0.5 * bin_size, step_size)
+    nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=subplot_spec)
+    nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=subplot_spec)
+    ax1 = fig.add_subplot(nested_gs[0, 0])
+    ax2 = fig.add_subplot(nested_gs[1, 0])
+
+    df = align.to_events(events, align_events, (tb, tf), return_df=True)
+    ax1.scatter(df.time, df.event_index, c="k", marker="|", s=1, zorder=2)
+    ax1.axvline(x=0, c="r", ls="--", lw=1, zorder=3)
+    ax1.set_title(title)
+    ax1.set_xlim(tb, tf)
+
+    counts_pre = np.searchsorted(np.sort(df.time.values), edges - 0.5 * bin_size)
+    counts_post = np.searchsorted(np.sort(df.time.values), edges + 0.5 * bin_size)
+    counts_pre = np.searchsorted(np.sort(df.time.values), edges - 0.5 * bin_size)
+    counts_post = np.searchsorted(np.sort(df.time.values), edges + 0.5 * bin_size)
+    lick_rate = (counts_post - counts_pre) / (bin_size * len(align_events))
+    ax2.plot(edges, lick_rate)
+    ax2.set_title("lickRate")
+    ax2.set_xlim(tb, tf)
+    ax2.set_xlabel("Time from go cue (s)")
+
+    return fig, ax1, ax2
