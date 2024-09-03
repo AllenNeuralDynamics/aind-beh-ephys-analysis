@@ -26,7 +26,6 @@ RUN conda install -y \
 
 RUN pip install -U --no-cache-dir \
     aind-ephys-utils==0.0.15 \
-    aind-dynamic-foraging-basic-analysis==0.2.3 \
     hdmf-zarr==0.6.0 \
     ipympl==0.9.3 \
     matplotlib==3.9.1 \
@@ -41,6 +40,7 @@ RUN pip install -U --no-cache-dir \
     wavpack-numcodecs==0.1.5 \
     zarr==2.18.2 \
     harp-python@git+https://github.com/jsiegle/harp-python@decode-clock \
+    aind_dynamic_foraging_basic_analysis==0.2.6 \
     aind-ephys-rig-qc@git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO
 
 COPY postInstall /
