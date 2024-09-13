@@ -38,12 +38,21 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         session_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
     sorted_dir = os.path.join(data_dir, session_id+'_sorted_curated')
     nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
-    recordings = os.listdir(nwb_dir_temp)
-    if len(recordings) == 1:
-        nwb_dir = os.path.join(nwb_dir_temp, recordings[0])
+    if not os.path.exists(nwb_dir_temp):
+        nwb_dir_temp = os.path.join(sorted_dir)
+        files_temp = os.listdir(nwb_dir_temp)
+        nwb = [f for f in files_temp if f.endswith('.nwb')]
+        nwb_dir = os.path.join(nwb_dir_temp, nwb[0])
     else:
-        nwb_dir = None
-        print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+        recordings = os.listdir(nwb_dir_temp)
+        if len(recordings) == 1:
+            nwb_dir = os.path.join(nwb_dir_temp, recordings[0])
+            if not os.path.exists(nwb_dir):
+                nwb_dir = os.path.join(sorted_dir, recordings[0])
+        else:
+            nwb_dir = None
+            print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+        
     beh_nwb_dir = os.path.join('/root/capsule/data/all_behavior', raw_id+'.nwb')
 
     postprocessed_dir = os.path.join(sorted_dir, 'postprocessed')
