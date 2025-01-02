@@ -5,6 +5,7 @@ import re
 from PyPDF2 import PdfMerger
 import pandas as pd
 import os
+from matplotlib.colors import LinearSegmentedColormap
 
 
 def filter_spikes(spk_units_cond, n_points = 300, tau_ker = .15):
@@ -226,3 +227,56 @@ def plot_raster_rate_colormap(
     ax2.set_xlabel("Time from go cue (s)")
 
     return fig, ax1, ax2
+
+def shiftedColorMap(cmap, min_val, max_val, name):
+    epsilon = 0.001
+    start, stop = 0.0, 1.0
+    min_val, max_val = min(0.0, min_val), max(0.0, max_val) # Edit #2
+    midpoint = 1.0 - max_val/(max_val + abs(min_val))
+    cdict = {'red': [], 'green': [], 'blue': [], 'alpha': []}
+    # regular index to compute the colors
+    reg_index = np.linspace(start, stop, 257)
+    # shifted index to match the data
+    shift_index = np.hstack([np.linspace(0.0, midpoint, 128, endpoint=False), np.linspace(midpoint, 1.0, 129, endpoint=True)])
+    for ri, si in zip(reg_index, shift_index):
+        if abs(si - midpoint) < epsilon:
+            r, g, b, a = cmap(0.5) # 0.5 = original midpoint.
+        else:
+            r, g, b, a = cmap(ri)
+        cdict['red'].append((si, r, r))
+        cdict['green'].append((si, g, g))
+        cdict['blue'].append((si, b, b))
+        cdict['alpha'].append((si, a, a))
+    newcmap = LinearSegmentedColormap(name, cdict)
+
+    # colormaps.register(cmap=newcmap, force=True)
+    return newcmap
+
+def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-30, 60], y_neighbors_to_keep = 3, orginal_loc = False):
+    peak_ind = np.argmin(np.min(template, axis=0))
+    peak_channel = all_channels_int[peak_ind]
+    peak_sample = np.argmin(template[:, peak_ind])  
+    peak_group = np.arange(peak_channel - 2*y_neighbors_to_keep, peak_channel + 2*y_neighbors_to_keep + 1, 2)
+    if right_left[peak_ind]: # peak is on the right
+        sub_peak_channel = peak_channel - 1 
+    else: 
+        sub_peak_channel = peak_channel + 1 
+    sub_group = np.arange(sub_peak_channel - 2*y_neighbors_to_keep, sub_peak_channel + 2*y_neighbors_to_keep + 1, 2)
+
+    # get the reordered template: major column on left, minor column on right
+    reordered_template = np.full((2*y_neighbors_to_keep + 1, 2*(sample_to_keep[1] - sample_to_keep[0])), np.nan)
+    if peak_sample+sample_to_keep[1] > template.shape[0] or peak_sample+sample_to_keep[0] < 0:
+        peak_sample = 89
+    for channel_int, channel_curr in enumerate(peak_group):
+        if channel_curr in all_channels_int:
+            reordered_template[channel_int, :(sample_to_keep[1] - sample_to_keep[0])] = template[(peak_sample+sample_to_keep[0]):(peak_sample+sample_to_keep[1]), np.argwhere(all_channels_int == channel_curr)[0][0]].T
+
+    for channel_int, channel_curr in enumerate(sub_group):
+        if channel_curr in all_channels_int:
+            reordered_template[channel_int, (sample_to_keep[1] - sample_to_keep[0]):2*(sample_to_keep[1] - sample_to_keep[0])] = template[(peak_sample+sample_to_keep[0]):(peak_sample+sample_to_keep[1]), np.argwhere(all_channels_int == channel_curr)[0][0]].T
+
+    # whether switch back to original location
+    if orginal_loc:
+        if right_left[peak_ind]:
+            reordered_template = reordered_template[:, list(range((sample_to_keep[1] - sample_to_keep[0]), 2*(sample_to_keep[1] - sample_to_keep[0]))) + list(range((sample_to_keep[1] - sample_to_keep[0])))]
+    return reordered_template

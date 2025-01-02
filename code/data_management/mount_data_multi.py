@@ -20,8 +20,8 @@ all_ids = []
 all_mounts = []
 
 for curr_col in col_to_attach:
-    session_ids = list(data_df['session_id'].values)
-    curr_ids = list(data_df[curr_col].values)
+    session_ids = list(list(data_df[data_df[curr_col].isna()]['session_id'].values))
+    curr_ids = list(data_df[data_df[curr_col].isna()][curr_col].values)
     curr_mount = [session_curr + '_' + curr_col for session_curr in session_ids]
     all_ids.extend(curr_ids)
     all_mounts.extend(curr_mount)
