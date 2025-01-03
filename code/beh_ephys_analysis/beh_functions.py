@@ -37,12 +37,16 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     if not os.path.exists(session_dir):
         session_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
     sorted_dir = os.path.join(data_dir, session_id+'_sorted_curated')
+    sorted_raw_dir = os.path.join(data_dir, session_id+'_sorted')
     nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
     if not os.path.exists(nwb_dir_temp):
-        nwb_dir_temp = os.path.join(sorted_dir)
-        files_temp = os.listdir(nwb_dir_temp)
-        nwb = [f for f in files_temp if f.endswith('.nwb')]
-        nwb_dir = os.path.join(nwb_dir_temp, nwb[0])
+        if os.path.exists(sorted_dir):
+            nwb_dir_temp = os.path.join(sorted_dir)
+            files_temp = os.listdir(nwb_dir_temp)
+            nwb = [f for f in files_temp if f.endswith('.nwb')]
+            nwb_dir = os.path.join(nwb_dir_temp, nwb[0])
+        else:
+            nwb_dir = None
     else:
         recordings = os.listdir(nwb_dir_temp)
         if len(recordings) == 1:
@@ -94,7 +98,9 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'model_dir': model_dir,
                 'model_file': model_file,
                 'session_curation_file': session_curation_file,
-                'beh_nwb_dir': beh_nwb_dir}
+                'beh_nwb_dir': beh_nwb_dir,
+                'sorted_dir': sorted_dir,
+                'sorted_raw_dir': sorted_raw_dir}
 
     # make directories
     makedirs(dir_dict)
@@ -120,7 +126,7 @@ def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scrat
 
 def makedirs(directories):
     for directory_name, directory in directories.items():
-        if 'dir' in directory_name and directory is not None:
+        if 'dir' in directory_name and directory is not None and 'scratch' in directory:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
