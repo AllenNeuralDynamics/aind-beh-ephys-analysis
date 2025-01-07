@@ -5,10 +5,31 @@ import re
 from PyPDF2 import PdfMerger
 import pandas as pd
 import os
-from aind_dynamic_foraging_basic_analysis.lick_analysis import load_nwb
+# from aind_dynamic_foraging_basic_analysis.lick_analysis import load_nwb
 from scipy.stats import norm
 from datetime import datetime
 import ast
+
+def load_nwb(filename):
+    """
+    Load NWB from file, checking for HDF5 or Zarr
+    if filename is not a string, then return the input, assuming its the NWB file already
+    """
+
+    if type(filename) is str:
+        if os.path.isdir(filename):
+            io = NWBZarrIO(filename, mode="r")
+            nwb = io.read()
+            return nwb
+        elif os.path.isfile(filename):
+            io = NWBHDF5IO(filename, mode="r")
+            nwb = io.read()
+            return nwb
+        else:
+            raise FileNotFoundError(filename)
+    else:
+        # Assuming its already an NWB
+        return filename
 
 def parseSessionID(file_name):
     if len(re.split('[_.]', file_name)[0]) == 6 & re.split('[_.]', file_name)[0].isdigit():
@@ -40,27 +61,33 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     sorted_raw_dir = os.path.join(data_dir, session_id+'_sorted')
     nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
     if not os.path.exists(nwb_dir_temp):
-        if os.path.exists(sorted_dir):
-            nwb_dir_temp = os.path.join(sorted_dir)
-            files_temp = os.listdir(nwb_dir_temp)
-            nwb = [f for f in files_temp if f.endswith('.nwb')]
-            nwb_dir = os.path.join(nwb_dir_temp, nwb[0])
-        else:
-            nwb_dir = None
-    else:
-        recordings = os.listdir(nwb_dir_temp)
-        if len(recordings) == 1:
-            nwb_dir = os.path.join(nwb_dir_temp, recordings[0])
-            if not os.path.exists(nwb_dir):
-                nwb_dir = os.path.join(sorted_dir, recordings[0])
-        else:
-            nwb_dir = None
-            print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
-        
-    beh_nwb_dir = os.path.join('/root/capsule/data/all_behavior', raw_id+'.nwb')
+        nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
 
-    postprocessed_dir = os.path.join(sorted_dir, 'postprocessed')
-    curated_dir = os.path.join(sorted_dir, 'curated')
+    recordings = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
+    if len(recordings) == 1:
+        nwb_dir = os.path.join(nwb_dir_temp, recordings[0])
+        if not os.path.exists(nwb_dir):
+            nwb_dir = os.path.join(sorted_dir, recordings[0])
+    else:
+        nwb_dir = None
+        print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+    
+    beh_nwb_dir = os.path.join('/root/capsule/data/all_behavior', raw_id+'.nwb')
+    # postprocessed dirs
+    if os.path.exists(sorted_dir):
+        postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
+    else:
+        postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
+    postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
+    postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
+    postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+    
+    # curated dirs
+    curated_dir_temp = os.path.join(sorted_dir, 'curated')
+    if not os.path.exists(curated_dir_temp):
+        curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
+    curated_sub_folders = os.listdir(curated_dir_temp)
+    curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])
     models_dir = os.path.join(data_dir, session_id+'_model_stan')
 
     # model dir
@@ -74,12 +101,24 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         model_file = None
         session_curation_file = os.path.join(models_dir, raw_id+'_session_data.csv')
     
+    # opto dirs
+    opto_csv_dir = os.path.join(raw_dir, 'ecephys_clipped')
+
+    if not os.path.exists(opto_csv_dir):
+        opto_csv_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
+
+    if os.path.exists(opto_csv_dir):
+        temp_files = os.listdir(opto_csv_dir)
+        opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
+
     # processed dirs
     processed_dir = os.path.join(scratch_dir, session_id)
     alignment_dir = os.path.join(processed_dir, 'alignment')
     beh_fig_dir = os.path.join(processed_dir, 'behavior')
     ephys_fig_dir = os.path.join(processed_dir, 'ephys')
     opto_fig_dir = os.path.join(processed_dir, 'opto')
+    opto_tag_dir = os.path.join(processed_dir, 'opto_tag')
+    opto_tag_fig_dir = os.path.join(opto_tag_dir, 'figures')
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
@@ -91,6 +130,8 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'beh_fig_dir': beh_fig_dir,
                 'ephys_fig_dir': ephys_fig_dir,
                 'opto_fig_dir': opto_fig_dir,
+                'opto_tag_dir': opto_tag_dir,
+                'opto_tag_fig_dir': opto_tag_fig_dir,
                 'nwb_dir': nwb_dir,
                 'postprocessed_dir': postprocessed_dir,
                 'curated_dir': curated_dir,
@@ -100,7 +141,8 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'session_curation_file': session_curation_file,
                 'beh_nwb_dir': beh_nwb_dir,
                 'sorted_dir': sorted_dir,
-                'sorted_raw_dir': sorted_raw_dir}
+                'sorted_raw_dir': sorted_raw_dir,
+                'opto_csvs': opto_csvs,}
 
     # make directories
     makedirs(dir_dict)
