@@ -575,35 +575,58 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     sorted_raw_dir = os.path.join(data_dir, session_id+'_sorted')
     nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
     # if final version os nwb does not exist, try the raw version
+    nwb_dir = None
     if not os.path.exists(nwb_dir_temp):
         nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
-
-    nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
-    if len(nwbs) == 1:
-        nwb_dir = os.path.join(nwb_dir_temp, nwbs[0])
-        if not os.path.exists(nwb_dir):
-            nwb_dir = os.path.join(sorted_dir, nwbs[0])
-    else:
-        nwb_dir = None
-        print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+    if os.path.exists(nwb_dir_temp):
+        nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
+        if len(nwbs) == 1:
+            nwb_dir = os.path.join(nwb_dir_temp, nwbs[0])
+            if not os.path.exists(nwb_dir):
+                nwb_dir = os.path.join(sorted_dir, nwbs[0])
+        elif len(nwbs)>1:
+            nwb_dir = None
+            print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+        else:
+            nwb_dir = None
+            print('There is no nwb file in the nwb directory.')
+        
     
     beh_nwb_dir = os.path.join('/root/capsule/data/all_behavior', raw_id+'.nwb')
     # postprocessed dirs
     if os.path.exists(sorted_dir):
         postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
-    else:
+        postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
+        postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
+        postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+    elif os.path.exists(sorted_raw_dir):
         postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
-    postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
-    postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
-    postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+        if os.path.exists(postprocessed_dir_temp):
+            postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
+            postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
+            postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+        else:
+            postprocessed_dir = None
+            postprocessed_sub_folder = None
+    else:
+        postprocessed_dir_temp = None
+        postprocessed_sub_folder = None
+        postprocessed_dir = None
+
     
     # curated dirs
-    curated_dir_temp = os.path.join(sorted_dir, 'curated')
-    if not os.path.exists(curated_dir_temp):
+    curated_dir = None
+    
+    if os.path.exists(sorted_dir):
+        curated_dir_temp = os.path.join(sorted_dir, 'curated')
+        if os.path.exists(curated_dir_temp):
+            curated_sub_folders = os.listdir(curated_dir_temp)
+            curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])    
+    elif os.path.exists(sorted_raw_dir):
         curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
-    curated_sub_folders = os.listdir(curated_dir_temp)
-    curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])
-    models_dir = os.path.join(data_dir, session_id+'_model_stan')
+        if os.path.exists(curated_dir_temp):
+            curated_sub_folders = os.listdir(curated_dir_temp)
+            curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])
 
     # model dir
     
@@ -803,4 +826,3 @@ def plot_session_in_time_all(nwb, bin_size = 10):
     ax.set_frame_on(False)
     plt.tight_layout()
     return fig
-plot_session_in_time_all(nwb)
