@@ -9,6 +9,7 @@ from aind_dynamic_foraging_basic_analysis.lick_analysis import load_nwb
 from scipy.stats import norm
 from datetime import datetime
 import ast
+from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 
 def parseSessionID(file_name):
     if len(re.split('[_.]', file_name)[0]) == 6 & re.split('[_.]', file_name)[0].isdigit():
@@ -210,3 +211,34 @@ def makeSessionDF(nwb, cut = [0, np.nan]):
         'outcome_time': outcome_time.values,
         })
     return trialData
+
+def plot_session_in_time_all(nwb, bin_size = 10):
+    fig = plt.Figure(figsize = (12, 6))
+    gs = GridSpec(3, 1, figure = fig, height_ratios=[6,1,1], hspace = 0.5)
+    choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(nwb)
+    ax_choice_reward = fig.add_subplot(gs[0,0])
+    plot_foraging_session(  # noqa: C901
+                            choice_history,
+                            reward_history,
+                            p_reward = p_reward,
+                            autowater_offered = autowater_offered,
+                            trial_time = trial_time,
+                            ax = ax_choice_reward,
+                        )
+    # plot licks
+    data = load_data(nwb)    
+    ax = fig.add_subplot(gs[1])
+    bins = np.arange(np.min(data['all_licks']-data['tbl_trials']['goCue_start_time'][0]), np.max(data['all_licks']-data['tbl_trials']['goCue_start_time'][0]), bin_size)  
+    ax.hist(data['left_licks']-data['tbl_trials']['goCue_start_time'][0], bins = bins, color = 'blue', alpha = 0.5, label = 'left licks', density = True)
+    ax.set_xlim(0, -data['tbl_trials']['goCue_start_time'][0]+data['tbl_trials']['goCue_start_time'].values[-1])
+    ax.legend(loc = 'upper right')
+    ax.set_frame_on(False)
+    ax = fig.add_subplot(gs[2])
+    ax.hist(data['right_licks']-data['tbl_trials']['goCue_start_time'][0], bins = bins, color = 'red', alpha = 0.5, label = 'right licks', density = True)
+    ax.set_xlim(0, -data['tbl_trials']['goCue_start_time'][0]+data['tbl_trials']['goCue_start_time'].values[-1])
+    ax.legend(loc = 'upper right')
+    ax.set_xlabel('Time in session (s)')
+    ax.set_frame_on(False)
+    plt.tight_layout()
+    return fig
+plot_session_in_time_all(nwb)
