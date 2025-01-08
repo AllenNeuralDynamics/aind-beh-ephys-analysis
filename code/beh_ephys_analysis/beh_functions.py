@@ -11,7 +11,7 @@ import ast
 
 from uuid import uuid4
 import json
-import datetime
+from datetime import datetime
 import logging
 from dateutil.tz import tzlocal
 
