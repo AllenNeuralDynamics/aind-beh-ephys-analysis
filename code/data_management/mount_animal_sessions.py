@@ -10,19 +10,18 @@ client = CodeOcean(domain="https://codeocean.allenneuraldynamics.org", token=os.
 script_dir = os.path.dirname(os.path.abspath(__file__))
 datalist_dir = os.path.join(script_dir, 'session_assets.csv')
 data_df = pd.read_csv(datalist_dir)
-
 # %%
-col_to_attach = ['raw_data', 'sorted']
+ani_id = '751004'
+col_to_attach = ['raw_data', 'sorted', 'processed']
 
 # %%
 # Lists of strings for id and mount
 all_ids = []
 all_mounts = []
-
 for curr_col in col_to_attach:
     session_ids = list(list(data_df[data_df[curr_col].notna()]['session_id'].values))
     curr_ids = list(data_df[data_df[curr_col].notna()][curr_col].values)
-    curr_mount = [session_curr + '_' + curr_col for session_curr in session_ids]
+    curr_mount = [f"{session_curr}_{curr_col}" for session_curr in session_ids if ani_id in session_curr]
     all_ids.extend(curr_ids)
     all_mounts.extend(curr_mount)
 #%%
