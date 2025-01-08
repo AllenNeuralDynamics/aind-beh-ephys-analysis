@@ -573,14 +573,15 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     sorted_dir = os.path.join(data_dir, session_id+'_sorted_curated')
     sorted_raw_dir = os.path.join(data_dir, session_id+'_sorted')
     nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
+    # if final version os nwb does not exist, try the raw version
     if not os.path.exists(nwb_dir_temp):
         nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
 
-    recordings = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
-    if len(recordings) == 1:
-        nwb_dir = os.path.join(nwb_dir_temp, recordings[0])
+    nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
+    if len(nwbs) == 1:
+        nwb_dir = os.path.join(nwb_dir_temp, nwbs[0])
         if not os.path.exists(nwb_dir):
-            nwb_dir = os.path.join(sorted_dir, recordings[0])
+            nwb_dir = os.path.join(sorted_dir, nwbs[0])
     else:
         nwb_dir = None
         print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
@@ -625,7 +626,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
 
     # processed dirs
-    processed_dir = os.path.join(scratch_dir, session_id)
+    processed_dir = os.path.join(scratch_dir, aniID, session_id)
     alignment_dir = os.path.join(processed_dir, 'alignment')
     beh_fig_dir = os.path.join(processed_dir, 'behavior')
     ephys_fig_dir = os.path.join(processed_dir, 'ephys')
