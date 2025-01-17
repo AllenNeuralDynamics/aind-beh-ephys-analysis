@@ -572,20 +572,27 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         session_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
     sorted_dir = os.path.join(data_dir, session_id+'_sorted_curated')
     sorted_raw_dir = os.path.join(data_dir, session_id+'_sorted')
-    nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
-    # if final version os nwb does not exist, try the raw version
-    if not os.path.exists(nwb_dir_temp):
-        nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
-
-    nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
-    if len(nwbs) == 1:
-        nwb_dir = os.path.join(nwb_dir_temp, nwbs[0])
-        if not os.path.exists(nwb_dir):
-            nwb_dir = os.path.join(sorted_dir, nwbs[0])
+    if os.path.exists(sorted_dir):
+        nwb_dir_temp = [path for path in os.listdir(sorted_dir) if path.endswith('.nwb')]
+        if len(nwb_dir_temp) == 1:
+            nwb_dir_temp = nwb_dir_temp[0]
+        elif len(nwb_dir_temp) == 0:
+            nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
     else:
-        nwb_dir = None
-        print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
-    
+        nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
+    # if final version os nwb does not exist, try the raw version
+    if session_id in os.path.basename(nwb_dir_temp):
+        nwb_dir = nwb_dir_temp
+    else: 
+        nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
+        if len(nwbs) == 1:
+            nwb_dir = os.path.join(nwb_dir_temp, nwbs[0])
+            if not os.path.exists(nwb_dir):
+                nwb_dir = os.path.join(sorted_dir, nwbs[0])
+        else:
+            nwb_dir = None
+            print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+        
     beh_nwb_dir = os.path.join('/root/capsule/data/all_behavior', raw_id+'.nwb')
     # postprocessed dirs
     if os.path.exists(sorted_dir):
