@@ -5,8 +5,7 @@ client = CodeOcean(domain="https://codeocean.allenneuraldynamics.org", token=os.
 
 # %%
 computations = client.capsules.list_computations(capsule_id=os.getenv("CO_CAPSULE_ID"))
-ids = list(set([data_asset.id for computation in computations for data_asset in computation.data_assets]))
-
+ids = list({data_asset.id for computation in computations if computation and computation.data_assets for data_asset in computation.data_assets})
 # %%
 results_rm = client.capsules.detach_data_assets(
     capsule_id=os.getenv("CO_CAPSULE_ID"),
@@ -15,3 +14,5 @@ results_rm = client.capsules.detach_data_assets(
 print(f'Removed all {len(ids)} data assets.')
 
 
+
+# %%

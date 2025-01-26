@@ -19,9 +19,9 @@ col_to_attach = ['raw_data', 'sorted', 'processed']
 all_ids = []
 all_mounts = []
 for curr_col in col_to_attach:
-    session_ids = list(list(data_df[data_df[curr_col].notna()]['session_id'].values))
-    curr_ids = list(data_df[data_df[curr_col].notna()][curr_col].values)
-    curr_mount = [f"{session_curr}_{curr_col}" for session_curr in session_ids if ani_id in session_curr]
+    session_ids = list(list(data_df[(data_df[curr_col].notna()) & (data_df['session_id'].str.contains(ani_id, na=False))]['session_id'].values))
+    curr_ids = list(data_df[(data_df[curr_col].notna()) & (data_df['session_id'].str.contains(ani_id, na=False))][curr_col].values)
+    curr_mount = [f"{session_curr}_{curr_col}" for session_curr in session_ids]
     all_ids.extend(curr_ids)
     all_mounts.extend(curr_mount)
 #%%

@@ -8,6 +8,8 @@ import os
 # from aind_dynamic_foraging_basic_analysis.lick_analysis import load_nwb
 from scipy.stats import norm
 import ast
+from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
+from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_data
 
 from uuid import uuid4
 import json
@@ -18,6 +20,12 @@ from dateutil.tz import tzlocal
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
 from pynwb.file import Subject
 from scipy.io import loadmat
+
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+
+from scipy.stats import norm
+import statsmodels.api as sm
 
 save_folder=R'/root/capsule/scratch/check_rwd_licks'
 
@@ -129,7 +137,7 @@ def bonsai_to_nwb(fname, save_file):
         experiment_description="",  # optional
         related_publications="",  # optional
         notes=obj.ShowNotes,
-        protocol=obj.Task    
+        protocol=obj.Task
     )
 
     #######  Animal information #######
@@ -209,7 +217,7 @@ def bonsai_to_nwb(fname, save_file):
     nwbfile.add_trial_column(name='rewarded_historyR', description=f'The reward history of right lick port')
     nwbfile.add_trial_column(name='delay_start_time', description=f'The delay start time')
     nwbfile.add_trial_column(name='goCue_start_time', description=f'The go cue start time')
-    nwbfile.add_trial_column(name='reward_outcome_time', description=f'The reward outcome time (reward/no reward/no response)')
+    nwbfile.add_trial_column(name='reward_outcome_time', description=f'The reward outcome time (reward/no reward/no response) Note: This is in fact time when choice is registered.')
     ## training paramters ##
     # behavior structure
     nwbfile.add_trial_column(name='bait_left', description=f'Whether the current left lickport has a bait or not')
@@ -240,6 +248,8 @@ def bonsai_to_nwb(fname, save_file):
     nwbfile.add_trial_column(name='response_duration', description=f'The maximum time that the animal must make a choce in order to get a reward')
     # reward consumption duration
     nwbfile.add_trial_column(name='reward_consumption_duration', description=f'The duration for the animal to consume the reward')
+    # reward delay
+    nwbfile.add_trial_column(name='reward_delay', description=f'The delay between choice and reward delivery')
     # auto water
     nwbfile.add_trial_column(name='auto_waterL', description=f'Autowater given at Left')
     nwbfile.add_trial_column(name='auto_waterR', description=f'Autowater given at Right')
@@ -265,6 +275,7 @@ def bonsai_to_nwb(fname, save_file):
     nwbfile.add_trial_column(name='fraction_of_session', description=f'Turn on/off opto in a fraction of the session (related to session_wide_control)')
     nwbfile.add_trial_column(name='session_start_with', description=f'The session start with opto on or off (related to session_wide_control)')
     nwbfile.add_trial_column(name='session_alternation', description=f'Turn on/off opto in every other session (related to session_wide_control)')
+    nwbfile.add_trial_column(name='minimum_opto_interval', description=f'Minimum interval between two optogenetics trials (number of trials)')
 
     # auto training parameters
     nwbfile.add_trial_column(name='auto_train_engaged', description=f'Whether the auto training is engaged')
@@ -276,9 +287,18 @@ def bonsai_to_nwb(fname, save_file):
     
     # add lickspout position
     nwbfile.add_trial_column(name='lickspout_position_x', description=f'x position (um) of the lickspout position (left-right)')
-    nwbfile.add_trial_column(name='lickspout_position_y', description=f'y position (um) of the lickspout position (forward-backward)')
     nwbfile.add_trial_column(name='lickspout_position_z', description=f'z position (um) of the lickspout position (up-down)')
 
+    # determine lickspout keys based on stage position keys
+    stage_positions = getattr(obj, 'B_StagePositions', [{}])
+    if list(stage_positions[0].keys()) == ['x', 'y1', 'y2', 'z']:   # aind stage
+        nwbfile.add_trial_column(name='lickspout_position_y1',
+                                 description=f'y position (um) of the left lickspout position (forward-backward)')
+        nwbfile.add_trial_column(name='lickspout_position_y2',
+                                 description=f'y position (um) of the right lickspout position (forward-backward)')
+    else:
+        nwbfile.add_trial_column(name='lickspout_position_y',
+                                 description=f'y position (um) of the lickspout position (forward-backward)')
     # add reward size
     nwbfile.add_trial_column(name='reward_size_left', description=f'Left reward size (uL)')
     nwbfile.add_trial_column(name='reward_size_right', description=f'Right reward size (uL)')
@@ -312,11 +332,12 @@ def bonsai_to_nwb(fname, save_file):
             LaserPulseDurC = np.nan
 
         else:
-            if getattr(obj, f'TP_Laser_{Sc}')[i] == 'Blue':
+            laser_color=_get_field(obj, field_list=[f'TP_Laser_{Sc}',f'TP_LaserColor_{Sc}'],index=i)
+            if laser_color == 'Blue':
                 LaserWavelengthC = float(473)
-            elif getattr(obj, f'TP_Laser_{Sc}')[i] == 'Red':
+            elif laser_color == 'Red':
                 LaserWavelengthC = float(647)
-            elif getattr(obj, f'TP_Laser_{Sc}')[i] == 'Green':
+            elif laser_color == 'Green':
                 LaserWavelengthC = float(547)
             LaserLocationC = str(getattr(obj, f'TP_Location_{Sc}')[i])
             Laser1Power=float(eval(_get_field(obj, field_list=[f'TP_Laser1_power_{Sc}',f'TP_LaserPowerLeft_{Sc}'],index=i,default='[np.nan,np.nan]'))[1])
@@ -333,7 +354,7 @@ def bonsai_to_nwb(fname, save_file):
             LaserFrequencyC = float(getattr(obj, f'TP_Frequency_{Sc}')[i])
             LaserRampingDownC = float(getattr(obj, f'TP_RD_{Sc}')[i])
             LaserPulseDurC = float(getattr(obj, f'TP_PulseDur_{Sc}')[i])
-        
+         
         if Harp == '':
             goCue_start_time_t = getattr(obj, f'B_GoCueTime')[i]  # Use CPU time
         else:
@@ -341,80 +362,100 @@ def bonsai_to_nwb(fname, save_file):
                 goCue_start_time_t = getattr(obj, f'B_GoCueTimeHarp')[i]  # Use Harp time, old format
             else:
                 goCue_start_time_t = getattr(obj, f'B_GoCueTimeSoundCard')[i]  # Use Harp time, new format
-            
-        nwbfile.add_trial(start_time=getattr(obj, f'B_TrialStartTime{Harp}')[i], 
-                        stop_time=getattr(obj, f'B_TrialEndTime{Harp}')[i],
-                        animal_response=obj.B_AnimalResponseHistory[i],
-                        rewarded_historyL=obj.B_RewardedHistory[0][i],
-                        rewarded_historyR=obj.B_RewardedHistory[1][i],
-                        reward_outcome_time=obj.B_RewardOutcomeTime[i],
-                        delay_start_time=getattr(obj, f'B_DelayStartTime{Harp}')[i],
-                        goCue_start_time=goCue_start_time_t,
-                        bait_left=obj.B_BaitHistory[0][i],
-                        bait_right=obj.B_BaitHistory[1][i],
-                        base_reward_probability_sum=float(obj.TP_BaseRewardSum[i]),
-                        reward_probabilityL=float(obj.B_RewardProHistory[0][i]),
-                        reward_probabilityR=float(obj.B_RewardProHistory[1][i]),
-                        reward_random_number_left=_get_field(obj, 'B_CurrentRewardProbRandomNumber', index=i, default=[np.nan] * 2)[0],
-                        reward_random_number_right=_get_field(obj, 'B_CurrentRewardProbRandomNumber', index=i, default=[np.nan] * 2)[1],
-                        left_valve_open_time=float(obj.TP_LeftValue[i]),
-                        right_valve_open_time=float(obj.TP_RightValue[i]),
-                        block_beta=float(obj.TP_BlockBeta[i]),
-                        block_min=float(obj.TP_BlockMin[i]),
-                        block_max=float(obj.TP_BlockMax[i]),
-                        min_reward_each_block=float(obj.TP_BlockMinReward[i]),
-                        delay_beta=float(obj.TP_DelayBeta[i]),
-                        delay_min=float(obj.TP_DelayMin[i]),
-                        delay_max=float(obj.TP_DelayMax[i]),
-                        delay_duration=obj.B_DelayHistory[i],
-                        ITI_beta=float(obj.TP_ITIBeta[i]),
-                        ITI_min=float(obj.TP_ITIMin[i]),
-                        ITI_max=float(obj.TP_ITIMax[i]),
-                        ITI_duration=obj.B_ITIHistory[i],
-                        response_duration=float(obj.TP_ResponseTime[i]),
-                        reward_consumption_duration=float(obj.TP_RewardConsumeTime[i]),
-                        auto_waterL=obj.B_AutoWaterTrial[0][i] if type(obj.B_AutoWaterTrial[0]) is list else obj.B_AutoWaterTrial[i],   # Back-compatible with old autowater format
-                        auto_waterR=obj.B_AutoWaterTrial[1][i] if type(obj.B_AutoWaterTrial[0]) is list else obj.B_AutoWaterTrial[i],
-                        # optogenetics
-                        laser_on_trial=obj.B_LaserOnTrial[i],
-                        laser_wavelength=LaserWavelengthC,
-                        laser_location=LaserLocationC,
-                        laser_1_power=Laser1Power,
-                        laser_2_power=Laser2Power,
-                        laser_on_probability=LaserOnProbablityC,
-                        laser_duration=LaserDurationC,
-                        laser_condition=LaserConditionC,
-                        laser_condition_probability=LaserConditionProC,
-                        laser_start=LaserStartC,
-                        laser_start_offset=LaserStartOffsetC,
-                        laser_end=LaserEndC,
-                        laser_end_offset=LaserEndOffsetC,
-                        laser_protocol=LaserProtocolC,
-                        laser_frequency=LaserFrequencyC,
-                        laser_rampingdown=LaserRampingDownC,
-                        laser_pulse_duration=LaserPulseDurC,
-                        
-                        session_wide_control=_get_field(obj, 'TP_SessionWideControl', index=i, default='None'),
-                        fraction_of_session=float(_get_field(obj, 'TP_FractionOfSession', index=i, default=np.nan)),
-                        session_start_with=_get_field(obj, 'TP_SessionStartWith', index=i, default='None'),
-                        session_alternation=_get_field(obj, 'TP_SessionAlternating', index=i, default='None'),
-                        # add all auto training parameters (eventually should be in session.json)
-                        auto_train_engaged=_get_field(obj, 'TP_auto_train_engaged', index=i,default='None'),
-                        auto_train_curriculum_name=_get_field(obj, 'TP_auto_train_curriculum_name', index=i, default='None'),
-                        auto_train_curriculum_version=_get_field(obj, 'TP_auto_train_curriculum_version', index=i, default='None'),
-                        auto_train_curriculum_schema_version=_get_field(obj, 'TP_auto_train_curriculum_schema_version', index=i, default='None'),
-                        auto_train_stage=_get_field(obj, 'TP_auto_train_stage', index=i, default='None'),
-                        auto_train_stage_overridden=_get_field(obj, 'TP_auto_train_stage_overridden', index=i, default=np.nan),
 
-                        # lickspout position
-                        lickspout_position_x=_get_field(obj, 'B_NewscalePositions', index=i, default=[np.nan] * 3)[0],
-                        lickspout_position_y=_get_field(obj, 'B_NewscalePositions', index=i, default=[np.nan] * 3)[1],
-                        lickspout_position_z=_get_field(obj, 'B_NewscalePositions', index=i, default=[np.nan] * 3)[2],
-                        
-                        # reward size
-                        reward_size_left=float(_get_field(obj, 'TP_LeftValue_volume', index=i)),
-                        reward_size_right=float(_get_field(obj, 'TP_RightValue_volume', index=i)),
-                        )
+        trial_kwargs = {
+        'start_time' : getattr(obj, f'B_TrialStartTime{Harp}')[i],
+        'stop_time' : getattr(obj, f'B_TrialEndTime{Harp}')[i],
+        'animal_response' : obj.B_AnimalResponseHistory[i],
+        'rewarded_historyL' : obj.B_RewardedHistory[0][i],
+        'rewarded_historyR' : obj.B_RewardedHistory[1][i],
+        'reward_outcome_time' : obj.B_RewardOutcomeTime[i],
+        'delay_start_time' : _get_field(obj, f'B_DelayStartTime{Harp}', index=i, default=np.nan),
+        'goCue_start_time' : goCue_start_time_t,
+        'bait_left' : obj.B_BaitHistory[0][i],
+        'bait_right' : obj.B_BaitHistory[1][i],
+        'base_reward_probability_sum' : float(obj.TP_BaseRewardSum[i]),
+        'reward_probabilityL' : float(obj.B_RewardProHistory[0][i]),
+        'reward_probabilityR' : float(obj.B_RewardProHistory[1][i]),
+        'reward_random_number_left' : _get_field(obj, 'B_CurrentRewardProbRandomNumber', index=i, default=[np.nan] * 2)[
+                                        0],
+        'reward_random_number_right' : _get_field(obj, 'B_CurrentRewardProbRandomNumber', index=i, default=[np.nan] * 2)[
+                                         1],
+        'left_valve_open_time' : float(obj.TP_LeftValue[i]),
+        'right_valve_open_time' : float(obj.TP_RightValue[i]),
+        'block_beta' : float(obj.TP_BlockBeta[i]),
+        'block_min' : float(obj.TP_BlockMin[i]),
+        'block_max' : float(obj.TP_BlockMax[i]),
+        'min_reward_each_block' : float(obj.TP_BlockMinReward[i]),
+        'delay_beta' : float(obj.TP_DelayBeta[i]),
+        'delay_min' : float(obj.TP_DelayMin[i]),
+        'delay_max' : float(obj.TP_DelayMax[i]),
+        'delay_duration' : obj.B_DelayHistory[i],
+        'ITI_beta' : float(obj.TP_ITIBeta[i]),
+        'ITI_min' : float(obj.TP_ITIMin[i]),
+        'ITI_max' : float(obj.TP_ITIMax[i]),
+        'ITI_duration' : obj.B_ITIHistory[i],
+        'response_duration' : float(obj.TP_ResponseTime[i]),
+        'reward_consumption_duration' : float(obj.TP_RewardConsumeTime[i]),
+        'reward_delay' : float(_get_field(obj, 'TP_RewardDelay', index=i, default=0)),
+        'auto_waterL' : obj.B_AutoWaterTrial[0][i] if type(obj.B_AutoWaterTrial[0]) is list else obj.B_AutoWaterTrial[
+            i],  # Back-compatible with old autowater format
+        'auto_waterR' : obj.B_AutoWaterTrial[1][i] if type(obj.B_AutoWaterTrial[0]) is list else obj.B_AutoWaterTrial[i],
+        # optogenetics
+        'laser_on_trial' : obj.B_LaserOnTrial[i],
+        'laser_wavelength' : LaserWavelengthC,
+        'laser_location' : LaserLocationC,
+        'laser_1_power' : Laser1Power,
+        'laser_2_power' : Laser2Power,
+        'laser_on_probability' : LaserOnProbablityC,
+        'laser_duration' : LaserDurationC,
+        'laser_condition' : LaserConditionC,
+        'laser_condition_probability' : LaserConditionProC,
+        'laser_start' : LaserStartC,
+        'laser_start_offset' : LaserStartOffsetC,
+        'laser_end' : LaserEndC,
+        'laser_end_offset' : LaserEndOffsetC,
+        'laser_protocol' : LaserProtocolC,
+        'laser_frequency' : LaserFrequencyC,
+        'laser_rampingdown' : LaserRampingDownC,
+        'laser_pulse_duration' : LaserPulseDurC,
+
+        'session_wide_control' : _get_field(obj, 'TP_SessionWideControl', index=i, default='None'),
+        'fraction_of_session' : float(_get_field(obj, 'TP_FractionOfSession', index=i, default=np.nan)),
+        'session_start_with' : _get_field(obj, 'TP_SessionStartWith', index=i, default='None'),
+        'session_alternation' : _get_field(obj, 'TP_SessionAlternating', index=i, default='None'),
+        'minimum_opto_interval' : float(_get_field(obj, 'TP_MinOptoInterval', index=i, default=0)),
+
+        # add all auto training parameters (eventually should be in session.json)
+        'auto_train_engaged' : _get_field(obj, 'TP_auto_train_engaged', index=i, default='None'),
+        'auto_train_curriculum_name' : _get_field(obj, 'TP_auto_train_curriculum_name', index=i, default='None'),
+        'auto_train_curriculum_version' : _get_field(obj, 'TP_auto_train_curriculum_version', index=i, default='None'),
+        'auto_train_curriculum_schema_version' : _get_field(obj, 'TP_auto_train_curriculum_schema_version', index=i,
+                                                          default='None'),
+        'auto_train_stage' : _get_field(obj, 'TP_auto_train_stage', index=i, default='None'),
+        'auto_train_stage_overridden' : _get_field(obj, 'TP_auto_train_stage_overridden', index=i, default=np.nan),
+
+        # reward size
+        'reward_size_left' : float(_get_field(obj, 'TP_LeftValue_volume', index=i)),
+        'reward_size_right' : float(_get_field(obj, 'TP_RightValue_volume', index=i))
+        }
+
+        # populate lick spouts with correct format depending if using newscale or aind stage
+        stage_positions = getattr(obj, 'B_StagePositions', [])  # If obj doesn't have attr, skip if since i !< len([])
+        if i < len(stage_positions):    # index is valid for stage position lengths
+            trial_kwargs['lickspout_position_x'] = stage_positions[i].get('x', np.nan)  # nan default if keys are wrong
+            trial_kwargs['lickspout_position_z'] = stage_positions[i].get('z', np.nan)  # nan default if keys are wrong
+            if list(stage_positions[i].keys()) == ['x', 'y1', 'y2', 'z']:    # aind stage
+                trial_kwargs['lickspout_position_y1'] = stage_positions[i]['y1']
+                trial_kwargs['lickspout_position_y2'] = stage_positions[i]['y2']
+            else:       # newscale stage
+                trial_kwargs['lickspout_position_y'] = stage_positions[i].get('y', np.nan) # nan default if keys are wrong
+        else:   # if i not valid index, populate values with nan for x, y, z
+            trial_kwargs['lickspout_position_x'] = np.nan
+            trial_kwargs['lickspout_position_y'] = np.nan
+            trial_kwargs['lickspout_position_z'] = np.nan
+
+        nwbfile.add_trial(**trial_kwargs)
 
 
     #######  Other time series  #######
@@ -508,7 +549,6 @@ def bonsai_to_nwb(fname, save_file):
         description='Optogenetics start time (from Harp)'
     )
     nwbfile.add_acquisition(OptogeneticsTimeHarp)
-
     # save NWB file
     base_filename = os.path.splitext(os.path.basename(fname))[0] + '.nwb'
     if len(nwbfile.trials) > 0:
@@ -581,35 +621,58 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     else:
         nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
     # if final version os nwb does not exist, try the raw version
-    if session_id in os.path.basename(nwb_dir_temp):
-        nwb_dir = nwb_dir_temp
-    else: 
+    nwb_dir = None
+    if not os.path.exists(nwb_dir_temp):
+        nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
+    if os.path.exists(nwb_dir_temp):
         nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
         if len(nwbs) == 1:
             nwb_dir = os.path.join(nwb_dir_temp, nwbs[0])
             if not os.path.exists(nwb_dir):
                 nwb_dir = os.path.join(sorted_dir, nwbs[0])
-        else:
+        elif len(nwbs)>1:
             nwb_dir = None
             print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+        else:
+            nwb_dir = None
+            print('There is no nwb file in the nwb directory.')
         
+    
     beh_nwb_dir = os.path.join('/root/capsule/data/all_behavior', raw_id+'.nwb')
     # postprocessed dirs
     if os.path.exists(sorted_dir):
         postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
-    else:
+        postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
+        postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
+        postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+    elif os.path.exists(sorted_raw_dir):
         postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
-    postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
-    postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
-    postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+        if os.path.exists(postprocessed_dir_temp):
+            postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
+            postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
+            postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+        else:
+            postprocessed_dir = None
+            postprocessed_sub_folder = None
+    else:
+        postprocessed_dir_temp = None
+        postprocessed_sub_folder = None
+        postprocessed_dir = None
+
     
     # curated dirs
-    curated_dir_temp = os.path.join(sorted_dir, 'curated')
-    if not os.path.exists(curated_dir_temp):
+    curated_dir = None
+    
+    if os.path.exists(sorted_dir):
+        curated_dir_temp = os.path.join(sorted_dir, 'curated')
+        if os.path.exists(curated_dir_temp):
+            curated_sub_folders = os.listdir(curated_dir_temp)
+            curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])    
+    elif os.path.exists(sorted_raw_dir):
         curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
-    curated_sub_folders = os.listdir(curated_dir_temp)
-    curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])
-    models_dir = os.path.join(data_dir, session_id+'_model_stan')
+        if os.path.exists(curated_dir_temp):
+            curated_sub_folders = os.listdir(curated_dir_temp)
+            curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])
 
     # model dir
     
@@ -620,11 +683,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     else:
         model_dir = None
         model_file = None
-        session_curation_file = os.path.join(models_dir, raw_id+'_session_data.csv')
+        session_curation_file = None
     
     # opto dirs
     opto_csv_dir = os.path.join(raw_dir, 'ecephys_clipped')
-
+    opto_csvs = None
     if not os.path.exists(opto_csv_dir):
         opto_csv_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
 
@@ -656,7 +719,6 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'nwb_dir': nwb_dir,
                 'postprocessed_dir': postprocessed_dir,
                 'curated_dir': curated_dir,
-                'models_dir': models_dir,
                 'model_dir': model_dir,
                 'model_file': model_file,
                 'session_curation_file': session_curation_file,
@@ -728,7 +790,7 @@ def delete_files_without_name(folder_path, name):
 
 def makeSessionDF(nwb, cut = [0, np.nan]):
     tblTrials = nwb.trials.to_dataframe()
-    if cut[1] == np.nan:
+    if np.isnan(cut[1]):
         tblTrials = tblTrials.iloc[cut[0]:].copy()
     else:
         tblTrials = tblTrials.iloc[cut[0]:cut[1]].copy()
@@ -775,8 +837,150 @@ def makeSessionDF(nwb, cut = [0, np.nan]):
         'laser_prev': laserPrev,
         'choices_prev': choicesPrev,
         'go_cue_time': go_cue_time.values,
-        'choice_time': choice_time.values,
+        'choice_time': outcome_time.values,
         'outcome_time': outcome_time.values,
         })
     return trialData
 
+def get_history_from_nwb(nwb, cut = [0, np.nan]):
+    """Get choice and reward history from nwb file"""
+
+    df_trial = nwb.trials.to_dataframe()
+    if np.isnan(cut[1]):
+        df_trial = df_trial.iloc[cut[0]:].copy()
+    else:
+        df_trial = df_trial.iloc[cut[0]:cut[1]].copy()
+
+    autowater_offered = (df_trial.auto_waterL == 1) | (df_trial.auto_waterR == 1)
+    # autowater_offered[df_trial.auto_waterL == 1] = -1
+    choice_history = df_trial.animal_response.map({0: 0, 1: 1, 2: np.nan}).values
+    reward_history = df_trial.rewarded_historyL | df_trial.rewarded_historyR
+    p_reward = [
+        df_trial.reward_probabilityL.values,
+        df_trial.reward_probabilityR.values,
+    ]
+    random_number = [
+        df_trial.reward_random_number_left.values,
+        df_trial.reward_random_number_right.values,
+    ]
+
+    trial_time = df_trial['goCue_start_time'].values - df_trial['goCue_start_time'].values[0]
+    return (
+        choice_history,
+        reward_history,
+        p_reward,
+        autowater_offered,
+        random_number,
+        trial_time,
+    )
+
+def plot_session_in_time_all(nwb, bin_size = 10, in_time = True):
+    fig = plt.Figure(figsize = (12, 6))
+    gs = GridSpec(3, 1, figure = fig, height_ratios=[6,1,1], hspace = 0.5)
+    choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(nwb)
+    ax_choice_reward = fig.add_subplot(gs[0,0])
+    if in_time:
+        plot_foraging_session(  # noqa: C901
+                            choice_history,
+                            reward_history,
+                            p_reward = p_reward,
+                            autowater_offered = autowater_offered,
+                            trial_time = trial_time,
+                            ax = ax_choice_reward,
+                            )           
+    else:
+        plot_foraging_session(  # noqa: C901
+                            choice_history,
+                            reward_history,
+                            p_reward = p_reward,
+                            autowater_offered = autowater_offered,
+                            ax = ax_choice_reward,
+                            )
+    # plot licks
+    data = load_data(nwb)    
+    ax = fig.add_subplot(gs[2])
+    bins = np.arange(np.min(data['all_licks']-data['tbl_trials']['goCue_start_time'][0]), np.max(data['all_licks']-data['tbl_trials']['goCue_start_time'][0]), bin_size)  
+    ax.hist(data['left_licks']-data['tbl_trials']['goCue_start_time'][0], bins = bins, color = 'blue', alpha = 0.5, label = 'left licks', density = True)
+    ax.set_xlim(0, -data['tbl_trials']['goCue_start_time'][0]+data['tbl_trials']['goCue_start_time'].values[-1])
+    ax.legend(loc = 'upper right')
+    ax.set_frame_on(False)
+    ax.set_xlabel('Time in session (s)')
+    ax = fig.add_subplot(gs[1])
+    ax.hist(data['right_licks']-data['tbl_trials']['goCue_start_time'][0], bins = bins, color = 'red', alpha = 0.5, label = 'right licks', density = True)
+    ax.set_xlim(0, -data['tbl_trials']['goCue_start_time'][0]+data['tbl_trials']['goCue_start_time'].values[-1])
+    ax.legend(loc = 'upper right')
+    ax.set_frame_on(False)
+    plt.tight_layout()
+    return fig
+
+def plot_session_glm(nwb, tMax = 10, cut = [0, np.nan]):
+    tbl = makeSessionDF(nwb, cut = cut)
+    allChoices = 2 * (tbl['choice'].values - 0.5)
+    allRewards = allChoices * tbl['outcome'].values
+    allNoRewards = allChoices * (1 - tbl['outcome'].values)
+    allChoice_R = tbl['choice'].values
+
+    # Creating rwdMatx
+    rwdMatx = []
+    for i in range(1, tMax + 1):
+        rwdMatx.append(np.concatenate([np.full(i, np.nan), allRewards[:len(allRewards) - i]]))
+
+    rwdMatx = np.array(rwdMatx)
+
+    # Creating noRwdMatx
+    noRwdMatx = []
+    for i in range(1, tMax + 1):
+        noRwdMatx.append(np.concatenate([np.full(i, np.nan), allNoRewards[:len(allNoRewards) - i]]))
+
+    noRwdMatx = np.array(noRwdMatx)
+
+    # Combining rwdMatx and noRwdMatx
+    X = np.vstack([rwdMatx, noRwdMatx]).T
+
+    # Remove rows with NaN values
+    valid_idx = ~np.isnan(X).any(axis=1)
+    X = X[valid_idx]
+    y = allChoice_R[valid_idx]
+
+    # Adding a constant to the model (intercept)
+    X = sm.add_constant(X)
+
+    # Fitting the GLM model
+    glm_binom = sm.GLM(y, X, family=sm.families.Binomial(link=sm.families.links.Logit()))
+    glm_result = glm_binom.fit()
+
+    # R-squared calculation (pseudo R-squared)
+    rsq = glm_result.pseudo_rsquared(kind="cs")
+
+    # Coefficients and confidence intervals
+    coef_vals = glm_result.params[1:tMax + 1]
+    ci_bands = glm_result.conf_int()[1:tMax + 1]
+    error_l = np.abs(coef_vals - ci_bands[:, 0])
+    error_u = np.abs(coef_vals - ci_bands[:, 1])
+
+    fig = plt.figure(figsize=(8, 6))
+    # Plotting reward coefficients
+    plt.errorbar(np.arange(1, tMax + 1) + 0.2, coef_vals, yerr=[error_l, error_u], fmt='o', color='c', linewidth=2, label='Reward')
+    plt.plot(np.arange(1, tMax + 1) + 0.2, coef_vals, 'c-', linewidth=1)
+
+    # Coefficients and confidence intervals for no reward
+    coef_vals_no_rwd = glm_result.params[tMax + 1:]
+    ci_bands_no_rwd = glm_result.conf_int()[tMax + 1:]
+    error_l_no_rwd = np.abs(coef_vals_no_rwd - ci_bands_no_rwd[:, 0])
+    error_u_no_rwd = np.abs(coef_vals_no_rwd - ci_bands_no_rwd[:, 1])
+
+    # Plotting no reward coefficients
+    plt.errorbar(np.arange(1, tMax + 1) + 0.2, coef_vals_no_rwd, yerr=[error_l_no_rwd, error_u_no_rwd], fmt='o', color='m', linewidth=2, label='No Reward')
+    plt.plot(np.arange(1, tMax + 1) + 0.2, coef_vals_no_rwd, 'm-', linewidth=1)
+
+    # Labels and legend
+    plt.xlabel('Outcome n Trials Back')
+    plt.ylabel('β Coefficient')
+    plt.xlim([0.5, tMax + 0.5])
+    plt.axhline(0, color='k', linestyle='--')
+
+    # Adding R-squared and intercept information in the legend
+    intercept_info = f'R² = {rsq:.2f} | Int: {glm_result.params[0]:.2f}'
+    plt.legend(loc='upper right')
+
+    return fig, nwb.session_id
