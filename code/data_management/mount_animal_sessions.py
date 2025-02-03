@@ -12,7 +12,7 @@ datalist_dir = os.path.join(script_dir, 'session_assets.csv')
 data_df = pd.read_csv(datalist_dir)
 # %%
 ani_id = '751004'
-col_to_attach = ['raw_data', 'sorted', 'processed']
+col_to_attach = ['raw_data', 'sorted', 'processed', 'model_stan']
 
 # %%
 # Lists of strings for id and mount

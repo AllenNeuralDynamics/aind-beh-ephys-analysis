@@ -5,7 +5,7 @@ session = 'behavior_751004_2024-12-20_13-26-11'
 # %%
 import sys
 import os
-sys.path.append('/root/capsule/aind-beh-ephys-analysis/code/beh_ephys_analysis')
+sys.path.append('/root/capsule/code/beh_ephys_analysis')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -63,17 +63,17 @@ else:
     nwb = load_nwb_from_filename(nwb_file)
     fig = plot_session_in_time_all(nwb)
     fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_choice_reward.png'))
-    display(fig)
+    # display(fig)
     
     fig, _ = plot_lick_analysis(nwb)
     fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_lick_analysis.png'))
-    display(fig)
+    # display(fig)
 
     fig, _ = plot_session_glm(nwb, tMax=5)
     fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_glm.png'))
-    display(fig)
+    # display(fig)
 
-    plt.close('all')
+    # plt.close('all')
 
 # %%
 left_licks = nwb.acquisition["left_lick_time"].timestamps[:]

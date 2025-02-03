@@ -704,7 +704,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     beh_fig_dir = os.path.join(processed_dir, 'behavior')
     ephys_dir = os.path.join(processed_dir, 'ephys')
     ephys_dir_raw = os.path.join(processed_dir, 'ephys', 'raw')
+    ephys_processed_dir_raw = os.path.join(ephys_dir_raw, 'processed')
+    ephys_fig_dir_raw = os.path.join(ephys_dir_raw, 'figures')
     ephys_dir_curated = os.path.join(processed_dir, 'ephys', 'curated')
+    ephys_processed_dir_curated = os.path.join(ephys_dir_curated, 'processed')
+    ephys_fig_dir_curated = os.path.join(ephys_dir_curated, 'figures')
     opto_dir = os.path.join(ephys_dir, 'opto')
     opto_dir_raw = os.path.join(opto_dir, 'raw')
     opto_dir_curated = os.path.join(opto_dir, 'curated')
@@ -720,7 +724,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'alignment_dir': alignment_dir,
                 'beh_fig_dir': beh_fig_dir,
                 'ephys_dir_raw': ephys_dir_raw,
+                'ephys_processed_dir_raw': ephys_processed_dir_raw,
+                'ephys_fig_dir_raw': ephys_fig_dir_raw,
                 'ephys_dir_curated': ephys_dir_curated,
+                'ephys_processed_dir_curated': ephys_processed_dir_curated,
+                'ephys_fig_dir_curated': ephys_fig_dir_curated,
                 'opto_dir': opto_dir,
                 'opto_dir_raw': opto_dir_raw,
                 'opto_dir_curated': opto_dir_curated,
@@ -741,7 +749,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'opto_csvs': opto_csvs,}
 
     # make directories
-    # makedirs(dir_dict)
+    makedirs(dir_dict)
 
     return dir_dict
 

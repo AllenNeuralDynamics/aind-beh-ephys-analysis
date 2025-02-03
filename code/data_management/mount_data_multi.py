@@ -10,9 +10,11 @@ client = CodeOcean(domain="https://codeocean.allenneuraldynamics.org", token=os.
 script_dir = os.path.dirname(os.path.abspath(__file__))
 datalist_dir = os.path.join(script_dir, 'session_assets.csv')
 data_df = pd.read_csv(datalist_dir)
+data_df = data_df[data_df['session_id'].notna() & (data_df['session_id'] != "")]
+
 
 # %%
-col_to_attach = ['raw_data', 'sorted_curated', 'model_stan']
+col_to_attach = ['raw_data', 'sorted_curated', 'sorted', 'model_stan']
 
 # %%
 # Lists of strings for id and mount
