@@ -741,7 +741,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'opto_csvs': opto_csvs,}
 
     # make directories
-    makedirs(dir_dict)
+    # makedirs(dir_dict)
 
     return dir_dict
 
