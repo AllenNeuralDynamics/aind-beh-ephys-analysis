@@ -612,67 +612,70 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         session_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
     sorted_dir = os.path.join(data_dir, session_id+'_sorted_curated')
     sorted_raw_dir = os.path.join(data_dir, session_id+'_sorted')
-    if os.path.exists(sorted_dir):
-        nwb_dir_temp = [path for path in os.listdir(sorted_dir) if path.endswith('.nwb')]
-        if len(nwb_dir_temp) == 1:
-            nwb_dir_temp = nwb_dir_temp[0]
-        elif len(nwb_dir_temp) == 0:
-            nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
-    else:
-        nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
-    # if final version os nwb does not exist, try the raw version
-    nwb_dir = None
-    if not os.path.exists(nwb_dir_temp):
-        nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
+    # nwb files
+    nwb_dir_raw = None
+    nwb_dir_curated = None
+    # raw version
+    nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
     if os.path.exists(nwb_dir_temp):
         nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
         if len(nwbs) == 1:
-            nwb_dir = os.path.join(nwb_dir_temp, nwbs[0])
-            if not os.path.exists(nwb_dir):
-                nwb_dir = os.path.join(sorted_dir, nwbs[0])
+            nwb_dir_raw = os.path.join(nwb_dir_temp, nwbs[0])
+        elif len(nwbs)>1:
+            print('There are multiple recordings in the curated nwb directory. Please specify the recording you would like to use.')
+        else:
+            print('There is no nwb file in the curated directory.')
+    # curated version
+    nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
+    if os.path.exists(nwb_dir_temp):
+        nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
+        if len(nwbs) == 1:
+            nwb_dir_curated = os.path.join(nwb_dir_temp, nwbs[0])
         elif len(nwbs)>1:
             nwb_dir = None
-            print('There are multiple recordings in the nwb directory. Please specify the recording you would like to use.')
+            print('There are multiple recordings in the raw nwb directory. Please specify the recording you would like to use.')
         else:
             nwb_dir = None
-            print('There is no nwb file in the nwb directory.')
-        
+            print('There is no nwb file in the raw directory.')
+
+    # pro   
     
-    beh_nwb_dir = os.path.join('/root/capsule/data/all_behavior', raw_id+'.nwb')
+    beh_nwb_dir = None
+
     # postprocessed dirs
+    postprocessed_dir_raw = None
+    postprocessed_dir_curated = None
+
     if os.path.exists(sorted_dir):
         postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
-        postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
-        postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
-        postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
-    elif os.path.exists(sorted_raw_dir):
-        postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
         if os.path.exists(postprocessed_dir_temp):
             postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
             postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
-            postprocessed_dir = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
-        else:
-            postprocessed_dir = None
-            postprocessed_sub_folder = None
-    else:
-        postprocessed_dir_temp = None
-        postprocessed_sub_folder = None
-        postprocessed_dir = None
+            postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+
+    if os.path.exists(sorted_raw_dir):
+        postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
+        if os.path.exists(postprocessed_dir_temp):
+            postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
+            postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
+            postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
 
     
     # curated dirs
-    curated_dir = None
+    curated_dir_raw = None
+    curated_dir_curated = None
     
     if os.path.exists(sorted_dir):
         curated_dir_temp = os.path.join(sorted_dir, 'curated')
         if os.path.exists(curated_dir_temp):
             curated_sub_folders = os.listdir(curated_dir_temp)
-            curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])    
-    elif os.path.exists(sorted_raw_dir):
+            curated_dir_curated = os.path.join(curated_dir_temp, curated_sub_folders[0])    
+    
+    if os.path.exists(sorted_raw_dir):
         curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
         if os.path.exists(curated_dir_temp):
             curated_sub_folders = os.listdir(curated_dir_temp)
-            curated_dir = os.path.join(curated_dir_temp, curated_sub_folders[0])
+            curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
 
     # model dir
     
@@ -699,10 +702,14 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
     alignment_dir = os.path.join(processed_dir, 'alignment')
     beh_fig_dir = os.path.join(processed_dir, 'behavior')
-    ephys_fig_dir = os.path.join(processed_dir, 'ephys')
-    opto_fig_dir = os.path.join(processed_dir, 'opto')
-    opto_tag_dir = os.path.join(processed_dir, 'opto_tag')
-    opto_tag_fig_dir = os.path.join(opto_tag_dir, 'figures')
+    ephys_dir = os.path.join(processed_dir, 'ephys')
+    ephys_dir_raw = os.path.join(processed_dir, 'ephys', 'raw')
+    ephys_dir_curated = os.path.join(processed_dir, 'ephys', 'curated')
+    opto_dir = os.path.join(ephys_dir, 'opto')
+    opto_dir_raw = os.path.join(opto_dir, 'raw')
+    opto_dir_curated = os.path.join(opto_dir, 'curated')
+    opto_dir_fig_raw = os.path.join(opto_dir, 'raw', 'figures')
+    opto_dir_fig_curated = os.path.join(opto_dir, 'curated', 'figures')
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
@@ -712,19 +719,25 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'processed_dir': processed_dir,
                 'alignment_dir': alignment_dir,
                 'beh_fig_dir': beh_fig_dir,
-                'ephys_fig_dir': ephys_fig_dir,
-                'opto_fig_dir': opto_fig_dir,
-                'opto_tag_dir': opto_tag_dir,
-                'opto_tag_fig_dir': opto_tag_fig_dir,
-                'nwb_dir': nwb_dir,
-                'postprocessed_dir': postprocessed_dir,
-                'curated_dir': curated_dir,
+                'ephys_dir_raw': ephys_dir_raw,
+                'ephys_dir_curated': ephys_dir_curated,
+                'opto_dir': opto_dir,
+                'opto_dir_raw': opto_dir_raw,
+                'opto_dir_curated': opto_dir_curated,
+                'opto_dir_fig_raw': opto_dir_fig_raw,
+                'opto_dir_fig_curated': opto_dir_fig_curated,
+                'nwb_dir_raw': nwb_dir_raw,
+                'nwb_dir_curated': nwb_dir_curated,
+                'postprocessed_dir_raw': postprocessed_dir_raw,
+                'postprocessed_dir_curated': postprocessed_dir_curated,
+                'curated_dir_raw': curated_dir_raw,
+                'curated_dir_curated': curated_dir_curated,
                 'model_dir': model_dir,
                 'model_file': model_file,
                 'session_curation_file': session_curation_file,
                 'beh_nwb_dir': beh_nwb_dir,
-                'sorted_dir': sorted_dir,
-                'sorted_raw_dir': sorted_raw_dir,
+                'sorted_dir_curated': sorted_dir,
+                'sorted_dir_curated': sorted_raw_dir,
                 'opto_csvs': opto_csvs,}
 
     # make directories

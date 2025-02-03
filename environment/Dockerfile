@@ -35,13 +35,17 @@ RUN pip install -U --no-cache-dir \
     pypdf2==3.0.1 \
     scipy==1.13.0 \
     seaborn==0.13.2 \
-    spikeinterface[full]==0.100.0 \
+    spikeinterface==0.101.2 \
     statsmodels==0.14.2 \
     wavpack-numcodecs==0.1.5 \
-    zarr==2.18.2 \
+    zarr==2.16.1 \
     harp-python@git+https://github.com/jsiegle/harp-python@decode-clock \
-    aind_dynamic_foraging_basic_analysis==0.2.6 \
-    aind-ephys-rig-qc@git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO
+    aind-ephys-rig-qc@git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO \
+    git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis@plot_session_in_time_sue \
+    aind-dynamic-foraging-data-utils==0.1.4 \
+    codeocean
+    
+RUN pip install -e git+https://github.com/AllenNeuralDynamics/aind_multisession_ephys.git#egg=aind-multisession-ephys
 
 COPY postInstall /
 RUN /postInstall
