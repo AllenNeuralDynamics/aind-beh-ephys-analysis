@@ -1,8 +1,8 @@
 # %% [markdown]
 # ### Check behavior
 # put in session ID to process
-session = 'behavior_751004_2024-12-22_13-09-17'
-ephys_cut = [0, 1200] # pre cut in seconds, post cut in seconds
+session = 'behavior_751004_2024-12-21_13-28-28'
+ephys_cut = [0, 0] # pre cut in seconds, post cut in seconds
 print(session)
 # %%
 import sys

@@ -39,6 +39,7 @@ RUN pip install -U --no-cache-dir \
     statsmodels==0.14.2 \
     wavpack-numcodecs==0.1.5 \
     zarr==2.16.1 \
+    natsort \
     harp-python@git+https://github.com/jsiegle/harp-python@decode-clock \
     aind-ephys-rig-qc@git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO \
     git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis@plot_session_in_time_sue \
