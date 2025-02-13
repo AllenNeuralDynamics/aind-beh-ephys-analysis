@@ -44,7 +44,8 @@ RUN pip install -U --no-cache-dir \
     aind-ephys-rig-qc@git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO \
     git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis@plot_session_in_time_sue \
     aind-dynamic-foraging-data-utils==0.1.4 \
-    codeocean
+    codeocean==0.2.0 \
+    requests==2.32.3
     
 RUN pip install -e git+https://github.com/AllenNeuralDynamics/aind_multisession_ephys.git#egg=aind-multisession-ephys
 

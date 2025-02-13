@@ -22,8 +22,9 @@ all_ids = []
 all_mounts = []
 
 for curr_col in col_to_attach:
-    session_ids = list(list(data_df[data_df[curr_col].notna()]['session_id'].values))
-    curr_ids = list(data_df[data_df[curr_col].notna()][curr_col].values)
+    valid_inds = [True if isinstance(s, str) and 30 < len(s) < 40 else False for s in data_df['sorted_curated'].to_list()]
+    session_ids = list(data_df[valid_inds]['session_id'].values)
+    curr_ids = list(data_df[valid_inds][curr_col].values)
     curr_mount = [session_curr + '_' + curr_col for session_curr in session_ids]
     all_ids.extend(curr_ids)
     all_mounts.extend(curr_mount)
