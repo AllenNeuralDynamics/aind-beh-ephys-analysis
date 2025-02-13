@@ -1,6 +1,6 @@
 # %%
-session = 'behavior_751004_2024-12-23_14-20-03'
-data_type = 'curated'
+session = 'behavior_758017_2025-02-05_11-42-34'
+data_type = 'raw'
 target = 'soma'
 
 # %%
@@ -200,7 +200,7 @@ else:
 if data_type == 'curated':
     unit_spikes = [spikes[(spikes >= qm['ephys_cut'][0]) & (spikes < qm['ephys_cut'][1])] for spikes in unit_spikes]
 unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
-with open(os.path.join(session_dir['ephys_processed_dir_curated'], 'spiketimes.pkl'), 'wb') as f:
+with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
     pickle.dump(unit_spikes, f)
 
 # %%
@@ -291,7 +291,7 @@ with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_in
 # %%
 dim_len = [len(opto_df_target[dim].unique()) for dim in opto_info['dimensions']]
 print(f'Saving opto_responses: {session}')
-
+ 
 resp_p = {}
 resp_lat = {}
 for curr_id in unit_ids:
@@ -330,9 +330,10 @@ for curr_id in unit_ids:
     # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'spiketimes_{curr_id}.npy'), spike_times)    
     # print(f'Unit {curr_id} done')
 
+opto_response = {'resp_p': resp_p, 'resp_lat': resp_lat}
+
 with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_responses_{target}.pkl'), 'wb') as f:
-    pickle.dump(resp_p, f)
-    pickle.dump(resp_lat, f)
+    pickle.dump(opto_response, f)
 
 print(f'Saved opto_responses: {session}')
     
@@ -383,7 +384,7 @@ for unit_ind, unit_id in enumerate(unit_ids):
     # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'unit_waveform_{unit_id}.npy'), reordered_template)
     opto_waveforms[unit_id] = reordered_template
 
-with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveforms_{data_type}.pkl'), 'wb') as f:
+with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveforms_{target}.pkl'), 'wb') as f:
     pickle.dump(opto_waveforms, f)
 print(f'Saved templates: {session}')
 

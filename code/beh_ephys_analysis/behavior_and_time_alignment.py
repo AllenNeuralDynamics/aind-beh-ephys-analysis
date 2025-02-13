@@ -1,7 +1,7 @@
 # %% [markdown]
 # ### Check behavior
 # put in session ID to process
-session = 'behavior_751004_2024-12-21_13-28-28'
+session = 'behavior_758017_2025-02-05_11-42-34'
 ephys_cut = [0, 0] # pre cut in seconds, post cut in seconds
 print(session)
 # %%
@@ -64,15 +64,15 @@ else:
     print('Plotting session.')
     nwb = load_nwb_from_filename(nwb_file)
     fig = plot_session_in_time_all(nwb)
-    fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_choice_reward.png'))
+    fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_choice_reward.pdf'))
     # display(fig)
     
     fig, _ = plot_lick_analysis(nwb)
-    fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_lick_analysis.png'))
+    fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_lick_analysis.pdf'))
     # display(fig)
 
     fig, _ = plot_session_glm(nwb, tMax=5)
-    fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_glm.png'))
+    fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_glm.pdf'))
     # display(fig)
 
     # plt.close('all')

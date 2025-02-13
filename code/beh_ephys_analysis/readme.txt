@@ -1,6 +1,6 @@
 behavior_and_time_alignment.py
 Before curation
-Check behavior, sound card and ephys alignment, creates a .json file about alignment metric
+Check behavior, sound card and ephys alignment, creates a .json file about alignment metric. Only needs to be ran once at the beginning. Update .json to include beginning or end of session. 
 
 
 session_preprocessing.py
