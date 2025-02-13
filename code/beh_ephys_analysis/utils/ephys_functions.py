@@ -96,14 +96,16 @@ def build_spike_histogram_overlap(time_domain,
     time = starts + 0.5*binSize
     return time, tiled_data
 
-def fitSpikeModelG(dfTrial, matSpikes, formula):
+def fitSpikeModelG(dfTrial, matSpikes, formula, matIso = None):
     TvCurrU = np.array([])
     PvCurrU = np.array([])
     EvCurrU = np.array([])
     for i in range(np.shape(matSpikes)[1]):
         currSpikes = np.squeeze(matSpikes[:,i])
         currData = dfTrial.copy()
-        currData['spikes'] = currSpikes
+        currData['spikes'] = np.squeeze(currSpikes)
+        if matIso is not None:
+            currData['iso'] = matIso[:,i]
         # Fit the GLM
         model = sm.GLM.from_formula(formula=formula, data=currData, family=sm.families.Gaussian()).fit()
         # t value

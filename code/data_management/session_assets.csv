@@ -1,4 +1,4 @@
-session_id,Note,raw_data,sorted,sorted_opto_highpass_curation,sorted_curated,sorted_opto_bandpass,sorted_opto_highpass_curation,model_stan
+ ,Note,raw_data,sorted,sorted_opto_highpass_curation,sorted_curated,sorted_opto_bandpass,sorted_opto_highpass_curation,model_stan
 behavior_716325_2024-05-29_10-33-32,,8eda219a-7e5e-499c-b3d6-d6b1c4012beb,c3d9b46b-fbdb-4e54-8414-6bbc6d912b1f,,,,,d647e1b6-7bc9-478f-ab0c-24d349d087af
 behavior_716325_2024-05-30_11-33-46,,6df5d1fa-16bf-407d-961d-3515046271a0,bc671ca5-3665-46fb-92ca-ff946a6dffc8,,,,,d647e1b6-7bc9-478f-ab0c-24d349d087af
 behavior_716325_2024-05-31_10-31-14,,2d28ccd9-48ab-429e-92ef-7723135ee306,908c91c4-294d-48fc-893f-6b2a7bb3e34d,f0810b1a-3b23-450a-9ac7-ddf64d79520b,2d2014c0-d616-4381-8ca3-be516b028960,88148836-0e30-4d43-acd5-1a6f79347dea,8b2549e6-e396-49fd-9dff-11136925d51b,d647e1b6-7bc9-478f-ab0c-24d349d087af
@@ -32,16 +32,11 @@ behavior_751004_2024-12-20_13-26-11,"Good behavior, Good recording, videos are s
 behavior_751004_2024-12-21_13-28-28,"Good behavior (Slightly left biased), Good recording, videos are synced, major drift at the end",019cab81-ad4e-45e7-ba9b-8dac12480323,ba67f1a1-44a7-4f99-8a4d-13a64cd9f0e8,24c5da39-c065-4cb5-8f16-3e1416829ad6,e41d6b2a-8cfd-4fa7-b96b-5fb089d3e8eb,,,dee86390-9e3d-47d8-8b3c-dfc6c1172596
 behavior_751004_2024-12-22_13-09-17,"Good behavior, Good recording, videos are synced major drift at the end",1d0ed8bd-6b36-4c19-a8a4-dcb757abba8b,bc6b4df0-83db-4ba5-aa53-9596fa5a318e,5d8d79ea-9c6b-4bd4-93f0-99670fd08b5e,773d43dc-7f5a-4830-b490-aae48b305cb8,,,dee86390-9e3d-47d8-8b3c-dfc6c1172596
 behavior_751004_2024-12-23_14-20-03,"Left biased behavior, Good recording, videos are synced, drift only at the end",414a1912-d365-465a-83e0-f613c95c0c70,244fcaa9-14dd-4a0b-bd29-32cf6ef6faf2,1f28a1ac-7d93-49e1-9ecc-c9b304ac8f83,8ae61d7d-0e8b-4ba7-9aa2-dddceff8a829,,,dee86390-9e3d-47d8-8b3c-dfc6c1172596
-,,,,,,,,
-,,,,,,,,
-,,,,,,,,
-,,,,,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             , ,,
-,,,,,,,,
-,,,,,,,,
-,,,,,,,,
-,,,,,,,,
-,,,,,,,,
-,,,,,,,,
-,,,,,,,,
-,,,,,,,,
-,,,,,,,,
+behavior_751769_2025-01-16_11-32-05,,e08f98e9-7319-4aa1-993e-e28e69604f5b,,,,,,
+behavior_751769_2025-01-17_11-37-39,,a4dae472-9a9b-4bd7-a920-9691a69869dc,9b2e786f-2bd9-4bb2-a423-9d50cb5dc584,,,,,
+behavior_751769_2025-01-18_10-15-25,,5a341fc5-eb96-4f7d-9de5-99a99a41a83b,8f806c5e-28a7-46fe-a654-cc6f7150dada,,,,,
+behavior_758017_2025-02-04_11-57-38,,75f7920a-17c9-4e0c-8259-aee69e0544b2,2efd0064-8eb1-4124-8232-37ff7c7b96e1,,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             , ,,
+behavior_758017_2025-02-05_11-42-34,,b4263e0d-c566-440e-9f82-f617b46adcd4,f4744bf9-ad36-4386-b9a0-a44549e56092,,,,,
+behavior_758017_2025-02-06_11-26-14,,,,,,,,
+behavior_758017_2025-02-07_14-11-08,,,,,,,,
+behavior_751766_2025-02-11_11-53-38,,,,,,,,
