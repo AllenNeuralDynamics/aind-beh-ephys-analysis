@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -e
+
+pip uninstall -y traitlets
+pip install --no-cache-dir --ignore-installed traitlets==5.9.0
+
+# move VS code data directory into capsule, so it persists
+ln -s /root/capsule/code/.vscode/ /.vscode
+
+# install updated version of code-server
+VERSION=4.20.1
+mkdir /.code-server
+cd /.code-server
+curl -fL "https://github.com/coder/code-server/releases/download/v$VERSION/code-server-$VERSION-linux-amd64.tar.gz" \
+  | tar -xvz
+ln -s /.code-server/code-server-$VERSION-linux-amd64/bin/code-server  /usr/bin/code-server
+cd -
+
+eval "$(conda shell.bash hook)"
+
+# create a new environment for codeocean
+conda create -n codeocean python=3.11
+conda activate codeocean
+conda install ipykernel
+ipython kernel install --user --name=codeocean
+pip install codeocean
+pip install pandas
+pip install numpy

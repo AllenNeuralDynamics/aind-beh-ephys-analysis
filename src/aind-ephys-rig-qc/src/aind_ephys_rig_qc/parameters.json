@@ -1,0 +1,7 @@
+{
+    "report_name" : "QC.pdf",
+    "timestamp_alignment_method" : "harp",
+    "original_timestamp_filename" : "original_timestamps.npy",
+    "plot_drift_map" : false,
+    "flip_NIDAQ" : false
+}

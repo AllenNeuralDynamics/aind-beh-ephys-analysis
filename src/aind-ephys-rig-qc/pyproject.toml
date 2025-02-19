@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aind-ephys-rig-qc"
+description = "Generated from aind-library-template"
+license = {text = "MIT"}
+requires-python = ">=3.7"
+authors = [
+    {name = "Allen Institute for Neural Dynamics"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3"
+]
+readme = "README.md"
+dynamic = ["version"]
+
+dependencies = [
+    'open-ephys-python-tools>=0.1.9',
+    'matplotlib',
+    'fpdf2',
+    'scipy',
+    'rich',
+    'spikeinterface[full]',
+    'harp-python @ git+https://github.com/jsiegle/harp-python@decode-clock'
+]
+
+[project.optional-dependencies]
+dev = [
+    'black',
+    'coverage',
+    'flake8',
+    'interrogate',
+    'isort',
+    'Sphinx',
+    'furo'
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "aind_ephys_rig_qc.__version__"}
+
+[tool.black]
+line-length = 79
+target_version = ['py36']
+exclude = '''
+
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | build
+    | dist
+  )/
+  | .gitignore
+)
+'''
+
+[tool.coverage.run]
+omit = ["*__init__*", "*temporal_alignment*"]
+source = ["aind_ephys_rig_qc", "tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.:",
+    "from",
+    "import",
+    "pragma: no cover",
+]
+fail_under = 100
+
+[tool.isort]
+line_length = 79
+profile = "black"
+
+[tool.interrogate]
+exclude = ["setup.py", "docs", "build"]
+fail-under = 100
