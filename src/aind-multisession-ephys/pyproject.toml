@@ -1,0 +1,101 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aind_multisession_ephys"
+description = "Prints messages to stdout. Simple boilerplate for libraries."
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Allen Institute for Neural Dynamics"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3"
+]
+readme = "README.md"
+dynamic = ["version"]
+
+dependencies = [
+    'pandas==2.2.3',
+    'aind-data-schema>=1.2.0',
+    'hdmf-zarr==0.6.0',
+    'matplotlib==3.8.0',
+    'pynwb==2.8.3',
+    'scikit-learn==1.6.1',
+    'aind-ephys-utils==0.0.15',
+    'hdmf==3.14.6',
+    'ipympl==0.9.3',
+    'numpy==1.26.4',
+    'open-ephys-python-tools==0.1.10',
+    'pypdf2==3.0.1',
+    'scipy==1.13.1',
+    'statsmodels',
+    'spikeinterface==0.101.2',
+    'seaborn==0.13.2',
+    'zarr==2.16',
+    'harp-python @ git+https://github.com/jsiegle/harp-python@decode-clock',
+    'aind_dynamic_foraging_basic_analysis @ git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis@plot_session_in_time_sue',
+    'tzdata==2023.3',
+    'zipp==3.17.0',
+    'threadpoolctl==3.5.0'
+]
+
+[project.optional-dependencies]
+dev = [
+    'black',
+    'coverage',
+    'flake8',
+    'interrogate',
+    'isort',
+    'Sphinx',
+    'furo'
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "aind_multisession_ephys.__version__"}
+
+[tool.black]
+line-length = 79
+target_version = ['py310']
+exclude = '''
+
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | build
+    | dist
+  )/
+  | .gitignore
+)
+'''
+
+[tool.coverage.run]
+omit = ["*__init__*"]
+source = ["aind_multisession_ephys", "tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.:",
+    "^from .* import .*",
+    "^import .*",
+    "pragma: no cover"
+]
+fail_under = 0
+
+[tool.isort]
+line_length = 120
+profile = "black"
+
+[tool.interrogate]
+exclude = ["setup.py", "docs", "build"]
+fail-under = 0

@@ -654,7 +654,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
 
     if os.path.exists(sorted_raw_dir):
-        postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
+        postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
         if os.path.exists(postprocessed_dir_temp):
             postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
             postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
