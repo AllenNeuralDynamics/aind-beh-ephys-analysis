@@ -40,7 +40,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     # %%
     print(session)
     session_dir = session_dirs(session)
-    aniID, datetime, string = parseSessionID(session)
+    aniID, date_time, string = parseSessionID(session)
     session_json_dir = os.path.join(session_dir['raw_dir'], 'behavior')
     session_json_files = []
     for dir, _, files in os.walk(session_json_dir):

@@ -12,3 +12,9 @@ opto_waveforms_preprocessing.py
 Before and after curation 
 Create sorting analyzer based on stimulation conditions, compute waveforms in each condition and compare similarity to spont waveforms
 
+opto_tagging.py
+Plot and decide if units are opto tagged on session level or single unit level.
+
+ephys_behavior curation:
+plot units that are potentialy opto tagged with behavior and set cut off time
+
