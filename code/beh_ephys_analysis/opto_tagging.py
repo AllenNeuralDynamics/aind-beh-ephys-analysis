@@ -11,7 +11,7 @@ import matplotlib.patches as patches
 import json
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-import re
+import re 
 from utils.beh_functions import session_dirs
 from utils.plot_utils import shiftedColorMap, template_reorder, plot_raster_bar,merge_pdfs
 from open_ephys.analysis import Session
@@ -63,7 +63,7 @@ def max_index_ndarray(arr):
 
     return max_nd_index 
 # %%
-def opto_plotting_unit(unit_id, spike_times, waveform, opto_wf, qc_dict, resp_p, resp_lat, opto_df, opto_info, waveform_params, dim_1 = 'powers', resp_thresh=0.8, lat_thresh=0.015, plot = False):
+def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf, qc_dict, resp_p, resp_lat, opto_df, opto_info, waveform_params, dim_1 = 'powers', resp_thresh=0.8, lat_thresh=0.015, plot = False):
     # calculate baseline
     baseline = qc_dict['firing_rate']*opto_info['resp_win']
     # conditions
@@ -73,7 +73,7 @@ def opto_plotting_unit(unit_id, spike_times, waveform, opto_wf, qc_dict, resp_p,
     # find resp_p > thresh and resp_lat < lat_thresh
     resp_p = np.array(resp_p.tolist())
     resp_lat = np.array(resp_lat.tolist())
-    resp_pass_ind = np.where((resp_p > resp_thresh) & (resp_lat < lat_thresh))
+    resp_pass_ind = np.where((resp_p > resp_thresh + baseline) & (resp_lat < lat_thresh))
     opto_tagging_dict = {'unit_id': unit_id, 
                  'resp_p': None, 
                  'resp_lat': None, 
@@ -82,9 +82,10 @@ def opto_plotting_unit(unit_id, spike_times, waveform, opto_wf, qc_dict, resp_p,
                  'num_pulses': None, 
                  'durations': None, 
                  'freqs': None, 
-                 'stim_times': None}
+                 'stim_times': None, 
+                 'opto_pass': False}
     if len(resp_pass_ind[0]) > 0:
-        pass_opto = True
+        opto_tagging_dict['opto_pass'] = True
         # get the response p and latencies
         opto_tagging_dict['resp_p'] = resp_p[resp_pass_ind]
         opto_tagging_dict['resp_lat'] = resp_lat[resp_pass_ind]
@@ -131,8 +132,24 @@ def opto_plotting_unit(unit_id, spike_times, waveform, opto_wf, qc_dict, resp_p,
     if plot:
         fig = plt.figure(figsize=(12, 8))
         # select the first dimension to separate by subplots
-        gs_fr = gridspec.GridSpec(2, 1, height_ratios=[1, 5])
-        gs = gridspec.GridSpecFromSubplotSpec(1, len(opto_info[dim_1]), width_ratios=[1]*len(opto_info[dim_1]), subplot_spec=gs_fr[1])
+        gs_all = gridspec.GridSpec(2, 1, height_ratios=[1, 5])
+        # plot basic firing rates first
+        gs_basic = gridspec.GridSpecFromSubplotSpec(2, 3, width_ratios=[1, 1, 2], subplot_spec=gs_all[0])
+        ax.add_subplot(gs_basic[0, 2])
+        bins = np.linspace(np.min(spike_times), np.max(spike_times), 1000)
+        ax.hist(spike_times, bins=bins, color='black', alpha=0.5)
+        ax.set_title(f'Firing Rate: {qc_dict["firing_rate"]:.2f} Hz')
+        ax.add_subplot(gs_basic[1, 2])
+        ax.scatter(spike_times, spike_amplitude, color='b', alpha=0.5, s=1)
+        ax.axhline(0, color='k', linestyle='--', linewidth=0.5)
+        ax.set_title('Spike Amplitude (uV)')
+        ax.set_xlabel('Time (s)')
+
+
+
+
+
+        gs = gridspec.GridSpecFromSubplotSpec(1, len(opto_info[dim_1]), width_ratios=[1]*len(opto_info[dim_1]), subplot_spec=gs_all[1])
         max_p_all = []
         max_lat_all = []
         pulse_width = opto_df['duration'].mode()[0]
@@ -262,7 +279,12 @@ def opto_plotting_unit(unit_id, spike_times, waveform, opto_wf, qc_dict, resp_p,
 def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False, target_unit_ids=None):
     session_dir = session_dirs(session)
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
+    we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
+    spike_amplitude = we.load_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
     unit_ids = sorting.get_unit_ids()
+
+    # create two sorting analyzer objects, one for opto tagging period, the other for the rest of the session
+    opto_tagging_period = (opto_info['stim_times'][0], opto_info['stim_times'][-1])
 
     # load quality metrics from nwb
     # load quality metrics
@@ -327,42 +349,29 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     opto_pass = []
     if target_unit_ids is None:
         target_unit_ids = unit_ids
-    target_qc = pd.DataFrame(columns=unit_qc.columns)
     target_pass_qc = []
     opto_tagging_df_sess = pd.DataFrame()
     for unit_id in target_unit_ids:
     #     if pass_qc[unit_id]:   
         qc_dict = unit_qc.loc[unit_qc['ks_unit_id'] == unit_id].iloc[0].to_dict()
-<<<<<<< HEAD
-        fig, opto_tagging_dict_curr = opto_plotting_unit(unit_id, spiketimes[unit_id], waveforms[unit_id], opto_wf, qc_dict, 
-=======
-        fig, opto_pass_curr = opto_plotting_unit(unit_id, spiketimes[unit_id], waveforms[unit_id], opto_wf, qc_dict, 
->>>>>>> f6dc00d4a7daec671461fc85c85f70d216fe92c7
+        fig, opto_tagging_dict_curr = opto_plotting_unit(unit_id, spiketimes[unit_id], spike_amplitude[unit_id], waveforms[unit_id], opto_wf, qc_dict, 
                                         opto_responses['resp_p'][unit_id], opto_responses['resp_lat'][unit_id], opto_df, opto_info, 
                                         waveform_params, dim_1 = 'powers', resp_thresh=resp_thresh, lat_thresh=lat_thresh, plot=plot)
         if fig is not None:
             fig.savefig(os.path.join(session_dir[f'opto_dir_fig_{data_type}'], f'unit_{unit_id}_pulse_width_{pulse_width}_opto_tagging.pdf'))
         plt.close('all')
-<<<<<<< HEAD
         opto_tagging_df_sess = pd.concat([opto_tagging_df_sess, pd.DataFrame([opto_tagging_dict_curr])], ignore_index=True)
-=======
-        opto_pass.append(opto_pass_curr)
->>>>>>> f6dc00d4a7daec671461fc85c85f70d216fe92c7
         target_pass_qc.append(pass_qc[unit_id])
-        target_qc = pd.concat([target_qc, pd.DataFrame([qc_dict])], ignore_index=True)
-        # opto_tagging_df.append()
+        opto_pass_curr = opto_tagging_dict_curr['resp_p'] is not np.nan
+        opto_pass.append(opto_pass_curr)
 
     merge_pdfs(session_dir[f'opto_dir_fig_{data_type}'], os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging.pdf'))
     # both pass qc and opto tagging
-    # unit_count_pass = np.sum(np.array(target_pass_qc) & np.array(opto_pass))
-    # print(f'{unit_count_pass} out of {len(target_pass_qc)} units pass quality control and opto tagging')
-<<<<<<< HEAD
+    unit_count_pass = np.sum(np.array(target_pass_qc) & np.array(opto_pass))
+    print(f'{unit_count_pass} out of {len(target_pass_qc)} units pass quality control and opto tagging')
     opto_tagging_df_sess['default_qc'] = target_pass_qc
-=======
-    # target_qc['opto_pass'] = opto_pass
->>>>>>> f6dc00d4a7daec671461fc85c85f70d216fe92c7
     # target_qc['target_pass_qc'] = target_pass_qc
-    return target_qc
+    return opto_tagging_df_sess
 
 # %%
 if __name__ == "__main__":
@@ -372,8 +381,8 @@ if __name__ == "__main__":
     resp_thresh = 0.6
     lat_thresh = 0.02
 
-    opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= [0], plot = True)
-
+    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True)
+    opto_tagging_df_sess.to_csv(os.path.join(session_dirs(session)[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv'), index=False)
 
 
 

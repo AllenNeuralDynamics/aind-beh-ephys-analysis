@@ -30,6 +30,98 @@ from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 import pickle
 import datetime
 
+def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = None):
+    # loading info
+    session_dir = session_dirs(session)
+    opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv'))
+    sorting_analyzer = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
+    sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
+    unit_ids = sorting.get_unit_ids()
+    spike_times = sorting.get_unit_spike_train(unit_id=unit_ids[0])
+    spike_vector = sorting.to_spike_vector()
+    spike_indices = spike_vector["sample_index"]
+    sparsity_mask_all = sorting_analyzer.sparsity.mask
+    sparsity_all = si.ChannelSparsity(
+            sparsity_mask_all,
+            unit_ids=sorting.unit_ids,
+            channel_ids=sorting_analyzer.channel_ids,
+    )
+    ephys_path = os.path.dirname(session_dir['session_dir'])
+    stream_name = 'ProbeA'
+    compressed_folder = os.path.join(ephys_path, 'ecephys_compressed')
+    recording_zarr = [os.path.join(compressed_folder, f) for f in os.listdir(compressed_folder) if stream_name in f][0]
+    recording = si.read_zarr(recording_zarr)
+    good_channel_ids = recording.channel_ids[
+            np.in1d(recording.channel_ids, sorting_analyzer.channel_ids)
+    ]
+    recording = recording.select_channels(good_channel_ids)
+
+    # find maximum spike sample number with 'pre'
+    pre_end = opto_df.loc[opto_df['pre_post']== 'pre']['laser_onset_samples'].max()
+    post_start = opto_df.loc[opto_df['pre_post']== 'post']['laser_onset_samples'].min()
+    spike_indices_laser = (spike_indices <= pre_end) | (spike_indices >= post_start)
+
+    # make sorting_analyzer for laser and no laser periods
+    # for laser period
+    spike_vector_laser = spike_vector[spike_indices_laser]
+    sorting_laser = si.NumpySorting(
+                spike_vector_laser, 
+                unit_ids=sorting.unit_ids,
+                sampling_frequency=sorting.sampling_frequency
+            )   
+    sorting_analyzer_laser = si.create_sorting_analyzer(
+            sorting_laser,
+            recording,
+            sparsity=sparsity_all
+            )
+    min_spikes_per_unit = 5
+    keep_unit_ids = []
+    count_spikes = sorting_laser.count_num_spikes_per_unit()
+    for unit_id, count in count_spikes.items():
+            if count >= min_spikes_per_unit:
+                    keep_unit_ids.append(unit_id)
+    sorting_analyzer_laser = sorting_analyzer_laser.select_units(keep_unit_ids)
+
+    # for no laser period
+    spike_vector_nolaser = spike_vector[~spike_indices_laser]
+    sorting_nolaser = si.NumpySorting(
+                spike_vector_nolaser, 
+                unit_ids=sorting.unit_ids,
+                sampling_frequency=sorting.sampling_frequency
+            )
+    sorting_analyzer_nolaser = si.create_sorting_analyzer(
+            sorting_nolaser,
+            recording,
+            sparsity=sparsity_all
+            )
+    min_spikes_per_unit = 5
+    keep_unit_ids = []
+    count_spikes = sorting_nolaser.count_num_spikes_per_unit()
+    for unit_id, count in count_spikes.items():
+            if count >= min_spikes_per_unit:
+                keep_unit_ids.append(unit_id)
+    sorting_analyzer_nolaser = sorting_analyzer_nolaser.select_units(keep_unit_ids)
+    # compute 
+    analyzer_dict = {"correlograms": {
+                "window_ms": window_ms,
+                "bin_ms": bin_ms}}
+    sorting_analyzer_laser.compute(analyzer_dict, n_jobs=-1)
+    sorting_analyzer_nolaser.compute(analyzer_dict, n_jobs=-1)
+    # save correlograms
+    correlogram_laser = sorting_analyzer.get_extension('correlograms')
+    unit_ids_laser = sorting_analyzer_laser.unit_ids
+    correlogram_nolaser = sorting_analyzer_nolaser.get_extension('correlograms')
+    unit_ids_nolaser = sorting_analyzer_nolaser.unit_ids
+    if post_fix is not None:
+        file_name = f'{session}_correlogram_laser_{post_fix}.pkl'
+    else:
+        file_name = f'{session}_correlogram_laser_win{window_ms}_bin{bin_ms}.pkl'
+    with open(os.path.join(session_dir[f'opto_dir_{data_type}'], file_name), 'wb') as f:
+        pickle.dump(correlogram_laser.data, f)
+        pickle.dump(unit_ids_laser, f)
+        pickle.dump(correlogram_nolaser.data, f)
+        pickle.dump(unit_ids_nolaser, f)
+
 def ephys_opto_preprocessing(session, data_type, target):
 
     # Create a white-to-bright red colormap
@@ -240,6 +332,8 @@ def ephys_opto_preprocessing(session, data_type, target):
     # Collect all target laser times and conditions
     # save all confirmed laser times
     opto_df['time'] = laser_times
+    laser_onset_samples = np.searchsorted(timestamps, opto_df['time'].values)
+    opto_df['laser_onset_samples'] = laser_onset_samples
     if 'emission_location' in opto_df.columns:
         opto_df = opto_df.drop(columns=['site'])
         opto_df['site'] = opto_df['emission_location']
@@ -392,6 +486,12 @@ def ephys_opto_preprocessing(session, data_type, target):
     with open(qm_file, 'w') as f:
         json.dump(qm, f, indent=4)
     print(f"Output saved to {output_file}")
+
+
+    session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
+    session_crosscorr(session, data_type, window_ms=1000, bin_ms=10, post_fix = 'long')
+    print(f"Cross-correlation saved to {session_dir[f'opto_dir_{data_type}']}")
+
     sys.stdout = sys.__stdout__
     # Close the file
     log_file.close()
