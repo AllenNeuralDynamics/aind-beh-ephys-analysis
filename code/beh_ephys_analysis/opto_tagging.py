@@ -333,13 +333,21 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     for unit_id in target_unit_ids:
     #     if pass_qc[unit_id]:   
         qc_dict = unit_qc.loc[unit_qc['ks_unit_id'] == unit_id].iloc[0].to_dict()
+<<<<<<< HEAD
         fig, opto_tagging_dict_curr = opto_plotting_unit(unit_id, spiketimes[unit_id], waveforms[unit_id], opto_wf, qc_dict, 
+=======
+        fig, opto_pass_curr = opto_plotting_unit(unit_id, spiketimes[unit_id], waveforms[unit_id], opto_wf, qc_dict, 
+>>>>>>> f6dc00d4a7daec671461fc85c85f70d216fe92c7
                                         opto_responses['resp_p'][unit_id], opto_responses['resp_lat'][unit_id], opto_df, opto_info, 
                                         waveform_params, dim_1 = 'powers', resp_thresh=resp_thresh, lat_thresh=lat_thresh, plot=plot)
         if fig is not None:
             fig.savefig(os.path.join(session_dir[f'opto_dir_fig_{data_type}'], f'unit_{unit_id}_pulse_width_{pulse_width}_opto_tagging.pdf'))
         plt.close('all')
+<<<<<<< HEAD
         opto_tagging_df_sess = pd.concat([opto_tagging_df_sess, pd.DataFrame([opto_tagging_dict_curr])], ignore_index=True)
+=======
+        opto_pass.append(opto_pass_curr)
+>>>>>>> f6dc00d4a7daec671461fc85c85f70d216fe92c7
         target_pass_qc.append(pass_qc[unit_id])
         target_qc = pd.concat([target_qc, pd.DataFrame([qc_dict])], ignore_index=True)
         # opto_tagging_df.append()
@@ -348,7 +356,11 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     # both pass qc and opto tagging
     # unit_count_pass = np.sum(np.array(target_pass_qc) & np.array(opto_pass))
     # print(f'{unit_count_pass} out of {len(target_pass_qc)} units pass quality control and opto tagging')
+<<<<<<< HEAD
     opto_tagging_df_sess['default_qc'] = target_pass_qc
+=======
+    # target_qc['opto_pass'] = opto_pass
+>>>>>>> f6dc00d4a7daec671461fc85c85f70d216fe92c7
     # target_qc['target_pass_qc'] = target_pass_qc
     return target_qc
 
