@@ -70,8 +70,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     session_rec = Session(session_dir['session_dir'])
     recording = session_rec.recordnodes[0].recordings[0]
     timestamps = recording.continuous[0].timestamps
-    laser_onset_samples = np.searchsorted(timestamps, opto_df['time'].values)
-    opto_df['laser_onset_samples'] = laser_onset_samples
+    laser_onset_samples = opto_df['laser_onset_samples'].values
 
     # %%
     if load_sorting_analyzer:
@@ -389,7 +388,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     
 if __name__ == "__main__":
     session = 'behavior_751004_2024-12-23_14-20-03'
-    data_type = 'curated'
+    data_type = 'raw'
     target = 'soma'
     load_sorting_analyzer = True
     opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
