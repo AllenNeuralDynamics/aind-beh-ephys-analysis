@@ -74,6 +74,11 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     opto_df['laser_onset_samples'] = laser_onset_samples
 
     # %%
+    if load_sorting_analyzer:
+        waveform_zarr_folder = f'{session_dir[f"opto_dir_{data_type}"]}/opto_waveforms.zarr'
+        if not os.path.exists(waveform_zarr_folder):
+            print("Analyzer doesn't exist, computing first.")
+            load_sorting_analyzer = False
     if not load_sorting_analyzer:
         # recording info
         sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
@@ -341,13 +346,14 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
             euc_dist_norm = euc_dist / energy
             waveform_metrics.at[index, 'euclidean_norm'] = euc_dist_norm
 
-    waveform_metrics.to_csv(f"{session_dir[f'opto_dir_{data_type}']}/{session}_opto_waveform_metrics.csv", index=False)
-    print(f"Saved waveform metrics to {session_dir[f'opto_dir_{data_type}']}/{session}_opto_waveform_metrics.csv")
+    with open(f"{session_dir[f'opto_dir_{data_type}']}/{session}_opto_waveform_metrics.pkl", 'wb') as f:
+        pickle.dump(waveform_metrics, f)
+    print(f"Saved waveform metrics to {session_dir[f'opto_dir_{data_type}']}/{session}_opto_waveform_metrics.pkl")
 
 
     # %%
     unit_ids = waveform_metrics['unit_id'].unique()
-    gs = gridspec.GridSpec(20, 5)
+    gs = gridspec.GridSpec(30, 5)
     fig = plt.figure(figsize=(10, 40))
     count = 0
     for unit_id in unit_ids:
