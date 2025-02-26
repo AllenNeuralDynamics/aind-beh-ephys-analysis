@@ -326,6 +326,9 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     spike_amplitude = we.load_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
     unit_ids = sorting.get_unit_ids()
 
+    # create two sorting analyzer objects, one for opto tagging period, the other for the rest of the session
+    opto_tagging_period = (opto_info['stim_times'][0], opto_info['stim_times'][-1])
+
     # load quality metrics from nwb
     # load quality metrics
     if os.path.exists(session_dir[f'nwb_dir_{data_type}']):
