@@ -103,25 +103,26 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
         
         euc_dist = []
         corr = []
-        for _, row in opto_tagging_df.iterrows():
-            wf_curr = opto_wf.query(
-                'unit_id == @unit_id and site == @site and power == @power and pre_post == @pre_post',
-                local_dict={
-                    'site': row['sites'],
-                    'power': row['powers'],
-                    'duration': row['durations'],
-                    'pre_post': row['stim_times'],
-                    'unit_id': unit_id
-                }
-            )
-            # Ensure wf_curr is not empty before extracting values
-            if not wf_curr.empty:
-                euc_dist_curr, corr_curr = wf_curr.iloc[0][['euclidean_norm', 'correlation']]
-            else:
-                euc_dist_curr, corr_curr = None, None  # Handle missing values
+        if opto_wf is not None:
+            for _, row in opto_tagging_df.iterrows():
+                wf_curr = opto_wf.query(
+                    'unit_id == @unit_id and site == @site and power == @power and pre_post == @pre_post',
+                    local_dict={
+                        'site': row['sites'],
+                        'power': row['powers'],
+                        'duration': row['durations'],
+                        'pre_post': row['stim_times'],
+                        'unit_id': unit_id
+                    }
+                )
+                # Ensure wf_curr is not empty before extracting values
+                if not wf_curr.empty:
+                    euc_dist_curr, corr_curr = wf_curr.iloc[0][['euclidean_norm', 'correlation']]
+                else:
+                    euc_dist_curr, corr_curr = None, None  # Handle missing values
 
-            euc_dist.append(euc_dist_curr)
-            corr.append(corr_curr)
+                euc_dist.append(euc_dist_curr)
+                corr.append(corr_curr)
         opto_tagging_df['euclidean_norm'] = euc_dist
         opto_tagging_df['correlation'] = corr
         opto_tagging_dict = {key: opto_tagging_df[key].values for key in opto_tagging_df.columns}
@@ -268,15 +269,15 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
             # plot waveform
             gs_sub_waveform = gridspec.GridSpecFromSubplotSpec(6, 2, subplot_spec=gs[power_ind], hspace=0.75)
             ax = fig.add_subplot(gs_sub_waveform[3,0])
-            wf_resp = opto_wf.query('unit_id == @unit_id and site == @max_site and power == @curr_power and duration == @pulse_width and pre_post == @curr_pre_post')
-            wf_spont = opto_wf.query('unit_id == @unit_id and pre_post == @curr_pre_post and spont == 1')
-
-            if len(wf_resp) > 0:
-                ax.plot(wf_spont['peak_waveform'].values[0], color='black', alpha = 0.5)
-            if len(wf_resp) > 0:
-                # plot the response waveform
-                ax.plot(wf_resp['peak_waveform'].values[0], color='red')
-                ax.set_title(f'Euc: {wf_resp["euclidean_norm"].values[0]:.2f} Corr: {wf_resp["correlation"].values[0]:.2f}')
+            if opto_wf is not None:
+                wf_resp = opto_wf.query('unit_id == @unit_id and site == @max_site and power == @curr_power and duration == @pulse_width and pre_post == @curr_pre_post')
+                wf_spont = opto_wf.query('unit_id == @unit_id and pre_post == @curr_pre_post and spont == 1')
+                if len(wf_resp) > 0:
+                    ax.plot(wf_spont['peak_waveform'].values[0], color='black', alpha = 0.5)
+                if len(wf_resp) > 0:
+                    # plot the response waveform
+                    ax.plot(wf_resp['peak_waveform'].values[0], color='red')
+                    ax.set_title(f'Euc: {wf_resp["euclidean_norm"].values[0]:.2f} Corr: {wf_resp["correlation"].values[0]:.2f}')
             
             ax = fig.add_subplot(gs_sub_waveform[3,1])
             shifted_cmap = shiftedColorMap(b_w_r_cmap, np.nanmin(waveform), np.nanmax(waveform), 'shifted_b_w_r');
@@ -325,9 +326,6 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
     spike_amplitude = we.load_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
     unit_ids = sorting.get_unit_ids()
-
-    # create two sorting analyzer objects, one for opto tagging period, the other for the rest of the session
-    opto_tagging_period = (opto_info['stim_times'][0], opto_info['stim_times'][-1])
 
     # load quality metrics from nwb
     # load quality metrics
@@ -382,10 +380,14 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     crosscorr = {'short': crosscorr_short, 'long': crosscorr_long}
     # load waveforms from csv
     opto_wf_pkl = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_waveform_metrics.pkl')
-    with open (opto_wf_pkl, 'rb') as f:
-        opto_wf = pickle.load(f)
+    if os.path.exists(opto_wf_pkl):
+        with open (opto_wf_pkl, 'rb') as f:
+            opto_wf = pickle.load(f)
+            opto_wf = opto_wf.apply(pd.to_numeric, errors='ignore')
+    else: 
+        opto_wf = None
     
-    opto_wf = opto_wf.apply(pd.to_numeric, errors='ignore')
+    
 
     opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_{target}.csv'))
     with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_info_{target}.json')) as f:
@@ -428,6 +430,57 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     # target_qc['target_pass_qc'] = target_pass_qc
     return opto_tagging_df_sess
 
+def opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None):
+    """
+    Plot the stability of opto-tagged spikes.
+    """
+    session_dir = session_dirs(session)
+    if opto_tagging_df is None:
+        opto_tagging_csv_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv') 
+        opto_tagging_df = pd.read_csv(opto_tagging_csv_dir)
+
+    # load spike times
+    with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'rb') as f:
+        spiketimes = pickle.load(f)
+    start = np.min(np.array([np.min(spiketimes[unit]) for unit in spiketimes.keys()]))
+    end = np.max(np.array([np.max(spiketimes[unit]) for unit in spiketimes.keys()]))
+
+    we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
+    spike_amplitude = we.load_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+
+    # %%
+    spike_mean_time = [np.mean(spiketimes[unit]) if len(spiketimes[unit]) > 0 else 0 for unit in spiketimes.keys() if len(spiketimes[unit]) > 0]
+    sort_ind = np.argsort(spike_mean_time)
+
+    # %%
+    opto_tagging_df_sorted = opto_tagging_df.iloc[sort_ind].copy()
+    opto_tagging_df_focus = opto_tagging_df_sorted[(opto_tagging_df_sorted['opto_pass'] == True) & (opto_tagging_df['decoder_label'] != 'artifact') & (opto_tagging_df['decoder_label'] != 'noise')].copy()
+
+    fig, ax = plt.subplots(len(opto_tagging_df_focus), 2, figsize=(10, 40))
+    # reset index
+    opto_tagging_df_focus.reset_index(drop=True, inplace=True)
+    bins = np.linspace(start, end, 200)
+    for i, row in opto_tagging_df_focus.iterrows():
+        ax[i, 1].scatter(spiketimes[row['unit_id']], -spike_amplitude[row['unit_id']], s=0.3, alpha = 0.5, edgecolor ='none')
+        ax[i, 1].axhline(y=0, color='k', linestyle='--', linewidth=0.5)
+        if i==0:
+            ax[i, 1].set_title('Spike Amplitude')
+        
+        # turn off ticks
+        ax[i, 1].set_xticks([])
+        ax[i, 1].set_yticks([])
+        ax[i, 1].set_xlim(start, end)
+        
+        ax[i, 0].hist(spiketimes[row['unit_id']], bins=bins, color='k', alpha=0.5, label='Spike Times')
+        if i==0:
+            ax[i, 0].set_title('Spike Times')
+        # turn off ticks
+        ax[i, 0].set_xticks([])
+        ax[i, 0].set_yticks([])
+        ax[i, 0].set_xlim(start, end)
+        ax[i, 0].set_ylabel(f'{row["firing_rate"]:.2f}')
+    fig.savefig(fname=os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagged_spike_stability.png'))
+
 # %%
 if __name__ == "__main__":
     session = 'behavior_758017_2025-02-04_11-57-38'
@@ -436,10 +489,15 @@ if __name__ == "__main__":
     resp_thresh = 0.3
     lat_thresh = 0.02 
     session_dir = session_dirs(session)
-    # merge_pdfs(session_dir[f'opto_dir_fig_{data_type}'], os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging.pdf'))
-
+    # final check
     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False)
     opto_tagging_df_sess.to_csv(os.path.join(session_dirs(session)[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv'), index=False)
+    opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None)
+    # first check
+    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True)
+    opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=opto_tagging_df_sess)
+
+
 
 
 
