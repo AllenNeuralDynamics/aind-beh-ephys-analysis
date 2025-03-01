@@ -324,7 +324,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     session_dir = session_dirs(session)
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
     we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
-    spike_amplitude = we.load_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+    spike_amplitude = we.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
     unit_ids = sorting.get_unit_ids()
 
     # load quality metrics from nwb
@@ -446,7 +446,7 @@ def opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None
     end = np.max(np.array([np.max(spiketimes[unit]) for unit in spiketimes.keys()]))
 
     we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
-    spike_amplitude = we.load_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+    spike_amplitude = we.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
 
     # %%
     spike_mean_time = [np.mean(spiketimes[unit]) if len(spiketimes[unit]) > 0 else 0 for unit in spiketimes.keys() if len(spiketimes[unit]) > 0]

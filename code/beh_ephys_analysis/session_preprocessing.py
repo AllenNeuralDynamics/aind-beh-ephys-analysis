@@ -267,6 +267,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     if data_type == 'curated':
         opto_df = opto_df[(laser_times >= qm['ephys_cut'][0]) & (laser_times < qm['ephys_cut'][1])].copy()
         laser_times = laser_times[(laser_times >= qm['ephys_cut'][0]) & (laser_times < qm['ephys_cut'][1])].copy() 
+    laser_times_ori = laser_times.copy()
 
     # %%
     nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
@@ -285,8 +286,8 @@ def ephys_opto_preprocessing(session, data_type, target):
         print('Ephys synced, getting spike times from nwb')
     else:
         print('Ephys not synced, resync spike times and laser times')
-        harp_sync_time = np.load(os.path.join(session_dir['alignment_dir'], 'harp_sync_time.npy'))
-        local_sync_time = np.load(os.path.join(session_dir['alignment_dir'], 'local_sync_time.npy'))
+        harp_sync_time = np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy'))
+        local_sync_time = np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy'))
         # to be updated
         unit_spikes = [align_timestamps_to_anchor_points(spike_times, local_sync_time, harp_sync_time) for spike_times in unit_spikes]
         laser_times = align_timestamps_to_anchor_points(laser_times, local_sync_time, harp_sync_time)
@@ -336,7 +337,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     # Collect all target laser times and conditions
     # save all confirmed laser times
     opto_df['time'] = laser_times
-    laser_onset_samples = np.searchsorted(timestamps, opto_df['time'].values)
+    laser_onset_samples = np.searchsorted(timestamps, laser_times_ori)
     opto_df['laser_onset_samples'] = laser_onset_samples
     if 'emission_location' in opto_df.columns:
         opto_df = opto_df.drop(columns=['site'])
@@ -448,7 +449,7 @@ def ephys_opto_preprocessing(session, data_type, target):
         all_channels_int = np.array([int(channel.split('CH')[-1]) for channel in all_channels])
     unit_spartsiity = we.sparsity.unit_id_to_channel_ids
     channel_locations = we.get_channel_locations()
-    unit_locations = we.load_extension("unit_locations").get_data(outputs="by_unit")
+    unit_locations = we.get_extension("unit_locations").get_data(outputs="by_unit")
     right_left = channel_locations[:, 0]<20
 
     # re-organize templates so that left and right separate
