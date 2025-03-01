@@ -151,45 +151,46 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
         ax.set_xlabel('Time (s)')
         # long crosscorr
         # no laser
-        ax = fig.add_subplot(gs_basic[0, 0])
-        if unit_id in crosscorr['long']['unit_ids_nolaser']:
-            unit_ind = np.where(crosscorr['long']['unit_ids_nolaser'] == unit_id)[0][0]
-            bin_size = np.mean(np.diff(crosscorr['long']['time_bins']))
-            ax.bar(0.5*crosscorr['long']['time_bins'][1:] + 0.5*crosscorr['long']['time_bins'][:-1], crosscorr['long']['correlogram_nolaser'][unit_ind, unit_ind, :], width=bin_size, color='black', alpha=0.75)
-        ax.set_xlim(crosscorr['long']['time_bins'][0], crosscorr['long']['time_bins'][-1])
-        ax.set_title('Long Crosscorr')
-        ax.set_ylabel('Session')
-        # turn off x ticks
-        ax.set_xticks([])
-        # laser
-        ax = fig.add_subplot(gs_basic[1, 0])
-        if unit_id in crosscorr['long']['unit_ids_laser']:
-            unit_ind = np.where(crosscorr['long']['unit_ids_laser'] == unit_id)[0][0]
-            bin_size = np.mean(np.diff(crosscorr['long']['time_bins']))
-            ax.bar(0.5*crosscorr['long']['time_bins'][1:] + 0.5*crosscorr['long']['time_bins'][:-1], crosscorr['long']['correlogram_laser'][unit_ind, unit_ind, :], width=bin_size, color='red', alpha=0.75)
-        ax.set_xlim(crosscorr['long']['time_bins'][0], crosscorr['long']['time_bins'][-1])
-        ax.set_xlabel('Lag (ms)')
-        ax.set_ylabel('Opto')
+        if crosscorr is not None:
+            ax = fig.add_subplot(gs_basic[0, 0])
+            if unit_id in crosscorr['long']['unit_ids_nolaser']:
+                unit_ind = np.where(crosscorr['long']['unit_ids_nolaser'] == unit_id)[0][0]
+                bin_size = np.mean(np.diff(crosscorr['long']['time_bins']))
+                ax.bar(0.5*crosscorr['long']['time_bins'][1:] + 0.5*crosscorr['long']['time_bins'][:-1], crosscorr['long']['correlogram_nolaser'][unit_ind, unit_ind, :], width=bin_size, color='black', alpha=0.75)
+            ax.set_xlim(crosscorr['long']['time_bins'][0], crosscorr['long']['time_bins'][-1])
+            ax.set_title('Long Crosscorr')
+            ax.set_ylabel('Session')
+            # turn off x ticks
+            ax.set_xticks([])
+            # laser
+            ax = fig.add_subplot(gs_basic[1, 0])
+            if unit_id in crosscorr['long']['unit_ids_laser']:
+                unit_ind = np.where(crosscorr['long']['unit_ids_laser'] == unit_id)[0][0]
+                bin_size = np.mean(np.diff(crosscorr['long']['time_bins']))
+                ax.bar(0.5*crosscorr['long']['time_bins'][1:] + 0.5*crosscorr['long']['time_bins'][:-1], crosscorr['long']['correlogram_laser'][unit_ind, unit_ind, :], width=bin_size, color='red', alpha=0.75)
+            ax.set_xlim(crosscorr['long']['time_bins'][0], crosscorr['long']['time_bins'][-1])
+            ax.set_xlabel('Lag (ms)')
+            ax.set_ylabel('Opto')
 
-        # short crosscorr
-        # no laser
-        ax = fig.add_subplot(gs_basic[0, 1])
-        if unit_id in crosscorr['short']['unit_ids_nolaser']:
-            unit_ind = np.where(crosscorr['short']['unit_ids_nolaser'] == unit_id)[0][0]
-            bin_size = np.mean(np.diff(crosscorr['short']['time_bins']))
-            ax.bar(0.5*crosscorr['short']['time_bins'][1:] + 0.5*crosscorr['short']['time_bins'][:-1], crosscorr['short']['correlogram_nolaser'][unit_ind, unit_ind, :], width=bin_size, color='black', alpha=0.5)
-        ax.set_xlim(crosscorr['short']['time_bins'][0], crosscorr['short']['time_bins'][-1])
-        ax.set_title('Short Crosscorr')
-        ax.set_xticks([])
-        # laser
-        ax = fig.add_subplot(gs_basic[1, 1])
-        if unit_id in crosscorr['short']['unit_ids_laser']:
-            unit_ind = np.where(crosscorr['short']['unit_ids_laser'] == unit_id)[0][0]
-            bin_size = np.mean(np.diff(crosscorr['short']['time_bins']))
-            ax.bar(0.5*crosscorr['short']['time_bins'][1:] + 0.5*crosscorr['short']['time_bins'][:-1], crosscorr['short']['correlogram_laser'][unit_ind, unit_ind, :], width=bin_size, color='red', alpha=0.5)
-        ax.set_xlim(crosscorr['short']['time_bins'][0], crosscorr['short']['time_bins'][-1])
-        ax.set_xlabel('Lag (ms)')
-        plt.tight_layout()
+            # short crosscorr
+            # no laser
+            ax = fig.add_subplot(gs_basic[0, 1])
+            if unit_id in crosscorr['short']['unit_ids_nolaser']:
+                unit_ind = np.where(crosscorr['short']['unit_ids_nolaser'] == unit_id)[0][0]
+                bin_size = np.mean(np.diff(crosscorr['short']['time_bins']))
+                ax.bar(0.5*crosscorr['short']['time_bins'][1:] + 0.5*crosscorr['short']['time_bins'][:-1], crosscorr['short']['correlogram_nolaser'][unit_ind, unit_ind, :], width=bin_size, color='black', alpha=0.5)
+            ax.set_xlim(crosscorr['short']['time_bins'][0], crosscorr['short']['time_bins'][-1])
+            ax.set_title('Short Crosscorr')
+            ax.set_xticks([])
+            # laser
+            ax = fig.add_subplot(gs_basic[1, 1])
+            if unit_id in crosscorr['short']['unit_ids_laser']:
+                unit_ind = np.where(crosscorr['short']['unit_ids_laser'] == unit_id)[0][0]
+                bin_size = np.mean(np.diff(crosscorr['short']['time_bins']))
+                ax.bar(0.5*crosscorr['short']['time_bins'][1:] + 0.5*crosscorr['short']['time_bins'][:-1], crosscorr['short']['correlogram_laser'][unit_ind, unit_ind, :], width=bin_size, color='red', alpha=0.5)
+            ax.set_xlim(crosscorr['short']['time_bins'][0], crosscorr['short']['time_bins'][-1])
+            ax.set_xlabel('Lag (ms)')
+            plt.tight_layout()
 
 
 
@@ -324,7 +325,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     session_dir = session_dirs(session)
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
     we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
-    spike_amplitude = we.load_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+    spike_amplitude = we.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
     unit_ids = sorting.get_unit_ids()
 
     # load quality metrics from nwb
@@ -342,6 +343,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     #     sorting = si.load_extractor(session_dir['curated_dir'])
     #     label = sorting.get_property('decoder_label')
     #     unit_qc['decoder_label'] = label
+    unit_qc = unit_qc.replace("<NA>", pd.NA)
     unit_qc = unit_qc.apply(pd.to_numeric, errors='ignore') 
     pass_qc = (unit_qc['isi_violations_ratio'] < 0.5) & \
             (unit_qc['firing_rate'] > 0.1) & \
@@ -373,11 +375,14 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
         waveforms = pickle.load(f)
     
     # load crosscorr
-    with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_correlogram_laser_short.pkl'), 'rb') as f:
-        crosscorr_short = pickle.load(f)
-    with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_correlogram_laser_long.pkl'), 'rb') as f:
-        crosscorr_long = pickle.load(f)
-    crosscorr = {'short': crosscorr_short, 'long': crosscorr_long}
+    if os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_correlogram_laser_short.pkl')): 
+        with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_correlogram_laser_short.pkl'), 'rb') as f:
+            crosscorr_short = pickle.load(f)
+        with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_correlogram_laser_long.pkl'), 'rb') as f:
+            crosscorr_long = pickle.load(f)
+        crosscorr = {'short': crosscorr_short, 'long': crosscorr_long}
+    else:
+        crosscorr = None
     # load waveforms from csv
     opto_wf_pkl = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_waveform_metrics.pkl')
     if os.path.exists(opto_wf_pkl):
@@ -446,7 +451,7 @@ def opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None
     end = np.max(np.array([np.max(spiketimes[unit]) for unit in spiketimes.keys()]))
 
     we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
-    spike_amplitude = we.load_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+    spike_amplitude = we.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
 
     # %%
     spike_mean_time = [np.mean(spiketimes[unit]) if len(spiketimes[unit]) > 0 else 0 for unit in spiketimes.keys() if len(spiketimes[unit]) > 0]
