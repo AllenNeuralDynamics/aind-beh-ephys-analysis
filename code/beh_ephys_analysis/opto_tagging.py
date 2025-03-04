@@ -123,10 +123,15 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
 
                 euc_dist.append(euc_dist_curr)
                 corr.append(corr_curr)
-        opto_tagging_df['euclidean_norm'] = euc_dist
-        opto_tagging_df['correlation'] = corr
+        if len(euc_dist) > 0:
+            opto_tagging_df['euclidean_norm'] = euc_dist
+            opto_tagging_df['correlation'] = corr
+        else:
+            opto_tagging_df['euclidean_norm'] = None
+            opto_tagging_df['correlation'] = None
         opto_tagging_dict = {key: opto_tagging_df[key].values for key in opto_tagging_df.columns}
     opto_tagging_dict['unit_id'] = unit_id
+    opto_tagging_dict['spike_times'] = spike_times
     opto_tagging_dict.update(qc_dict)
 
     
@@ -496,7 +501,7 @@ if __name__ == "__main__":
     session_dir = session_dirs(session)
     # final check
     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False)
-    opto_tagging_df_sess.to_csv(os.path.join(session_dirs(session)[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv'), index=False)
+    # opto_tagging_df_sess.to_csv(os.path.join(session_dirs(session)[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv'), index=False)
     opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None)
     # first check
     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True)

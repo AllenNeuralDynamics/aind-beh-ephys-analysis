@@ -136,7 +136,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
         print('Harp times saved to: {}'.format(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
         print('Local times saved to: {}'.format(os.path.join(session_dir['alignment_dir'], 'local_times.npy')))
     # %% find a stable time period
-    ephys_cut_new = [timestamps[0]+ephys_cut[0], timestamps[-1]-ephys_cut[1]]
+    ephys_cut_new = [recording.continuous[0].timestamps[0]+ephys_cut[0], recording.continuous[0].timestamps[-1]-ephys_cut[1]]
     qm_dict['ephys_cut'] = ephys_cut_new
     # %%
     qm_file = os.path.join(session_dir['processed_dir'], f"{session}_qm.json")
