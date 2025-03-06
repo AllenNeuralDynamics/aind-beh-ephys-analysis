@@ -44,7 +44,7 @@ from spikeinterface.preprocessing.motion import load_motion_info
 from PIL import Image
 
 # %%
-def plot_session_opto_drift(session, data_type, plot=True):
+def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     session_dir = session_dirs(session)
 
     # %%
@@ -241,8 +241,9 @@ def plot_session_opto_drift(session, data_type, plot=True):
                 temp = temp[(temp >= cut_off[0]) & (temp <= cut_off[1])]
                 if temp.size > 0:
                     amplitude_slow[i] = np.mean(temp)
-        # linear regression
-        # # Combine x and y into a feature matrix
+
+        ## linear regression for slower dynamics
+        # Combine x and y into a feature matrix
         X_lr = np.column_stack((drift_slow[closest_ybin], amplitude_slow))
 
         # Create and fit the linear regression model
@@ -254,43 +255,54 @@ def plot_session_opto_drift(session, data_type, plot=True):
 
         # sd.mean
         sd = np.std(spike_counts_slow[nan_inds_slow])/np.nanmean(spike_counts_slow)
-        # random forest model
+        ## random forest model for fast dynamics
         # Feature matrix
-        z_rf = spike_counts_slow_post - spike_counts_slow_pre # firing rate change
-        z_rf = np.abs((spike_counts_fast - spike_counts_slow_pre)/(0.5*(spike_counts_fast + spike_counts_slow_pre))) # firing rate change
+        z_rf_fast = np.abs((spike_counts_fast - spike_counts_slow_pre)/(0.5*(spike_counts_fast + spike_counts_slow_pre))) # firing rate change
+        X_rf_fast = np.abs(np.column_stack((drift[closest_ybin]-drift_slow_pre[closest_ybin], # drift
+                            amplitude_fast - amplitude_slow_pre,  # amplitude change
+                            (drift[closest_ybin]-drift_slow_pre[closest_ybin])*spike_counts_slow))) # interaction between drift and firing rate
+        nan_inds = np.where(~np.isnan(z_rf_fast) & np.all(~np.isnan(X_rf_fast), axis=1))[0]
+        # Train Random Forest model
+        model_rf_fast = RandomForestRegressor(n_estimators=10, random_state=42)
+        model_rf_fast.fit(X_rf_fast[nan_inds], z_rf_fast[nan_inds])
+        # Predictions
+        z_pred_rf_fast = model_rf_fast.predict(X_rf_fast)
+        # Evaluate model
+        r2_rf_fast = r2_score(z_rf_fast[nan_inds], z_pred_rf_fast[nan_inds])
+        print(f"Random Forest R² Score fast: {r2_rf_fast:.4f}")
+        # Feature Importance
+        importances_fast = model_rf_fast.feature_importances_
+        print(f"Feature Importance fast - motion: {importances_fast[0]:.2f}, amp: {importances_fast[1]:.2f}, motion*fr: {importances_fast[2]:.2f}")
+        
+        ## Random forest mode for slower dynamics
+        z_rf = spike_counts_slow_post - spike_counts_slow_pre/(0.5*(spike_counts_slow_post+spike_counts_slow_pre)) # firing rate change
         X_rf = np.column_stack((drift_slow_post[closest_ybin]-drift_slow_pre[closest_ybin], # drift
                             amplitude_slow_post - amplitude_slow_pre,  # amplitude change
                             (drift_slow_post[closest_ybin]-drift_slow_pre[closest_ybin])*spike_counts_slow)) # interaction between drift and firing rate
-        X_rf = np.abs(np.column_stack((drift[closest_ybin]-drift_slow_pre[closest_ybin], # drift
-                            amplitude_fast - amplitude_slow_pre,  # amplitude change
-                            (drift[closest_ybin]-drift_slow_pre[closest_ybin])*spike_counts_slow))) # interaction between drift and firing rate
-
-
-        nan_inds = np.where(~np.isnan(z_rf) & np.all(~np.isnan(X_rf), axis=1))[0]
+        nan_inds_slow_rf = np.where(~np.isnan(z_rf) & np.all(~np.isnan(X_rf), axis=1))[0]
         # Train Random Forest model
         model_rf = RandomForestRegressor(n_estimators=10, random_state=42)
-        model_rf.fit(X_rf[nan_inds], z_rf[nan_inds])
-
+        model_rf.fit(X_rf[nan_inds_slow_rf], z_rf[nan_inds_slow_rf])
         # Predictions
         z_pred_rf = model_rf.predict(X_rf)
-
         # Evaluate model
-        r2_rf = r2_score(z_rf[nan_inds], z_pred_rf[nan_inds])
-        print(f"Random Forest R² Score: {r2_rf:.4f}")
+        r2_rf = r2_score(z_rf[nan_inds_slow_rf], z_pred_rf[nan_inds_slow_rf])
+        print(f"Random Forest R² Score slow: {r2_rf:.4f}")
         # Feature Importance
         importances = model_rf.feature_importances_
-        print(f"Feature Importance - motion: {importances[0]:.2f}, amp: {importances[1]:.2f}, motion*fr: {importances[2]:.2f}")
+        print(f"Feature Importance slow - motion: {importances[0]:.2f}, amp: {importances[1]:.2f}, motion*fr: {importances[2]:.2f}")
 
-        # linear regression with for faster timescale
+        ## linear regression with for faster timescale
         model_fast = LinearRegression()
-        model_fast.fit(X_rf[nan_inds], z_rf[nan_inds])
-        z_pred_fast = model_fast.predict(X_rf[nan_inds])
-        r_squared_fast = model_fast.score(X_rf[nan_inds], z_rf[nan_inds])
+        model_fast.fit(X_rf_fast[nan_inds], z_rf_fast[nan_inds])
+        z_pred_fast = model_fast.predict(X_rf_fast[nan_inds])
+        r_squared_fast = model_fast.score(X_rf_fast[nan_inds], z_rf_fast[nan_inds])
 
 
         
         if plot: 
-            fig = plt.figure(figsize=(10, 10))
+            fig = plt.figure(figsize=(20, 20))
+            plt.rcParams.update({'font.size': 8})
             gs = gridspec.GridSpec(5, 3)
             ax = plt.subplot(gs[0, 0])
             plt.hist(spike_times, bins=temp_bins);
@@ -352,20 +364,27 @@ def plot_session_opto_drift(session, data_type, plot=True):
             plt.plot(temp_bins_slow, np.abs(amplitude_slow_post - amplitude_slow_pre), label = 'abs(diff(slow))', c='r')
             plt.legend()
 
-            gs_model = gridspec.GridSpecFromSubplotSpec(1, 4, gs[4, :])
+            gs_model = gridspec.GridSpecFromSubplotSpec(1, 5, gs[4, :])
             ax = plt.subplot(gs_model[0])
             plt.plot(temp_bins, spike_counts_slow, label='data', c='r')
             plt.plot(temp_bins[nan_inds_slow], model.predict(X_lr[nan_inds_slow]), label='prediction', c='b')
             plt.legend()
             plt.xlabel('Time (s)')
-            plt.title(f"LR R² score: {r_squared:.2f}")
+            plt.title(f"Slow FR: LR R²: {r_squared:.2f}")
 
             ax = plt.subplot(gs_model[1])
             plt.plot(temp_bins, z_rf, label='data', c='r')
+            plt.plot(temp_bins, z_pred_rf, label='prediction', c='b')
+            plt.xlabel('Time (s)')
+            plt.legend()
+            plt.title(f"Slow diff(FR): RF R²: {r2_rf:.2f}")
+
+            ax = plt.subplot(gs_model[2])
+            plt.plot(temp_bins, z_rf_fast, label='data', c='r')
             plt.plot(temp_bins[nan_inds], z_pred_fast, label='prediction', c='b')
             plt.legend()
             plt.xlabel('Time (s)')
-            plt.title(f"LR_fast R² score: {r_squared_fast:.2f}")
+            plt.title(f"Fast abs(diff(FR)): LR R²: {r_squared_fast:.2f}")
 
             # # Print coefficients and intercept
             # print(f"Coefficients: {model.coef_}")
@@ -375,20 +394,22 @@ def plot_session_opto_drift(session, data_type, plot=True):
             # X_new = np.array([[6, 7], [7, 8]])
             # z_pred = model.predict(X_new)
             # print(f"Predicted values: {z_pred}")
+
             ax = plt.subplot(gs_model[3])
+            plt.plot(temp_bins, z_rf_fast, label='data', c='r')
+            plt.plot(temp_bins[nan_inds], z_pred_rf_fast[nan_inds], label='prediction', c='b')
+            plt.xlabel('Time (s)')
+            plt.legend()
+            plt.title(f"Fast abs(diff(FR)) : RF R²: {r2_rf:.2f}")
+
+            ax = plt.subplot(gs_model[4])
             plt.hist(spike_counts_slow, bins=20, alpha=0.5, label='data', color='r')
             plt.title(f"SD/mean: {sd:.2f}")
             plt.xlabel('Time (s)')
             plt.legend()
-
-            ax = plt.subplot(gs_model[2])
-            plt.plot(temp_bins, z_rf, label='data', c='r')
-            plt.plot(temp_bins, z_pred_rf, label='prediction', c='b')
-            plt.xlabel('Time (s)')
-            plt.legend()
-            plt.title(f"RF R² score: {r2_rf:.2f}")
     
             plt.suptitle(f'{unit_id} y loc {unit_locations[unit_id][1] :.2f} um')
+            plt.rcParams.update({'font.size': 8})
             plt.tight_layout()
 
         return {'unit_id': unit_id,
@@ -424,9 +445,11 @@ def plot_session_opto_drift(session, data_type, plot=True):
         if plot:
             plt.savefig(os.path.join(drift_dir, f'{unit}_drift.pdf'))
             plt.show()
-    opto_drift_tbl.to_csv(os.path.join(session_dir['opto_dir_curated'], f'{session}_opto_drift_tbl.csv'))
+    if update_csv:
+        opto_drift_tbl.to_csv(os.path.join(session_dir['opto_dir_curated'], f'{session}_opto_drift_tbl.csv'))
     if plot:
         merge_pdfs(input_dir=drift_dir, output_filename=os.path.join(session_dir['opto_dir_curated'], f'{session}_drift.pdf'))
+    return opto_drift_tbl
 
 if __name__ == '__main__':
     session = 'behavior_751004_2024-12-19_11-50-37'

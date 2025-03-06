@@ -23,6 +23,7 @@ from aind_ephys_utils import align
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import colormaps
 import pickle
+import json
 
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_nwb
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
@@ -255,22 +256,23 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
                 curr_pre_post = 'post'
             
             laser_times_curr = np.sort(np.concatenate([opto_df.query('site == @max_site and power == @curr_power and pre_post == "pre"')['time'].values, 
-                                        opto_df.query('site == @max_site and power == @curr_power and pre_post == "post"')['time'].values], axis = 0), )[::-1] 
-            raster_df = align.to_events(spike_times, laser_times_curr, (-0.5, 1.5), return_df=True)
-            ax = fig.add_subplot(gs_sub_raster[0,1])
-            plot_raster_bar(raster_df, ax)
-            ax.set_title(f'Power: {curr_power}; Site: {max_site}')
-            ax.set_xlim(-0.5, 1)
-            ax.set_ylim(0, len(laser_times_curr)+1)
-            ax.set_yticks([])
-            # ax.axis('off')
-            ax.set(xlabel='Time (s)')
-            for spine in ax.spines.values():
-                spine.set_visible(False)
-            for j in range(opto_info['num_pulses'][0]):
-                x = j * 1/opto_info['freqs'][0]
-                rect = patches.Rectangle((x, 0), opto_info['durations'][0]/1000, len(laser_times_curr), color='r', alpha=0.5, edgecolor=None)
-                ax.add_patch(rect)
+                                        opto_df.query('site == @max_site and power == @curr_power and pre_post == @curr_pre_post')['time'].values], axis = 0), )[::-1] 
+            if len(laser_times_curr) > 0:
+                raster_df = align.to_events(spike_times, laser_times_curr, (-0.5, 1.5), return_df=True)
+                ax = fig.add_subplot(gs_sub_raster[0,1])
+                plot_raster_bar(raster_df, ax)
+                ax.set_title(f'Power: {curr_power}; Site: {max_site}')
+                ax.set_xlim(-0.5, 1)
+                ax.set_ylim(0, len(laser_times_curr)+1)
+                ax.set_yticks([])
+                # ax.axis('off')
+                ax.set(xlabel='Time (s)')
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+                for j in range(opto_info['num_pulses'][0]):
+                    x = j * 1/opto_info['freqs'][0]
+                    rect = patches.Rectangle((x, 0), opto_info['durations'][0]/1000, len(laser_times_curr), color='r', alpha=0.5, edgecolor=None)
+                    ax.add_patch(rect)
 
             # plot waveform
             gs_sub_waveform = gridspec.GridSpecFromSubplotSpec(6, 2, subplot_spec=gs[power_ind], hspace=0.75)
@@ -326,15 +328,17 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
         plt.tight_layout()
     return fig, opto_tagging_dict
 #%%
-def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False, target_unit_ids=None):
+def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False, target_unit_ids=None, ephys_cut = False):
     session_dir = session_dirs(session)
+    session_qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
+    with open(session_qm_file) as f:
+        qm = json.load(f)
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
     we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
     spike_amplitude = we.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
     unit_ids = sorting.get_unit_ids()
 
     # load quality metrics from nwb
-    # load quality metrics
     if os.path.exists(session_dir[f'nwb_dir_{data_type}']):
         nwb = load_nwb(session_dir[f'nwb_dir_{data_type}'])
         unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label', 'depth']]
@@ -342,12 +346,6 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
         print('No nwb file found.')
     
     # change all strings in unit_qc to float 
-    #     qm = pd.read_csv(session_dir['qm_dir'], index_col=0)
-    #     unit_qc = qm[:][['isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff']]
-    #     unit_qc['ks_unit_id'] = unit_qc.index
-    #     sorting = si.load_extractor(session_dir['curated_dir'])
-    #     label = sorting.get_property('decoder_label')
-    #     unit_qc['decoder_label'] = label
     unit_qc = unit_qc.replace("<NA>", pd.NA)
     unit_qc = unit_qc.apply(pd.to_numeric, errors='ignore') 
     pass_qc = (unit_qc['isi_violations_ratio'] < 0.5) & \
@@ -362,16 +360,11 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
 
 
     # load waveforms info
-    # we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
-    # unit_locations = we.load_extension("unit_locations").get_data(outputs="by_unit")
-    # channel_locations = we.get_channel_locations()
-    # right_left = channel_locations[:, 0]<20
     with open(os.path.join(session_dir[f'opto_dir_{data_type}'], session+'_waveform_params.json')) as f:
         waveform_params = json.load(f)
     print(waveform_params)
 
     # load opto responses
-
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'rb') as f:
         spiketimes = pickle.load(f)
     with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_responses_{target}.pkl'), 'rb') as f:
@@ -388,7 +381,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
         crosscorr = {'short': crosscorr_short, 'long': crosscorr_long}
     else:
         crosscorr = None
-    # load waveforms from csv
+    # load waveforms from pkl
     opto_wf_pkl = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_waveform_metrics.pkl')
     if os.path.exists(opto_wf_pkl):
         with open (opto_wf_pkl, 'rb') as f:
@@ -396,9 +389,13 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
             opto_wf = opto_wf.apply(pd.to_numeric, errors='ignore')
     else: 
         opto_wf = None
-    
-    
 
+    # load ephys cut
+    if ephys_cut:
+        drift_file = os.path.join(session_dir['opto_dir_curated'], f'{session}_opto_drift_tbl.csv')
+        opto_drift_tbl = pd.read_csv(drift_file)
+    
+    # load opto stimulation information
     opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_{target}.csv'))
     with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_info_{target}.json')) as f:
         opto_info = json.load(f)
@@ -413,12 +410,30 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     target_pass_qc = []
     opto_tagging_df_sess = pd.DataFrame()
     for unit_id in target_unit_ids:
+        spiketimes_curr = spiketimes[unit_id]
+        spike_amplitude_curr = spike_amplitude[unit_id]
+        opto_df_curr = opto_df
+
+        if ephys_cut:
+            if unit_id in opto_drift_tbl['unit_id'].tolist():
+                ephys_cut_curr = opto_drift_tbl.query('unit_id == @unit_id')['ephys_cut'].values[0]
+
+                string_list = ephys_cut_curr.replace("nan", "null")
+                ephys_cut_curr = json.loads(string_list)
+                ephys_cut_curr = np.array([np.nan if x is None else x for x in ephys_cut_curr])
+
+                ephys_cut_curr[np.isnan(ephys_cut_curr)] = np.array(qm['ephys_cut'])[np.isnan(ephys_cut_curr)]
+                spike_amplitude_curr = spike_amplitude_curr[(spiketimes_curr > ephys_cut_curr[0]) & (spiketimes_curr < ephys_cut_curr[1])]
+                spiketimes_curr = spiketimes_curr[(spiketimes_curr > ephys_cut_curr[0]) & (spiketimes_curr < ephys_cut_curr[1])]
+                opto_df_curr = opto_df_curr[(opto_df_curr['time'] > ephys_cut_curr[0]) & (opto_df_curr['time'] < ephys_cut_curr[1])]
+
+    
     #     if pass_qc[unit_id]:   
         qc_dict = unit_qc.loc[unit_qc['ks_unit_id'] == unit_id].iloc[0].to_dict()
-        fig, opto_tagging_dict_curr = opto_plotting_unit(unit_id, spiketimes[unit_id], spike_amplitude[unit_id], 
+        fig, opto_tagging_dict_curr = opto_plotting_unit(unit_id, spiketimes_curr, spike_amplitude_curr, 
                                                         waveforms[unit_id], opto_wf, qc_dict, crosscorr,
                                                         opto_responses['resp_p'][unit_id], opto_responses['resp_lat'][unit_id], 
-                                                        opto_df, opto_info, 
+                                                        opto_df_curr, opto_info, 
                                                         waveform_params, 
                                                         dim_1 = 'powers', resp_thresh=resp_thresh, lat_thresh=lat_thresh, plot=plot)
         if fig is not None:
@@ -493,19 +508,19 @@ def opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None
 
 # %%
 if __name__ == "__main__":
-    session = 'behavior_758017_2025-02-04_11-57-38'
+    session = 'behavior_751004_2024-12-20_13-26-11'
     target = 'soma'
-    data_type = 'raw' 
+    data_type = 'curated' 
     resp_thresh = 0.3
     lat_thresh = 0.02 
     session_dir = session_dirs(session)
     # final check
-    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False)
+    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = True)
     # opto_tagging_df_sess.to_csv(os.path.join(session_dirs(session)[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv'), index=False)
-    opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None)
+    # opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None)
     # first check
-    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True)
-    opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=opto_tagging_df_sess)
+    # opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True)
+    # opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=opto_tagging_df_sess)
 
 
 
