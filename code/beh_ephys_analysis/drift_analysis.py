@@ -162,7 +162,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
 
 
     # %%
-    sorting_analyzer = si.load_sorting_analyzer(session_dir[f'postprocessed_dir_{data_type}']) 
+    sorting_analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False) 
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
 
     # %%

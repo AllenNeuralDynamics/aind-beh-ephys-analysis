@@ -44,10 +44,13 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     session_json_dir = os.path.join(session_dir['raw_dir'], 'behavior')
     session_json_files = []
     for dir, _, files in os.walk(session_json_dir):
+        print(dir)
         for file in files:
+            print(file)
             if file.endswith('.json') and aniID in file and 'model' not in file:
                 session_json_files.extend([os.path.join(dir, file)])
     print(f'{len(session_json_files)} session json files found.')
+    nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
     if len(session_json_files) == 1:
         session_json_file = session_json_files[0]
         if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):
@@ -57,7 +60,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
             success, nwb_file = bonsai_to_nwb(session_json_file, os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
 
     # %%
-    nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
+
     if not os.path.exists(nwb_file):
         print('NWB file does not exist.')
     else:
@@ -151,7 +154,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     log_file.close()
 
 if __name__ == "__main__":
-    session = 'behavior_716325_2024-05-31_10-31-14'
+    session = 'behavior_717121_2024-06-15_10-00-58'
     ephys_cut = [0, 0]
     beh_and_time_alignment(session, ephys_cut=ephys_cut)
 

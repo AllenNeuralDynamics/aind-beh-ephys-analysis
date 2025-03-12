@@ -1,6 +1,9 @@
 # %%
 from codeocean.data_asset import DataAssetParams, DataAssetSearchParams,DataAssetAttachParams, Source, AWSS3Source
 import pandas as pd
+import os
+os.sys.path.append('/root/capsule/code/beh_ephys_analysis')
+from utils.beh_functions import parseSessionID
 import os, sys
 from codeocean import CodeOcean
 client = CodeOcean(domain="https://codeocean.allenneuraldynamics.org", token=os.getenv("API_SECRET"))
@@ -33,6 +36,17 @@ for curr_col in col_to_attach:
 # all_mounts = all_mounts + ['all_behavior']
 
 # Generate the list of DataAssetAttachParams objects
+all_mounts_new = []
+for id, mount in zip(all_ids, all_mounts):
+    curr_mount = mount
+    if 'stan' in mount:
+        lists = mount.split('_model_stan')
+        aniID, dateObj, raw_id = parseSessionID(lists[0])
+        
+        curr_mount = f'{aniID}_model_stan'
+    all_mounts_new.append(curr_mount)   
+        
+all_mounts = all_mounts_new
 data_assets = [DataAssetAttachParams(id, mount) for id, mount in zip(all_ids, all_mounts)]
 data_assets_id = all_ids
 

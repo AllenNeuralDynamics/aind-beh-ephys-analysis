@@ -334,8 +334,9 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     with open(session_qm_file) as f:
         qm = json.load(f)
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
-    we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
+    we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     spike_amplitude = we.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+    del we
     unit_ids = sorting.get_unit_ids()
 
     # load quality metrics from nwb

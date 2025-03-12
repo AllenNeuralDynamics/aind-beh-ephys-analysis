@@ -263,12 +263,12 @@ def ephys_opto_preprocessing(session, data_type, target):
     else:
         qm['laser_same_count'] = True
         print(f'{session} has equal number of laser triggers and opto_df')
-    # %%
-    if data_type == 'curated':
-        opto_df = opto_df[(laser_times >= qm['ephys_cut'][0]) & (laser_times < qm['ephys_cut'][1])].copy()
-        laser_times = laser_times[(laser_times >= qm['ephys_cut'][0]) & (laser_times < qm['ephys_cut'][1])].copy() 
+    # %% 
     laser_times_ori = laser_times.copy()
-
+    if session == 'behavior_717121_2024-06-15_10-00-58':
+        local_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/original_timestamps.npy')
+        harp_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/timestamps.npy')
+        laser_times = align_timestamps_to_anchor_points(laser_times, local_times, harp_times)
     # %%
     nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
     unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label']]
@@ -292,8 +292,6 @@ def ephys_opto_preprocessing(session, data_type, target):
         unit_spikes = [align_timestamps_to_anchor_points(spike_times, local_sync_time, harp_sync_time) for spike_times in unit_spikes]
         laser_times = align_timestamps_to_anchor_points(laser_times, local_sync_time, harp_sync_time)
     # remove cut off period if data is curated version
-    if data_type == 'curated':
-        unit_spikes = [spikes[(spikes >= qm['ephys_cut'][0]) & (spikes < qm['ephys_cut'][1])] for spikes in unit_spikes]
     unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
         pickle.dump(unit_spikes, f)
@@ -498,16 +496,16 @@ def ephys_opto_preprocessing(session, data_type, target):
 def ephys_opto_crosscorr(session, data_type):
     session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
     session_crosscorr(session, data_type, window_ms=1000, bin_ms=10, post_fix = 'long')
-    print(f"Cross-correlation saved to {session_dir[f'opto_dir_{data_type}']}")
+    # print(f"Cross-correlation saved to {session_dir[f'opto_dir_{data_type}']}")
 
 
 if __name__ == "__main__":
-    session = 'behavior_758017_2025-02-04_11-57-38'
-    data_type = 'raw'
+    session = 'behavior_717121_2024-06-15_10-00-58'
+    data_type = 'curated'
     target = 'soma'
-    # ephys_opto_preprocessing(session, data_type, target)
-    si.set_global_job_kwargs(n_jobs=-1)
-    session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
-    session_crosscorr(session, data_type, window_ms=2000, bin_ms=10, post_fix = 'long')
+    ephys_opto_preprocessing(session, data_type, target)
+    # si.set_global_job_kwargs(n_jobs=-1)
+    # session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
+    # session_crosscorr(session, data_type, window_ms=2000, bin_ms=10, post_fix = 'long')
 
 

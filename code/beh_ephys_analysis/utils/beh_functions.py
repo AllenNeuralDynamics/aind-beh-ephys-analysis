@@ -10,7 +10,7 @@ from scipy.stats import norm
 import ast
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_data
-
+from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from uuid import uuid4
 import json
 from datetime import datetime
@@ -81,7 +81,7 @@ def _get_field(obj, field_list, reject_list=[None, np.nan,'',[]], index=None, de
     
 
 ######## load the Json/Mat file #######
-def bonsai_to_nwb(fname, save_file):
+def bonsai_to_nwb(fname, save_file=None):
     if fname.endswith('.mat'):
         Obj = loadmat(fname)
         for key in Obj.keys():
@@ -552,13 +552,14 @@ def bonsai_to_nwb(fname, save_file):
     # save NWB file
     base_filename = os.path.splitext(os.path.basename(fname))[0] + '.nwb'
     if len(nwbfile.trials) > 0:
-        NWBName = save_file
-        io = NWBHDF5IO(NWBName, mode="w")
-        io.write(nwbfile)
-        io.close()
-        logger.info(f'Successfully converted: {NWBName}')
-        print(f'NWB saved {NWBName}')
-        return 'success', nwbfile
+        if save_file is not None: 
+            NWBName = save_file
+            io = NWBHDF5IO(NWBName, mode="w")
+            io.write(nwbfile)
+            io.close()
+            logger.info(f'Successfully converted: {NWBName}')
+            print(f'NWB saved {NWBName}')
+            return 'success', nwbfile
     else:
         logger.warning(f"No trials found! Skipping {fname}")
         return 'empty_trials', nwbfile
@@ -638,10 +639,6 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             nwb_dir = None
             print('There is no nwb file in the raw directory.')
 
-    # pro   
-    
-    beh_nwb_dir = None
-
     # postprocessed dirs
     postprocessed_dir_raw = None
     postprocessed_dir_curated = None
@@ -678,11 +675,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
 
     # model dir
-    
+    models_dir = os.path.join(data_dir, f'{aniID}_model_stan')
     if model_name is not None:
         model_dir = os.path.join(models_dir, model_name)
-        model_file = os.path.join(model_dir, raw_id+'_session_model_dv.csv')
-        session_curation_file = os.path.join(model_dir, 'ani_session_data.csv')
+        model_file = os.path.join(model_dir, session_id+'_session_model_dv.csv')
+        session_curation_file = os.path.join(models_dir, f'{aniID}_session_data.csv')
     else:
         model_dir = None
         model_file = None
@@ -714,6 +711,9 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     opto_dir_curated = os.path.join(opto_dir, 'curated')
     opto_dir_fig_raw = os.path.join(opto_dir, 'raw', 'figures')
     opto_dir_fig_curated = os.path.join(opto_dir, 'curated', 'figures')
+    # pro   
+    
+    beh_nwb_dir = os.path.join(processed_dir, 'behavior', f'{session_id}.nwb')
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
@@ -743,7 +743,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'model_dir': model_dir,
                 'model_file': model_file,
                 'session_curation_file': session_curation_file,
-                'beh_nwb_dir': beh_nwb_dir,
+                'nwb_beh': beh_nwb_dir,
                 'sorted_dir_curated': sorted_dir,
                 'sorted_dir_curated': sorted_raw_dir,
                 'opto_csvs': opto_csvs,}
@@ -757,7 +757,7 @@ def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scrat
     model_dirs = session_dirs(session_id, model_name, data_dir=data_dir, scratch_dir=scratch_dir)
     if model_dirs['model_file'] is not None:
         model_dv_temp = pd.read_csv(model_dirs['model_file'], index_col=0)
-        nwb = load_nwb(model_dirs['nwb_dir'])
+        nwb = load_nwb_from_filename(model_dirs['nwb_beh'])
         trial_df = nwb.trials.to_dataframe()
         # model_dv = pd.DataFrame(np.nan, index=range(len(trial_df)), columns=model_dv_temp.columns)
         session_curation = pd.read_csv(model_dirs['session_curation_file'])

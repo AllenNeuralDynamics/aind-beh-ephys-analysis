@@ -207,6 +207,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
         # %%
         num_cases = len(sorting_all.unit_ids) // num_units - 2
         sparsity_mask_all = np.tile(we.sparsity.mask, (num_cases + 2, 1))
+        del we
         sparsity_all = si.ChannelSparsity(
             sparsity_mask_all,
             unit_ids=sorting_all.unit_ids,
