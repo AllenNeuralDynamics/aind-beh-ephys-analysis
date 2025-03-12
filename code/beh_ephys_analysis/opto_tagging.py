@@ -33,14 +33,14 @@ colors = [(1, 1, 1), (1, 0, 0)]  # white to red
 my_red = LinearSegmentedColormap.from_list("white_to_red", colors)
 
 # %%
-session = 'behavior_758017_2025-02-04_11-57-38'
-session_dir = session_dirs(session)
-data_type = 'raw'
-target = 'soma'
+# session = 'behavior_758017_2025-02-04_11-57-38'
+# session_dir = session_dirs(session)
+# data_type = 'raw'
+# target = 'soma'
 
-resp_thresh = 0.8
-lat_thresh = 0.015
-pulse_width = 4
+# resp_thresh = 0.8
+# lat_thresh = 0.015
+# pulse_width = 4
 # %%
 def max_index_ndarray(arr):
     """
@@ -190,7 +190,7 @@ def opto_plotting_unit(unit_id, spike_times, waveform, qc_dict, resp_p, resp_lat
         plt.tight_layout()
     return fig, pass_opto
 #%%
-def opto_plotting_session(session, target, resp_thresh=0.8, lat_thresh=0.015, plot = False):
+def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False):
     session_dir = session_dirs(session)
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
     unit_ids = sorting.get_unit_ids()
@@ -202,13 +202,16 @@ def opto_plotting_session(session, target, resp_thresh=0.8, lat_thresh=0.015, pl
         unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label', 'depth']]
     else:
         print('No nwb file found.')
+    
+    # change all strings in unit_qc to float
+    unit_qc = unit_qc.apply(pd.to_numeric, errors='coerce')   
     #     qm = pd.read_csv(session_dir['qm_dir'], index_col=0)
     #     unit_qc = qm[:][['isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff']]
     #     unit_qc['ks_unit_id'] = unit_qc.index
     #     sorting = si.load_extractor(session_dir['curated_dir'])
     #     label = sorting.get_property('decoder_label')
     #     unit_qc['decoder_label'] = label
-
+    unit_qc = unit_qc.apply(pd.to_numeric, errors='ignore') 
     pass_qc = (unit_qc['isi_violations_ratio'] < 0.5) & \
             (unit_qc['firing_rate'] > 0.1) & \
             (unit_qc['presence_ratio'] > 0.95) & \
@@ -221,16 +224,15 @@ def opto_plotting_session(session, target, resp_thresh=0.8, lat_thresh=0.015, pl
 
 
     # load waveforms info
-    we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
-    unit_locations = we.load_extension("unit_locations").get_data(outputs="by_unit")
-    channel_locations = we.get_channel_locations()
-    right_left = channel_locations[:, 0]<20
+    # we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
+    # unit_locations = we.load_extension("unit_locations").get_data(outputs="by_unit")
+    # channel_locations = we.get_channel_locations()
+    # right_left = channel_locations[:, 0]<20
     with open(os.path.join(session_dir[f'opto_dir_{data_type}'], session+'_waveform_params.json')) as f:
         waveform_params = json.load(f)
     print(waveform_params)
 
     # prepare for heatmap
-
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'rb') as f:
         spiketimes = pickle.load(f)
     with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_responses_{target}.pkl'), 'rb') as f:
@@ -241,7 +243,7 @@ def opto_plotting_session(session, target, resp_thresh=0.8, lat_thresh=0.015, pl
     opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_{target}.csv'))
     with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_info_{target}.json')) as f:
         opto_info = json.load(f)
-    
+    pulse_width = opto_df['duration'].mode()[0]
     colors = ["blue", "white", "red"]
     b_w_r_cmap = LinearSegmentedColormap.from_list("b_w_r", colors)
     opto_pass = []
@@ -260,7 +262,7 @@ def opto_plotting_session(session, target, resp_thresh=0.8, lat_thresh=0.015, pl
     # both pass qc and opto tagging
     unit_count_pass = np.sum(np.array(list(pass_qc.values())) & np.array(opto_pass))
     print(f'{unit_count_pass} out of {len(pass_qc)} units pass quality control and opto tagging')
-    pass_dict = {'pass_qc': pass_qc.values(), 'opto_tagging': opto_pass}
+    pass_dict = {'pass_qc': pass_qc.values(), 'opto_tagging': opto_pass, 'unit_id': unit_ids}
     return pass_dict
 
 # %%
@@ -270,8 +272,9 @@ if __name__ == "__main__":
     data_type = 'raw' 
     resp_thresh = 0.6
     lat_thresh = 0.02
+    
 
-    opto_plotting_session(session, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, plot = True)
+    opto_plotting_session(session, target, data_type, resp_thresh=resp_thresh, lat_thresh=lat_thresh, plot = True)
 
 
 
