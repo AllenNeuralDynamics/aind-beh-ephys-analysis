@@ -344,10 +344,12 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
         nwb = load_nwb(session_dir[f'nwb_dir_{data_type}'])
         unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label', 'depth']]
     else:
-        print('No nwb file found.')
+        print('No nwb file found.') 
     
     # change all strings in unit_qc to float 
     unit_qc = unit_qc.replace("<NA>", pd.NA)
+    unit_qc['waveform_mean'] = nwb.units[:]['waveform_mean']
+    unit_qc['waveform_sd'] = nwb.units[:]['waveform_sd']
     unit_qc = unit_qc.apply(pd.to_numeric, errors='ignore') 
     pass_qc = (unit_qc['isi_violations_ratio'] < 0.5) & \
             (unit_qc['firing_rate'] > 0.1) & \
@@ -516,7 +518,9 @@ if __name__ == "__main__":
     lat_thresh = 0.02 
     session_dir = session_dirs(session)
     # final check
-    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = True)
+    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False)
+    with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'), 'wb') as f:
+        pickle.dump(opto_tagging_df_sess, f)
     # opto_tagging_df_sess.to_csv(os.path.join(session_dirs(session)[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv'), index=False)
     # opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None)
     # first check
