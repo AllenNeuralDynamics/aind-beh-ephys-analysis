@@ -792,7 +792,7 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
     tblTrials = get_session_tbl(session)
 
     if model_name is not None:
-        model_dv, scut = load_model_dv(session, model_name)
+        model_dv, cut = load_model_dv(session, model_name)
 
     if np.isnan(cut[1]):
         tblTrials = tblTrials.iloc[cut[0]:].copy()
@@ -833,6 +833,11 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
     laser = tblTrials['laser_on_trial'] == 1
     laserPrev = np.concatenate((np.full((1), np.nan), laserChoice[:-1]))
     # trial_id = tblTrials.loc[tblTrials['animal_response']!=2, 'id']
+
+    # stay vs switch
+    svs = np.zeros(len(choices), dtype=bool)
+    svs[choices==choicesPrev] = True
+
     trialData = pd.DataFrame({
         # 'trial_id': trial_id,
         'outcome': outcomes.values.astype(float), 
@@ -844,7 +849,10 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
         'go_cue_time': go_cue_time.values,
         'choice_time': outcome_time.values,
         'outcome_time': outcome_time.values,
+        'svs': svs
         })
+    # combine all columns of trialData and tblTrials
+    trialData = pd.concat([trialData, tblTrials], axis=1)
 
     if model_name is not None:
         session_df = pd.merge(trialData, model_dv, left_index=True, right_index=True, suffixes=('', '_model'))
@@ -862,8 +870,10 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
 
 def get_history_from_nwb(nwb, cut = [0, np.nan]):
     """Get choice and reward history from nwb file"""
-
-    df_trial = nwb.trials.to_dataframe()
+    if not isinstance(nwb, pd.DataFrame):       
+        df_trial = nwb.trials.to_dataframe()
+    else:
+        df_trial = nwb.copy()
     if np.isnan(cut[1]):
         df_trial = df_trial.iloc[cut[0]:].copy()
     else:
