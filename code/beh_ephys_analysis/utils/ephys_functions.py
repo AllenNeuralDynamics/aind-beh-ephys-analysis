@@ -5,7 +5,14 @@ import re
 from PyPDF2 import PdfMerger
 import pandas as pd
 import os
+import sys
 from matplotlib.colors import LinearSegmentedColormap
+sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
+from beh_functions import session_dirs
+from matplotlib import gridspec
+from aind_ephys_utils import align 
+import ast
+import json
 
 
 def filter_spikes(spk_units_cond, n_points = 300, tau_ker = .15):
@@ -159,77 +166,6 @@ def fitSpikeModelP(dfTrial, matSpikes, formula):
 
     return regressors, TvCurrU, PvCurrU, EvCurrU
 
-def makeSessionDF(nwb, cut):
-    tblTrials = nwb.trials.to_dataframe()
-    tblTrials = tblTrials.iloc[cut[0]:cut[1]+1].copy()
-    trialStarts = tblTrials.loc[tblTrials['animal_response']!=2, 'goCue_start_time'].values
-    responseTimes = tblTrials[tblTrials['animal_response']!=2]
-    responseTimes = responseTimes['reward_outcome_time'].values
-
-    # responseInds
-    responseInds = tblTrials['animal_response']!=2
-    leftRewards = tblTrials.loc[responseInds, 'rewarded_historyL']
-
-    # oucome 
-    leftRewards = tblTrials.loc[tblTrials['animal_response']!=2, 'rewarded_historyL']
-    rightRewards = tblTrials.loc[tblTrials['animal_response']!=2, 'rewarded_historyR']
-    outcomes = leftRewards | rightRewards
-    outcomePrev = np.concatenate((np.full((1), np.nan), outcomes[:-1]))
-
-    # choices
-    choices = tblTrials.loc[tblTrials['animal_response']!=2, 'animal_response'] == 1
-    choicesPrev = np.concatenate((np.full((1), np.nan), choices[:-1]))
-    
-    # laser
-    laserChoice = tblTrials.loc[tblTrials['animal_response']!=2, 'laser_on_trial'] == 1
-    laser = tblTrials['laser_on_trial'] == 1
-    laserPrev = np.concatenate((np.full((1), np.nan), laserChoice[:-1]))
-    trialData = pd.DataFrame({
-        'outcomes': outcomes.values.astype(float), 
-        'choices': choices.values.astype(float),
-        'laser': laserChoice.values.astype(float),
-        'outcomePrev': outcomePrev,
-        'laserPrev': laserPrev,
-        'choicesPrev': choicesPrev,
-        })
-    return trialData
-
-def plot_raster_rate_colormap(
-    events,
-    align_events, # sorted by certain value
-    fig,
-    subplot_spec,
-    title,
-    tb=-5,
-    tf=10,
-    bin_size=100 / 1000,
-    step_size=50 / 1000,
-):
-    """Plot raster and rate aligned to events"""
-    edges = np.arange(tb + 0.5 * bin_size, tf - 0.5 * bin_size, step_size)
-    nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=subplot_spec)
-    nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=subplot_spec)
-    ax1 = fig.add_subplot(nested_gs[0, 0])
-    ax2 = fig.add_subplot(nested_gs[1, 0])
-
-    df = align.to_events(events, align_events, (tb, tf), return_df=True)
-    ax1.scatter(df.time, df.event_index, c="k", marker="|", s=1, zorder=2)
-    ax1.axvline(x=0, c="r", ls="--", lw=1, zorder=3)
-    ax1.set_title(title)
-    ax1.set_xlim(tb, tf)
-
-    counts_pre = np.searchsorted(np.sort(df.time.values), edges - 0.5 * bin_size)
-    counts_post = np.searchsorted(np.sort(df.time.values), edges + 0.5 * bin_size)
-    counts_pre = np.searchsorted(np.sort(df.time.values), edges - 0.5 * bin_size)
-    counts_post = np.searchsorted(np.sort(df.time.values), edges + 0.5 * bin_size)
-    lick_rate = (counts_post - counts_pre) / (bin_size * len(align_events))
-    ax2.plot(edges, lick_rate)
-    ax2.set_title("lickRate")
-    ax2.set_xlim(tb, tf)
-    ax2.set_xlabel("Time from go cue (s)")
-
-    return fig, ax1, ax2
-
 def shiftedColorMap(cmap, min_val, max_val, name):
     epsilon = 0.001
     start, stop = 0.0, 1.0
@@ -282,3 +218,166 @@ def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-
         if right_left[peak_ind]:
             reordered_template = reordered_template[:, list(range((sample_to_keep[1] - sample_to_keep[0]), 2*(sample_to_keep[1] - sample_to_keep[0]))) + list(range((sample_to_keep[1] - sample_to_keep[0])))]
     return reordered_template
+
+def convert_values(value):
+    if isinstance(value, str):
+        try:
+            # Convert NumPy-like array strings into proper lists
+            if "nan" in value:
+                list_array = json.loads(value.replace("nan", "null"))
+                return np.array(list_array)
+            elif "[" in value and "]" in value and "," in value:
+                string_list = value.replace("nan", "np.nan")
+                return np.array(ast.literal_eval(string_list))
+            elif "[" in value and "]" in value and "," not in value:
+                # return np.array(ast.literal_eval(value.replace(" ", ",")))
+                return np.fromstring(value.strip("[]"), sep=" ")
+            else:
+                return ast.literal_eval(value)  # Convert regular lists
+        except (ValueError, SyntaxError):
+            return value  # If conversion fails, return original string
+    return value  # Return value as-is if not a string
+    
+def load_drift(session, unit_id, data_type='curated'):
+    session_dir = session_dirs(session)
+    drift_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv')
+    opto_drift_tbl = pd.read_csv(drift_file)    
+    opto_drift_tbl.reset_index(drop=True, inplace=True)
+    if unit_id==None:
+        return opto_drift_tbl
+    else:
+        if unit_id in opto_drift_tbl['unit_id'].values:
+            unit_drift = opto_drift_tbl[opto_drift_tbl['unit_id'] == unit_id].iloc[0].to_dict()
+            # Apply conversion
+            converted_data = {key: convert_values(val) for key, val in unit_drift.items()}
+            unit_drift = converted_data
+            return unit_drift
+        else:
+            return None
+
+def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, stepSize):
+    bin_times = np.arange(pre_event, post_event, stepSize) - 0.5*stepSize
+    spike_matrix = np.zeros((len(align_time), len(bin_times)))
+    for i, t in enumerate(align_time):
+        for j, b in enumerate(bin_times):
+            spike_matrix[i, j] = np.sum((spike_times >= t + b - 0.5*binSize) & (spike_times < t + b + 0.5*binSize))
+    spike_matrix = spike_matrix / binSize
+    return spike_matrix, bin_times
+
+def plot_filled_sem(time, y_mat, color, ax, label):
+    ax.plot(time, np.nanmean(y_mat, 0), c = color, label = label)
+    sem = np.std(y_mat, axis = 0)/np.sqrt(np.shape(y_mat)[0])
+    ax.fill_between(time, np.nanmean(y_mat, 0) - sem, np.nanmean(y_mat, 0) + sem, color = color, alpha = 0.25, edgecolor = None)
+
+def plot_raster_rate(
+    spike_times,
+    currArray,
+    slide_times,
+    align_events, # sorted by certain value
+    map_value,
+    bins,
+    labels,
+    colormap,
+    fig,
+    subplot_spec,
+    tb=-2,
+    tf=3,
+):
+    n_colors = len(bins)-1
+    color_list = [colormap(i / (n_colors - 1)) for i in range(n_colors)]
+
+    """Plot raster and rate aligned to events"""
+    nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, height_ratios= [3, 1], subplot_spec=subplot_spec)
+    ax1 = fig.add_subplot(nested_gs[0, 0])
+    ax2 = fig.add_subplot(nested_gs[1, 0])
+
+    # order events by values
+    sort_ind = np.argsort(map_value)
+    align_events = align_events[sort_ind]
+
+    df = align.to_events(spike_times, align_events, (tb, tf), return_df=True)
+    
+    # vertical line at time 0
+    ax1.axvline(x=0, c="r", ls="--", lw=1, zorder=1)
+
+    # raster plot
+    ax1.scatter(df.time, df.event_index, c="k", marker="|", s=1)
+
+    # horizontal line for each type if discrete
+    if len(np.unique(map_value)) <= 4:
+        discrete_types = np.sort(np.unique(map_value))
+    else:
+        discrete_types = bins
+    
+    for val in discrete_types:
+        level = np.sum(map_value <= val)
+        ax1.axhline(y=level, c="k", ls="--", lw=1)
+
+    ax1.set_title(' '.join(labels))
+    ax1.set_xlim(tb, tf)
+    ax1.set_ylabel('__'.join(labels))
+
+    # rate plot by binned values
+
+    for bin_ind in range(len(bins)-1): 
+        currList = np.where((np.array(map_value)>=bins[bin_ind]) & (np.array(map_value)<bins[bin_ind + 1]))[0]
+        if len(currList) > 0:
+            M = currArray[currList, :]
+            plot_filled_sem(slide_times, M, color_list[bin_ind], ax2, labels[bin_ind])
+
+    ax2.legend()
+
+    ax2.set_title("spike rate")
+    ax2.set_xlim(tb, tf)
+    ax2.set_xlabel("Time from alignment (s)")
+
+    return fig, ax1, ax2
+
+def plot_rate(
+    currArray,
+    slide_times, 
+    map_value,
+    bins,
+    labels,
+    colormap,
+    fig,
+    subplot_spec,
+    tb,
+    tf,
+):
+    n_colors = len(bins)-1
+    color_list = [colormap(i / (n_colors - 1)) for i in range(n_colors)]
+
+    """Plot rate aligned to events"""
+
+    # rate plot by binned values
+    ax = fig.add_subplot(subplot_spec)
+    for bin_ind in range(len(bins)-1): 
+        currList = np.where((np.array(map_value)>=bins[bin_ind]) & (np.array(map_value)<bins[bin_ind + 1]))[0]
+        if len(currList) > 0:
+            M = currArray[currList, :]
+            plot_filled_sem(slide_times, M, color_list[bin_ind], ax, labels[bin_ind])
+
+    ax.legend()
+
+    ax.set_title("spike rate")
+    ax.set_xlim(tb, tf)
+    ax.set_xlabel("Time from alignment (s)")
+
+    return fig, ax
+
+def regression_rwd(spike_counts, outcome, trials_back = [0, 2], sub_selection = None):
+    outcome_matrix = np.zeros((len(outcome), trials_back[1] - trials_back[0] + 1))
+    for i in range(len(outcome)):
+        for j in range(trials_back[0], trials_back[1] + 1):
+            if i-j >=0:
+                outcome_matrix[i, j] = outcome[i-j]
+            else:
+                outcome_matrix[i, j] = np.nan
+
+    outcome_matrix = sm.add_constant(outcome_matrix)
+    if sub_selection is not None:
+        outcome_matrix = outcome_matrix[sub_selection, :]
+        spike_counts = spike_counts[sub_selection]
+    lm = sm.OLS(spike_counts, outcome_matrix, missing='drop').fit()
+    return lm.params[1:], lm.pvalues[1:], lm.tvalues[1:], lm.conf_int(alpha=0.05)[1:] 

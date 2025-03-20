@@ -659,6 +659,8 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     if model_name is not None:
         model_dir = os.path.join(models_dir, model_name)
         model_file = os.path.join(model_dir, session_id+'_session_model_dv.csv')
+        if not os.path.exists(model_file):
+            model_file = os.path.join(model_dir, raw_id+'_session_model_dv.csv')
         session_curation_file = os.path.join(models_dir, f'{aniID}_session_data.csv')
     else:
         model_dir = None
@@ -836,7 +838,7 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
 
     # stay vs switch
     svs = np.zeros(len(choices), dtype=bool)
-    svs[choices==choicesPrev] = True
+    svs[choices!=choicesPrev] = True
 
     trialData = pd.DataFrame({
         # 'trial_id': trial_id,
@@ -852,7 +854,9 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
         'svs': svs
         })
     # combine all columns of trialData and tblTrials
-    trialData = pd.concat([trialData, tblTrials], axis=1)
+    choice_tbl = tblTrials.loc[tblTrials['animal_response']!=2].copy()
+    choice_tbl.reset_index(inplace=True)
+    trialData = pd.concat([trialData, choice_tbl], axis=1)
 
     if model_name is not None:
         session_df = pd.merge(trialData, model_dv, left_index=True, right_index=True, suffixes=('', '_model'))
@@ -902,14 +906,15 @@ def get_history_from_nwb(nwb, cut = [0, np.nan]):
         trial_time,
     )
 
-def plot_session_in_time_all(nwb, bin_size = 10, in_time = True, ax = None):
-    if ax is None:
-        fig = plt.Figure(figsize = (12, 6))
+def plot_session_in_time_all(nwb, bin_size = 10, in_time = True, ax_ori = None):
+    if ax_ori is None:
+        fig, _ = plt.subplots(figsize=(12, 6))
+        fig = plt.Figure(figsize=(12, 6))
         gs = GridSpec(3, 1, figure = fig, height_ratios=[6,1,1], hspace = 0.5)
     else:
-        gs = GridSpecFromSubplotSpec(3, 1, height_ratios=[6,1,1], hspace = 0.5, subplot_spec = ax.get_subplotspec())
+        gs = GridSpecFromSubplotSpec(3, 1, height_ratios=[6,1,1], hspace = 0.5, subplot_spec = ax_ori.get_subplotspec())
     choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(nwb)
-    ax_choice_reward = plt.subplot(gs[0,0]) 
+    ax_choice_reward = fig.add_subplot(gs[0])
     if in_time:
         plot_foraging_session(  # noqa: C901
                             choice_history,
@@ -927,28 +932,31 @@ def plot_session_in_time_all(nwb, bin_size = 10, in_time = True, ax = None):
                             autowater_offered = autowater_offered,
                             ax = ax_choice_reward,
                             )
+    # turn off x and y axis
+    ax_choice_reward.set_frame_on(False)
     # plot licks
-    data = load_data(nwb)    
-    ax = plt.subplot(gs[2])
+    data = load_data(nwb)   
+    ax = fig.add_subplot(gs[2]) 
+    # ax = plt.subplot(gs[2])
     bins = np.arange(np.min(data['all_licks']-data['tbl_trials']['goCue_start_time'][0]), np.max(data['all_licks']-data['tbl_trials']['goCue_start_time'][0]), bin_size)  
     ax.hist(data['left_licks']-data['tbl_trials']['goCue_start_time'][0], bins = bins, color = 'blue', alpha = 0.5, label = 'left licks', density = True)
     ax.set_xlim(0, -data['tbl_trials']['goCue_start_time'][0]+data['tbl_trials']['goCue_start_time'].values[-1])
     ax.legend(loc = 'upper right')
     ax.set_frame_on(False)
     ax.set_xlabel('Time in session (s)')
-    ax = plt.subplot(gs[1])
+    ax = fig.add_subplot(gs[1])
     ax.hist(data['right_licks']-data['tbl_trials']['goCue_start_time'][0], bins = bins, color = 'red', alpha = 0.5, label = 'right licks', density = True)
     ax.set_xlim(0, -data['tbl_trials']['goCue_start_time'][0]+data['tbl_trials']['goCue_start_time'].values[-1])
     ax.legend(loc = 'upper right')
     ax.set_frame_on(False)
     plt.tight_layout()
-    if ax is None:
+    if ax_ori is None:
         return fig
     else:
-        return ax
+        return ax_ori
 
-def plot_session_glm(nwb, tMax = 10, cut = [0, np.nan]):
-    tbl = makeSessionDF(nwb, cut = cut)
+def plot_session_glm(session, tMax = 10, cut = [0, np.nan]):
+    tbl = makeSessionDF(session, cut = cut)
     allChoices = 2 * (tbl['choice'].values - 0.5)
     allRewards = allChoices * tbl['outcome'].values
     allNoRewards = allChoices * (1 - tbl['outcome'].values)
@@ -1017,7 +1025,7 @@ def plot_session_glm(nwb, tMax = 10, cut = [0, np.nan]):
     intercept_info = f'R² = {rsq:.2f} | Int: {glm_result.params[0]:.2f}'
     plt.legend(loc='upper right')
 
-    return fig, nwb.session_id
+    return fig, session
 
 def get_session_tbl(session):
     session_dir = session_dirs(session)
@@ -1029,6 +1037,8 @@ def get_session_tbl(session):
 def get_unit_tbl(session, data_type):
     session_dir = session_dirs(session)
     unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl')
+    if not os.path.exists(unit_tbl_dir):
+        unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
     with open(unit_tbl_dir, 'rb') as f:
         unit_tbl = pickle.load(f)
     return unit_tbl

@@ -87,50 +87,52 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
                  'opto_pass': False}
     if len(resp_pass_ind[0]) > 0:
         opto_tagging_dict['opto_pass'] = True
-        # get the response p and latencies
-        opto_tagging_dict['resp_p'] = resp_p[resp_pass_ind]
-        opto_tagging_dict['resp_lat'] = resp_lat[resp_pass_ind]
-        power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind = resp_pass_ind[:-1]
-        opto_tagging_dict['powers'] = np.array(opto_info['powers'])[power_ind]
-        opto_tagging_dict['sites'] = np.array(opto_info['sites'])[site_ind]
-        opto_tagging_dict['num_pulses'] = np.array(opto_info['num_pulses'])[num_pulse_ind]
-        opto_tagging_dict['durations'] = np.array(opto_info['durations'])[duration_ind]
-        opto_tagging_dict['freqs'] = np.array(opto_info['freqs'])[freq_ind]
-        opto_tagging_dict['stim_times'] = np.array(['pre', 'post'])[stim_time_ind]
-        # get all similarities
-        opto_tagging_df = pd.DataFrame(opto_tagging_dict)
-        # group by site, power, duration, pre_post and take maximum of resp_p and resp_lat
-        opto_tagging_df = opto_tagging_df.groupby(['unit_id', 'sites', 'powers', 'num_pulses', 'durations', 'freqs', 'stim_times']).agg({'resp_p': 'max', 'resp_lat': 'min'}).reset_index()
-        
-        euc_dist = []
-        corr = []
-        if opto_wf is not None:
-            for _, row in opto_tagging_df.iterrows():
-                wf_curr = opto_wf.query(
-                    'unit_id == @unit_id and site == @site and power == @power and pre_post == @pre_post',
-                    local_dict={
-                        'site': row['sites'],
-                        'power': row['powers'],
-                        'duration': row['durations'],
-                        'pre_post': row['stim_times'],
-                        'unit_id': unit_id
-                    }
-                )
-                # Ensure wf_curr is not empty before extracting values
-                if not wf_curr.empty:
-                    euc_dist_curr, corr_curr = wf_curr.iloc[0][['euclidean_norm', 'correlation']]
-                else:
-                    euc_dist_curr, corr_curr = None, None  # Handle missing values
+    else: # get max P(resp) if no pass
+        resp_pass_ind = np.argmax(resp_p)
+    # get the response p and latencies
+    opto_tagging_dict['resp_p'] = resp_p[resp_pass_ind]
+    opto_tagging_dict['resp_lat'] = resp_lat[resp_pass_ind]
+    power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind = resp_pass_ind[:-1]
+    opto_tagging_dict['powers'] = np.array(opto_info['powers'])[power_ind]
+    opto_tagging_dict['sites'] = np.array(opto_info['sites'])[site_ind]
+    opto_tagging_dict['num_pulses'] = np.array(opto_info['num_pulses'])[num_pulse_ind]
+    opto_tagging_dict['durations'] = np.array(opto_info['durations'])[duration_ind]
+    opto_tagging_dict['freqs'] = np.array(opto_info['freqs'])[freq_ind]
+    opto_tagging_dict['stim_times'] = np.array(['pre', 'post'])[stim_time_ind]
+    # get all similarities
+    opto_tagging_df = pd.DataFrame(opto_tagging_dict)
+    # group by site, power, duration, pre_post and take maximum of resp_p and resp_lat
+    opto_tagging_df = opto_tagging_df.groupby(['unit_id', 'sites', 'powers', 'num_pulses', 'durations', 'freqs', 'stim_times']).agg({'resp_p': 'max', 'resp_lat': 'min'}).reset_index()
+    
+    euc_dist = []
+    corr = []
+    if opto_wf is not None:
+        for _, row in opto_tagging_df.iterrows():
+            wf_curr = opto_wf.query(
+                'unit_id == @unit_id and site == @site and power == @power and pre_post == @pre_post',
+                local_dict={
+                    'site': row['sites'],
+                    'power': row['powers'],
+                    'duration': row['durations'],
+                    'pre_post': row['stim_times'],
+                    'unit_id': unit_id
+                }
+            )
+            # Ensure wf_curr is not empty before extracting values
+            if not wf_curr.empty:
+                euc_dist_curr, corr_curr = wf_curr.iloc[0][['euclidean_norm', 'correlation']]
+            else:
+                euc_dist_curr, corr_curr = None, None  # Handle missing values
 
-                euc_dist.append(euc_dist_curr)
-                corr.append(corr_curr)
-        if len(euc_dist) > 0:
-            opto_tagging_df['euclidean_norm'] = euc_dist
-            opto_tagging_df['correlation'] = corr
-        else:
-            opto_tagging_df['euclidean_norm'] = None
-            opto_tagging_df['correlation'] = None
-        opto_tagging_dict = {key: opto_tagging_df[key].values for key in opto_tagging_df.columns}
+            euc_dist.append(euc_dist_curr)
+            corr.append(corr_curr)
+    if len(euc_dist) > 0:
+        opto_tagging_df['euclidean_norm'] = euc_dist
+        opto_tagging_df['correlation'] = corr
+    else:
+        opto_tagging_df['euclidean_norm'] = None
+        opto_tagging_df['correlation'] = None
+    opto_tagging_dict = {key: opto_tagging_df[key].values for key in opto_tagging_df.columns}
     opto_tagging_dict['unit_id'] = unit_id
     opto_tagging_dict['spike_times'] = spike_times
     opto_tagging_dict.update(qc_dict)
@@ -328,7 +330,7 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
         plt.tight_layout()
     return fig, opto_tagging_dict
 #%%
-def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False, target_unit_ids=None, ephys_cut = False):
+def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False, target_unit_ids=None, ephys_cut = False, save = False):
     session_dir = session_dirs(session)
     session_qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
     with open(session_qm_file) as f:
@@ -448,14 +450,17 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
         if opto_tagging_dict_curr['resp_p'] is None:
             opto_pass_curr = False
         opto_pass.append(opto_pass_curr)
-
-    merge_pdfs(session_dir[f'opto_dir_fig_{data_type}'], os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging.pdf'))
+    if plot:
+        merge_pdfs(session_dir[f'opto_dir_fig_{data_type}'], os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging.pdf'))
     # both pass qc and opto tagging
     unit_count_pass = np.sum(np.array(target_pass_qc) & np.array(opto_pass))
     print(f'{unit_count_pass} out of {len(target_pass_qc)} units pass quality control and opto tagging')
     opto_tagging_df_sess['default_qc'] = target_pass_qc
     opto_tagging_df_sess['opto_pass'] = opto_pass
     # target_qc['target_pass_qc'] = target_pass_qc
+    if save:
+        with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl'), 'wb') as f:
+            pickle.dump(opto_tagging_df_sess, f)
     return opto_tagging_df_sess
 
 def opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None):
@@ -511,16 +516,15 @@ def opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None
 
 # %%
 if __name__ == "__main__":
-    session = 'behavior_751004_2024-12-20_13-26-11'
+    session = 'behavior_717121_2024-06-15_10-00-58'
     target = 'soma'
     data_type = 'curated' 
     resp_thresh = 0.3
     lat_thresh = 0.02 
     session_dir = session_dirs(session)
-    # final check
-    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False)
-    with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'), 'wb') as f:
-        pickle.dump(opto_tagging_df_sess, f)
+    # final check  
+    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False, save=True)
+
     # opto_tagging_df_sess.to_csv(os.path.join(session_dirs(session)[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv'), index=False)
     # opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None)
     # first check

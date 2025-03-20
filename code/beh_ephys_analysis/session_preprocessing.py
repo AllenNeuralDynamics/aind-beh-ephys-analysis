@@ -22,7 +22,7 @@ import spikeinterface as si
 import spikeinterface.extractors as se
 import spikeinterface.postprocessing as spost
 import spikeinterface.widgets as sw
-from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_nwb
+from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_nwb  
 from aind_ephys_utils import align
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import colormaps
@@ -33,6 +33,10 @@ import datetime
 def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = None):
     # loading info
     session_dir = session_dirs(session)
+    if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):
+        beh_nwb = load_nwb_from_filename(os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
+    else:
+        beh_nwb == None
     opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv'))
     sorting_analyzer = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
@@ -231,12 +235,28 @@ def ephys_opto_preprocessing(session, data_type, target):
                     & (events.state == 1)
                 ].sort_values(by='sample_number')
     laser_times = np.sort(laser_events['timestamp'].values)
+    qm['laser_sync'] = True
+    # in rare case where only recording is synced by events is not
+    # if laser_times[-1] < timestamps[0] or laser_times[0] > timestamps[-1]:
+    #     qm['laser_sync'] = False
+    #     print(f'{session} laser is not synced.')
+    #     np_event = events[
+    #         (events.stream_name == 'ProbeA')
+    #         & (events.state == 1)
+    #         & (events.line == 1)
+    #     ].sort_values(by='sample_number')
+    #     np_event_time = np.sort(np_event['timestamp'].values)
+    #     np_global_time = timestamps[np_event['sample_number'].values-recording.continuous[0].sample_numbers[0]]
+    #     laser_times = align_timestamps_to_anchor_points(laser_times, np_event_time, np_global_time)
+        # laser_times_ori = laser_times.copy()
+        # if session == 'behavior_717121_2024-06-15_10-00-58':
+        #     local_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/original_timestamps.npy')
+        #     harp_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/timestamps.npy')
+        # laser_times = align_timestamps_to_anchor_points(laser_times, local_times, harp_times)
 
     # load all laser conditions
     opto_dfs = [pd.read_csv(csv) for csv in session_dir['opto_csvs']]
     opto_df = pd.concat(opto_dfs)
-    opto_df.loc[laser_times < timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'pre'
-    opto_df.loc[laser_times >= timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'post'
     # load all laser times
     plt.plot(laser_times)
     plt.axhline(y = np.max(timestamps), color = 'r', linestyle = '--')
@@ -264,11 +284,7 @@ def ephys_opto_preprocessing(session, data_type, target):
         qm['laser_same_count'] = True
         print(f'{session} has equal number of laser triggers and opto_df')
     # %% 
-    laser_times_ori = laser_times.copy()
-    if session == 'behavior_717121_2024-06-15_10-00-58':
-        local_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/original_timestamps.npy')
-        harp_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/timestamps.npy')
-        laser_times = align_timestamps_to_anchor_points(laser_times, local_times, harp_times)
+
     # %%
     nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
     unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label']]
@@ -291,7 +307,8 @@ def ephys_opto_preprocessing(session, data_type, target):
         # to be updated
         unit_spikes = [align_timestamps_to_anchor_points(spike_times, local_sync_time, harp_sync_time) for spike_times in unit_spikes]
         laser_times = align_timestamps_to_anchor_points(laser_times, local_sync_time, harp_sync_time)
-    # remove cut off period if data is curated version
+    opto_df.loc[laser_times < timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'pre'
+    opto_df.loc[laser_times >= timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'post'
     unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
         pickle.dump(unit_spikes, f)
@@ -335,7 +352,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     # Collect all target laser times and conditions
     # save all confirmed laser times
     opto_df['time'] = laser_times
-    laser_onset_samples = np.searchsorted(timestamps, laser_times_ori)
+    laser_onset_samples = np.searchsorted(timestamps, laser_times)
     opto_df['laser_onset_samples'] = laser_onset_samples
     if 'emission_location' in opto_df.columns:
         opto_df = opto_df.drop(columns=['site'])

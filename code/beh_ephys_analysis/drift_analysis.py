@@ -41,9 +41,41 @@ from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_nwb
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session_nwb
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
+from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
 # def load_motion_info(folder):
 from spikeinterface.preprocessing.motion import load_motion_info
 from PIL import Image
+import json
+from pathlib import Path
+try:
+    from spikeinterface.core.motion import Motion
+except:
+    from spikeinterface.sortingcomponents.motion.motion_utils import Motion
+
+def load_legacy_motion_info(folder):
+    folder = Path(folder)
+    spatial_bins_um = np.load(folder / "spatial_bins.npy")
+    displacement = [np.load(folder / "motion.npy")]
+    temporal_bins_s = [np.load(folder / "temporal_bins.npy")]
+
+    motion_info = {}
+    with open(folder / "parameters.json") as f:
+        motion_info["parameters"] = json.load(f)
+
+    with open(folder / "run_times.json") as f:
+        motion_info["run_times"] = json.load(f)
+
+    motion = Motion(
+        displacement,
+        temporal_bins_s,
+        spatial_bins_um,
+        direction="y",
+    )
+    motion_info["motion"] = motion
+    motion_info["peaks"] = np.load(folder / "peaks.npy")
+    motion_info["peak_locations"] = np.load(folder / "peaks.npy")
+
+    return motion_info
 
 # %%
 def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
@@ -53,23 +85,38 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     # ephys_opto_preprocessing(session, 'curated', 'soma')
 
     # %%
-    motion_info = load_motion_info(f'/root/capsule/data/{session}_sorted/preprocessed/motion/experiment1_Record Node 104#Neuropix-PXI-100.ProbeA_recording1')
+    motion_path = f'/root/capsule/data/{session}_sorted/preprocessed/motion/experiment1_Record Node 104#Neuropix-PXI-100.ProbeA_recording1'
+    all_files = os.listdir(motion_path)
+    if 'motion.npy' in all_files:
+        motion_info = load_legacy_motion_info(motion_path)
+    else:
+        motion_info = load_motion_info(motion_path)
 
     # %%
     # sampling 
     bin_sampling = 10
-    temp_bins_sampling = np.arange(motion_info['motion'].temporal_bins_s[0][0], motion_info['motion'].temporal_bins_s[0][-1], bin_sampling)
+    bin_short = 100
+    # get start and end of recording
+    start = Session(session_dir['session_dir']).recordnodes[0].recordings[0].continuous[0].timestamps[0]
+    stop = Session(session_dir['session_dir']).recordnodes[0].recordings[0].continuous[0].timestamps[-1]
     probe_location = np.linspace(2500, 0,  96)
+    map_time = motion_info['motion'].temporal_bins_s
+    if np.abs(np.mean(map_time)-0.5*(start+stop)) > 10*60:
+        mis_align = np.mean(map_time) - 0.5*(start+stop)
+        temp_bins_sampling = np.arange(start+mis_align, stop+mis_align, bin_sampling)
+        temp_bins = np.arange(start, stop, bin_short)
 
     drift_sampling = np.zeros(shape=(len(probe_location), len(temp_bins_sampling)))
     for i, t in enumerate(temp_bins_sampling): 
         for j, p in enumerate(probe_location):
             drift_sampling[j, i] = motion_info['motion'].get_displacement_at_time_and_depth([t], [p])
+    
+    # resest drift sampling time
+    if np.abs(np.mean(map_time)-0.5*(start+stop)) > 10*60:
+        temp_bins_sampling = temp_bins_sampling - mis_align
 
     # %%
     # fast dynamics
-    bin_short = 100
-    temp_bins = np.arange(motion_info['motion'].temporal_bins_s[0][0], motion_info['motion'].temporal_bins_s[0][-1], bin_short)
     drift = np.zeros(shape=(len(probe_location), len(temp_bins)))
 
     drift = np.full((len(probe_location), len(temp_bins)), np.nan)
@@ -103,26 +150,37 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     drift_slow_pre[:,0] = drift_slow_pre[:,1]
     drift_slow_post[:,-1] = drift_slow_post[:,-2]
 
-    # %%
+    # %% realign time if needed
+    # load qm
+    qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
+    with open(qm_file) as f:
+        qm_dict = json.load(f)
+    
+    # if not qm_dict['ephys_sync']:
+    #     temp_bins = align_timestamps_to_anchor_points(temp_bins, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
+    #     temp_bins_slow = align_timestamps_to_anchor_points(temp_bins_slow, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
+
+    # %% plot
     range_max = np.max(np.abs(drift)) 
     fig = plt.figure(figsize=(20, 10))
-    gs = gridspec.GridSpec(2, 5, height_ratios=[3, 1])
-    ax1 = plt.subplot(gs[0, 0])
-    sns.heatmap(drift, cmap='seismic', center=0, vmin=-range_max, vmax=range_max, ax=ax1, cbar=False)
+    gs = gridspec.GridSpec(3, 5, height_ratios=[0.25, 3, 1])
+    ax1 = plt.subplot(gs[1, 0]) 
+    cbar_ax = plt.subplot(gs[0, 0])
+    sns.heatmap(drift, cmap='seismic', center=0, vmin=-range_max, vmax=range_max, ax=ax1, cbar_ax=cbar_ax, cbar_kws={"orientation": "horizontal"})
     ax1.axvline(x=3, color='black', linestyle='--', linewidth=2) 
     ax1.set_xticks(np.linspace(0, len(temp_bins), 10), [f"{x:.1f}" for x in list(np.linspace(temp_bins[0], temp_bins[-1], 10))], rotation=90);
     ax1.set_yticks(np.linspace(0, len(probe_location), 5), [f"{x:.1f}" for x in list(np.linspace(probe_location[0], probe_location[-1], 5))]);
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel('Depth (um)')
-    ax1.set_title('Fast drift')
+    cbar_ax.set_title('Fast drift')
 
 
     # ax2 = plt.subplot(gs[1, 0])
-    ax2 = fig.add_subplot(gs[1, 0], sharex=ax1) 
+    ax2 = fig.add_subplot(gs[2, 0], sharex=ax1) 
     nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
     nwb = load_nwb_from_filename(nwb_file)
     choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(nwb)
-    plot_foraging_session(  # noqa: C901
+    _, Axes = plot_foraging_session(  # noqa: C901
                     choice_history,
                     reward_history,
                     p_reward = p_reward,
@@ -130,49 +188,54 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                     trial_time = trial_time,
                     ax = ax2,
                     legend=False,
-                    ax_lim=[temp_bins[0], temp_bins[-1]]
                     ) 
+    for ax in Axes:
+        ax.set_xlim([temp_bins[0], temp_bins[-1]])
 
-    ax3 = plt.subplot(gs[0, 1])
-    sns.heatmap(drift_slow, cmap='seismic', center=0, vmin=-range_max, vmax=range_max, ax=ax3, cbar=False)
+    ax3 = plt.subplot(gs[1, 1])
+    cbar_ax = plt.subplot(gs[0, 1])
+    sns.heatmap(drift_slow, cmap='seismic', center=0, vmin=-range_max, vmax=range_max, ax=ax3, cbar_ax=cbar_ax, cbar_kws={"orientation": "horizontal"})
     ax3.set_xticks(np.linspace(0, len(temp_bins_slow), 10), [f"{x:.1f}" for x in list(np.linspace(temp_bins_slow[0], temp_bins_slow[-1], 10))], rotation=90);
     ax3.set_yticks(np.linspace(0, len(probe_location), 5), [f"{x:.1f}" for x in list(np.linspace(probe_location[0], probe_location[-1], 5))]);
     ax3.set_xlabel('Time (s)')
     ax3.set_ylabel('Depth (um)')
-    ax3.set_title('Slow drift')
+    cbar_ax.set_title('Slow drift')
 
     # if opto files exist:
     if os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv')):
+        ax4 = fig.add_subplot(gs[2, 1]) 
         opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv'))
         opto_times_pre = opto_df.query('pre_post == "pre"')['time'].values
-        pre_end = np.max(opto_times_pre)
-        opto_times_post = opto_df.query('pre_post == "post"')['time'].values
-        post_start = np.min(opto_times_post)
-        # random number from uniform distribution  
-        y_rand = np.random.uniform(0, 1, len(opto_times_pre))
+        if len(opto_times_pre)>0:
+            pre_end = np.max(opto_times_pre)
+            y_rand = np.random.uniform(0, 1, len(opto_times_pre))
+            ax4.scatter(opto_times_pre, y_rand, c='r', label='pre', s=10, edgecolors=None)
 
-        ax4 = fig.add_subplot(gs[1, 1]) 
-        ax4.scatter(opto_times_pre, y_rand, c='r', label='pre', s=10, edgecolors=None)
-        y_rand = np.random.uniform(0, 1, len(opto_times_post))
-        ax4.scatter(opto_times_post, y_rand, c='b', label='post', s=10, edgecolors=None)
+        opto_times_post = opto_df.query('pre_post == "post"')['time'].values
+        if len(opto_times_post)>0:
+            post_start = np.min(opto_times_post)
+            y_rand = np.random.uniform(0, 1, len(opto_times_post))
+            ax4.scatter(opto_times_post, y_rand, c='b', label='post', s=10, edgecolors=None)    
+
         if len(opto_df[~opto_df['site'].str.contains('LC', na=False)]['time'].values)>0:
-            opto_surf_start = opto_df[~opto_df['site'].str.contains('LC', na=False)]['time'].values
-            y_rand = np.random.uniform(0, 1, len(opto_surf_start)) 
-            ax2.scatter(opto_surf_start, y_rand, label='surf', s=10, edgecolors='k', facecolors='none')
+            opto_surf = opto_df[~opto_df['site'].str.contains('LC', na=False)]['time'].values
+            y_rand = np.random.uniform(0, 1, len(opto_surf)) 
+            ax4.scatter(opto_surf, y_rand, label='surf', s=10, edgecolors='k', facecolors='none', linewidth=2)
             
         ax4.set_xlabel('Time (s)')
         ax4.set_xlim([temp_bins_slow[0], temp_bins_slow[-1]])
 
 
 
-    ax = plt.subplot(gs[0, 2])
+    ax = plt.subplot(gs[1, 2])
+    cbar_ax = plt.subplot(gs[0, 2])
     range_max = np.max(np.abs(np.diff(drift)))
-    sns.heatmap(np.diff(drift), cmap='seismic', center=0, vmin=-range_max, vmax=range_max, ax=ax, cbar=False)
-    ax.set_xticks(np.linspace(0, len(temp_bins), 10), [f"{x:.1f}" for x in list(np.linspace(temp_bins[0], temp_bins[-1], 10))]);
+    sns.heatmap(np.diff(drift), cmap='seismic', center=0, vmin=-range_max, vmax=range_max, ax=ax, cbar_ax=cbar_ax, cbar_kws={"orientation": "horizontal"})
+    ax.set_xticks(np.linspace(0, len(temp_bins), 10), [f"{x:.1f}" for x in list(np.linspace(temp_bins[0], temp_bins[-1], 10))], rotation=90);
     ax.set_yticks(np.linspace(0, len(probe_location), 5), [f"{x:.1f}" for x in list(np.linspace(probe_location[0], probe_location[-1], 5))]);
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Depth (um)')
-    ax.set_title('Fast drift derivative')
+    cbar_ax.set_title('Fast drift derivative')
 
     # ax = plt.subplot(gs[1, 2])
     # nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
@@ -180,13 +243,14 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
 
 
     range_max = np.max(np.abs(drift_slow_post - drift_slow_pre))
-    ax = plt.subplot(gs[0, 3])
-    sns.heatmap(drift_slow_post - drift_slow_pre, cmap='seismic', center=0, vmin=-range_max, vmax=range_max, cbar=False)
-    ax.set_xticks(np.linspace(0, len(temp_bins_slow), 10), [f"{x:.1f}" for x in list(np.linspace(temp_bins_slow[0], temp_bins_slow[-1], 10))]);
+    ax = plt.subplot(gs[1, 3])
+    cbar_ax = plt.subplot(gs[0, 3])
+    sns.heatmap(drift_slow_post - drift_slow_pre, cmap='seismic', center=0, vmin=-range_max, vmax=range_max, cbar_ax=cbar_ax, cbar_kws={"orientation": "horizontal"}, ax=ax)
+    ax.set_xticks(np.linspace(0, len(temp_bins_slow), 10), [f"{x:.1f}" for x in list(np.linspace(temp_bins_slow[0], temp_bins_slow[-1], 10))], rotation=90);
     ax.set_yticks(np.linspace(0, len(probe_location), 5), [f"{x:.1f}" for x in list(np.linspace(probe_location[0], probe_location[-1], 5))]);
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Depth (um)')
-    ax.set_title('Slow drift derivative')
+    cbar_ax.set_title('Slow drift derivative')
 
     # ax = plt.subplot(gs[1, 3])
     # nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
@@ -195,13 +259,14 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
 
     drift_diff = drift - drift_slow_pre
     range_max = np.max(np.abs(drift_diff))
-    ax = plt.subplot(gs[0, 4])
-    sns.heatmap(drift_diff, cmap='seismic', center=0, vmin=-range_max, vmax=range_max, cbar=False)
-    ax.set_xticks(np.linspace(0, len(temp_bins_slow), 10), [f"{x:.1f}" for x in list(np.linspace(temp_bins_slow[0], temp_bins_slow[-1], 10))]);
+    ax = plt.subplot(gs[1, 4])
+    cbar_ax = plt.subplot(gs[0, 4])
+    sns.heatmap(drift_diff, cmap='seismic', center=0, vmin=-range_max, vmax=range_max, cbar_ax=cbar_ax, cbar_kws={"orientation": "horizontal"}, ax=ax)
+    ax.set_xticks(np.linspace(0, len(temp_bins_slow), 10), [f"{x:.1f}" for x in list(np.linspace(temp_bins_slow[0], temp_bins_slow[-1], 10))], rotation=90);
     ax.set_yticks(np.linspace(0, len(probe_location), 5), [f"{x:.1f}" for x in list(np.linspace(probe_location[0], probe_location[-1], 5))]);
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Depth (um)')
-    ax.set_title('Fast drift - slow drift')
+    cbar_ax.set_title('Fast drift - slow drift')
 
     # ax = plt.subplot(gs[1, 4])
     # nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
@@ -367,8 +432,8 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                 plt.axvline(x=pre_end, color='r', linestyle='--', linewidth=2)
             if 'post_start' in locals():
                 plt.axvline(x=post_start, color='b', linestyle='--', linewidth=2)
-            if 'opto_surf_start' in locals():
-                plt.axvline(x=np.min(opto_surf_start), color='k', linestyle='--', linewidth=2)
+            if 'opto_surf' in locals():
+                plt.axvline(x=np.min(opto_surf), color='k', linestyle='--', linewidth=2)
             plt.title('Firing rate')
 
             ax = plt.subplot(gs[1, 0])
@@ -396,8 +461,8 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                 plt.axvline(x=pre_end, color='r', linestyle='--', linewidth=2)
             if 'post_start' in locals():
                 plt.axvline(x=post_start, color='b', linestyle='--', linewidth=2)
-            if 'opto_surf_start' in locals():
-                plt.axvline(x=np.min(opto_surf_start), color='k', linestyle='--', linewidth=2)
+            if 'opto_surf' in locals():
+                plt.axvline(x=np.min(opto_surf), color='k', linestyle='--', linewidth=2)
             # plt.plot(motion_info['motion'].get_displacement_at_time_and_depth(times_s, locations_um))
             ax = plt.subplot(gs[2, 1])
             plt.plot(temp_bins, (drift[closest_ybin, :] - drift_slow[closest_ybin,:]), label='fast-slow')
@@ -416,10 +481,10 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                 plt.axvline(x=pre_end, color='r', linestyle='--', linewidth=2)
             if 'post_start' in locals():
                 plt.axvline(x=post_start, color='b', linestyle='--', linewidth=2)
-            if 'opto_surf_start' in locals():
-                plt.axvline(x=np.min(opto_surf_start), color='k', linestyle='--', linewidth=2)
+            if 'opto_surf' in locals():
+                plt.axvline(x=np.min(opto_surf), color='k', linestyle='--', linewidth=2)
             plt.title('Spike amplitude')
-            plt.legend()
+            # plt.legend()
 
 
             ax = plt.subplot(gs[1, 2])
@@ -509,7 +574,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                     units_to_plot.append(row['unit_id'])
 
     # %%
-    drift_dir = os.path.join(session_dir['opto_dir_curated'], 'drift')
+    drift_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], 'drift')
     os.makedirs(name=drift_dir, exist_ok=True)
     # os.mkdir(drift_dir, exist_ok=True)?
     opto_drift_tbl = pd.DataFrame()
@@ -520,15 +585,32 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
             plt.savefig(os.path.join(drift_dir, f'{unit}_drift.pdf'))
             plt.show()
     if update_csv:
-        opto_drift_tbl.to_csv(os.path.join(session_dir['opto_dir_curated'], f'{session}_opto_drift_tbl.csv'))
+        opto_drift_tbl.to_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv'))
     if plot:
-        merge_pdfs(input_dir=drift_dir, output_filename=os.path.join(session_dir['opto_dir_curated'], f'{session}_drift.pdf')) 
+        merge_pdfs(input_dir=drift_dir, output_filename=os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_drift.pdf')) 
     return opto_drift_tbl
 
 if __name__ == '__main__':
-    session = 'behavior_751004_2024-12-20_13-26-11'
+    # session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    # session_list = session_assets['session_id']
+    # # session = 'behavior_716325_2024-05-31_10-31-14'
+    # for session in session_list:
+    #     print(session)
+    #     session_dir = session_dirs(session)
+    #     if session_dir['curated_dir_curated'] is not None:
+    #         data_type = 'curated'
+    #     else:
+    #         data_type = 'raw'
+    #     if session_dir[f'curated_dir_{data_type}'] is not None:
+    #         if not os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv')):
+    #             if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+    #                 print(session)
+    #                 # try:
+    #                 plot_session_opto_drift(session, data_type, update_csv=True)
+    #                 # except:
+                    #     print(f'error in {session}')
+    session = 'behavior_717121_2024-06-15_10-00-58'
     data_type = 'curated' 
-    plot_session_opto_drift(session, data_type, update_csv=False)
-
+    plot_session_opto_drift(session, data_type, update_csv=True)
 
 

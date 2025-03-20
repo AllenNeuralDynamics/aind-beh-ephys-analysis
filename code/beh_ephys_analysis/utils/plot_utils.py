@@ -115,6 +115,7 @@ def combine_pdf_big(pdf_dir, output_pdf):
     # Convert each PDF to PNG
     files = os.listdir(pdf_dir)
     files = natsorted(files)
+    print(f'Processing {len(files)} files in {pdf_dir}')
     for file in files:  # Sort to maintain order
         # print(f'Processing file: {file}')
         if file.lower().endswith(".pdf"):
