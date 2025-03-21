@@ -47,10 +47,12 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                         units  = None):
     # %%
     # load behavior data
-    session_dir = session_dirs(session, model_name = model_name)
+    session_dir = session_dirs(session, model_name = model_name) 
     session_df = makeSessionDF(session, model_name = model_name)
     tblTrials = get_session_tbl(session)
-    pdf_dir = session_dir[f'ephys_fig_dir_{data_type}']
+    pdf_dir = os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name)
+    if not os.path.exists(pdf_dir):
+        os.makedirs(pdf_dir, exist_ok=True)
     # remove all files in pdf_dir if exists
     if os.path.exists(pdf_dir):
         files = glob.glob(pdf_dir + '/*')
@@ -118,16 +120,17 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
             # plot session
             ax = fig.add_subplot(gs[0, 0]) 
             choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(session_df_curr)
-            plot_foraging_session(  # noqa: C901
-                            choice_history,
-                            reward_history,
-                            p_reward = p_reward,
-                            autowater_offered = autowater_offered,
-                            ax = ax,
-                            legend=False,
-                            ax_lim=[0, len(session_df_curr)],
-                            vertical=True,
-                            ) 
+            _, axes = plot_foraging_session(  # noqa: C901
+                                            choice_history,
+                                            reward_history,
+                                            p_reward = p_reward,
+                                            autowater_offered = autowater_offered,
+                                            ax = ax,
+                                            legend=False,
+                                            vertical=True,
+                                            ) 
+            for ax in axes:
+                ax.set_ylim(0, len(session_df_curr))
             ax.set_ylim(0, len(session_df_curr))
             # from start to end
             ax = fig.add_subplot(gs[0, 1])  
@@ -369,53 +372,56 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                 # plot regresssions
                 gs = gridspec.GridSpec(3, 7, height_ratios=[1, 1, 1], wspace=0.3, hspace=0.3)
                 ax = fig.add_subplot(gs[0,-1])
-                regressors, TvCurrU, PvCurrU, EvCurrU = fitSpikeModelG(session_df_curr, spike_matrix_LM, formula)
-                TvCurrUSig = TvCurrU.copy()
-                TvCurrUSig[PvCurrU>=0.05] = np.nan
-                cmap = plt.get_cmap('viridis')
-                colors = cmap(np.linspace(0, 1, len(regressors)))
-                for regress in range(1, len(regressors)):
-                    ax.plot(slide_times_LM, TvCurrU[:, regress], lw = 2, color = colors[regress,], label = regressors[regress])
-                    ax.plot(slide_times_LM, TvCurrUSig[:, regress], lw = 4, color = colors[regress,])
-                ax.legend(fontsize = fsLegend)
-                ax.set_xlabel(f'Time from {align_name} (s)')
-                ax.set_title('T-stats', fontsize = fs)
+                try: 
+                    regressors, TvCurrU, PvCurrU, EvCurrU = fitSpikeModelG(session_df_curr, spike_matrix_LM, formula)
+                    TvCurrUSig = TvCurrU.copy()
+                    TvCurrUSig[PvCurrU>=0.05] = np.nan
+                    cmap = plt.get_cmap('viridis')
+                    colors = cmap(np.linspace(0, 1, len(regressors)))
+                    for regress in range(1, len(regressors)):
+                        ax.plot(slide_times_LM, TvCurrU[:, regress], lw = 2, color = colors[regress,], label = regressors[regress])
+                        ax.plot(slide_times_LM, TvCurrUSig[:, regress], lw = 4, color = colors[regress,])
+                    ax.legend(fontsize = fsLegend)
+                    ax.set_xlabel(f'Time from {align_name} (s)')
+                    ax.set_title('T-stats', fontsize = fs)
 
-                ax = fig.add_subplot(gs[1,-1])
-                for regress in range(1, len(regressors)):
-                    ax.plot(slide_times_LM, -np.log10(PvCurrU[:, regress]), lw = 1, color = colors[regress,], label = regressors[regress])
+                    ax = fig.add_subplot(gs[1,-1])
+                    for regress in range(1, len(regressors)):
+                        ax.plot(slide_times_LM, -np.log10(PvCurrU[:, regress]), lw = 1, color = colors[regress,], label = regressors[regress])
 
-                plt.axhline(y = -np.log10(0.05), color='r', ls = '--')
-                ax.legend(fontsize = fsLegend)
-                ax.set_xlabel(f'Time from {align_name} (s)')
-                ax.set_title('p-value', fontsize = fs)
+                    plt.axhline(y = -np.log10(0.05), color='r', ls = '--')
+                    ax.legend(fontsize = fsLegend)
+                    ax.set_xlabel(f'Time from {align_name} (s)')
+                    ax.set_title('p-value', fontsize = fs)
+                except:
+                    print(f'Failed to fit model for unit {unit_id}')
                 plt.suptitle(f'Unit{str(unit_id)} Aligned to {align_name} default qc: {qc_pass} maybe opto: {opto_pass}', fontsize = 20) 
             # plt.tight_layout()  
             return fig
 
 # %%
-    log_record_file = os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'{session}_unit_beh.log')
-    # def process(unit_id):
-    #     try:
-    #         fig = plot_unit(unit_id) 
-    #         if fig is not None:
-    #             fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'unit_{unit_id}_goCue.pdf'))
-    #         plt.close(fig)
-    #         # write to log
-    #         with open(log_record_file, 'a') as f:
-    #             f.write(f'Unit {unit_id} plotted\n')
-    #         # pause for 1 second
-    #     except:
-    #         with open(log_record_file, 'a') as f:
-    #             f.write(f'Unit {unit_id} failed\n')
-    #     time.sleep(1)
-
-    def process(unit_id):
-        fig = plot_unit(unit_id) 
-        if fig is not None:
-            fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'unit_{unit_id}_{align_name}.pdf'))
-        plt.close(fig)
+    log_record_file = os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'{session}_unit_beh.log')
+    def process(unit_id): 
+        try:
+            fig = plot_unit(unit_id) 
+            if fig is not None:
+                fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'unit_{unit_id}_goCue.pdf'))
+            plt.close(fig)
+            # write to log
+            with open(log_record_file, 'a') as f:
+                f.write(f'Unit {unit_id} plotted\n')
+            # pause for 1 second
+        except:
+            with open(log_record_file, 'a') as f:
+                f.write(f'Unit {unit_id} failed\n')
         time.sleep(1)
+
+    # def process(unit_id):
+    #     fig = plot_unit(unit_id) 
+    #     if fig is not None: 
+    #         fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'unit_{unit_id}_{align_name}.pdf'))
+    #     plt.close(fig)
+    #     time.sleep(1)
 
 
 
@@ -431,7 +437,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     # for unit_id in unit_tbl['unit_id'].values:
     #     process(unit_id)
 
-    output_pdf = os.path.join(session_dirs(session)[f'ephys_dir_{data_type}'], f'{session}_unit_beh.pdf')
+    output_pdf = os.path.join(session_dirs(session)[f'ephys_dir_{data_type}'],f'{session}_unit_beh_{align_name}.pdf')
 
     if os.path.exists(pdf_dir):
         print(f'Combining {session}')
@@ -449,17 +455,25 @@ if __name__ == '__main__':
     curate_time = True
     align_name = 'go_cue'
     formula = 'spikes ~ 1 + outcome + choice + Qchosen'
-    # for session in session_ids:
-    #     print(session)
-    #     session_dir = session_dirs(session)
-    #     if '751181' not in session and '716325' not in session and os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-    #         plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
-    #                         model_name = model_name, formula=formula,
-    #                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-    #                         units=None)
-    session = 'behavior_717121_2024-06-15_10-00-58'
-    plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
-                        model_name = model_name, formula=formula,
-                        pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-                        units=None)
+    for session in session_ids:
+        print(session)
+        session_dir = session_dirs(session)
+        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+            if session_dir['curated_dir_curated'] is not None:
+                if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_curated'],f'{session}_unit_beh_{align_name}.pdf')):
+                    plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, 
+                                model_name = model_name, formula=formula,
+                                pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+                                units=None)
+            elif session_dir['curated_dir_raw'] is not None:
+                if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
+                    plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
+                                    model_name = model_name, formula=formula,
+                                    pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+                                    units=None)
+    # session = 'behavior_717121_2024-06-15_10-00-58'
+    # plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
+    #                     model_name = model_name, formula=formula,
+    #                     pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+    #                     units=None)
 

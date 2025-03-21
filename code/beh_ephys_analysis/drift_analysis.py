@@ -16,7 +16,7 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import re
 from utils.beh_functions import session_dirs, get_history_from_nwb
-from utils.plot_utils import shiftedColorMap, template_reorder, plot_raster_bar,merge_pdfs
+from utils.plot_utils import shiftedColorMap, template_reorder, plot_raster_bar,merge_pdfs, combine_pdf_big
 from session_preprocessing import ephys_opto_preprocessing
 from opto_tagging import opto_plotting_session
 from open_ephys.analysis import Session
@@ -105,6 +105,9 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
         mis_align = np.mean(map_time) - 0.5*(start+stop)
         temp_bins_sampling = np.arange(start+mis_align, stop+mis_align, bin_sampling)
         temp_bins = np.arange(start, stop, bin_short)
+    else:
+        temp_bins_sampling = np.arange(start, stop, bin_sampling)
+        temp_bins = np.arange(start, stop, bin_short)
 
     drift_sampling = np.zeros(shape=(len(probe_location), len(temp_bins_sampling)))
     for i, t in enumerate(temp_bins_sampling): 
@@ -156,9 +159,9 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     with open(qm_file) as f:
         qm_dict = json.load(f)
     
-    # if not qm_dict['ephys_sync']:
-    #     temp_bins = align_timestamps_to_anchor_points(temp_bins, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
-    #     temp_bins_slow = align_timestamps_to_anchor_points(temp_bins_slow, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
+    if not qm_dict['ephys_sync'] and '717121' not in session:
+        temp_bins = align_timestamps_to_anchor_points(temp_bins, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
+        temp_bins_slow = align_timestamps_to_anchor_points(temp_bins_slow, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
 
     # %% plot
     range_max = np.max(np.abs(drift)) 
@@ -567,7 +570,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     lat_thresh = 0.02
     for i, row in unit_tbl.iterrows():
         if row['resp_p'] is not None:
-            opto_pass = len(np.where((np.array(row['resp_p']) > p_thresh) & (np.array(row['resp_lat']) < lat_thresh) & (np.array(row['resp_lat']) > 0.004))[0]) > 0
+            opto_pass = row['opto_pass']> 0
             quality_pass = (row['isi_violations_ratio'] < 0.05) & (row['decoder_label'] != 'noise') & (row['decoder_label'] != 'artifact')
             if opto_pass & quality_pass:
                 if np.where(np.array(row['resp_p']) > p_thresh)[0].size > 0:
@@ -587,30 +590,29 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     if update_csv:
         opto_drift_tbl.to_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv'))
     if plot:
-        merge_pdfs(input_dir=drift_dir, output_filename=os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_drift.pdf')) 
+        # merge_pdfs(input_dir=drift_dir, output_filename=os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_drift.pdf')) 
+        combine_pdf_big(drift_dir, os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_drift.pdf'))
     return opto_drift_tbl
 
 if __name__ == '__main__':
-    # session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
-    # session_list = session_assets['session_id']
-    # # session = 'behavior_716325_2024-05-31_10-31-14'
-    # for session in session_list:
-    #     print(session)
-    #     session_dir = session_dirs(session)
-    #     if session_dir['curated_dir_curated'] is not None:
-    #         data_type = 'curated'
-    #     else:
-    #         data_type = 'raw'
-    #     if session_dir[f'curated_dir_{data_type}'] is not None:
-    #         if not os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv')):
-    #             if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-    #                 print(session)
-    #                 # try:
-    #                 plot_session_opto_drift(session, data_type, update_csv=True)
-    #                 # except:
-                    #     print(f'error in {session}')
-    session = 'behavior_717121_2024-06-15_10-00-58'
-    data_type = 'curated' 
-    plot_session_opto_drift(session, data_type, update_csv=True)
+    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_list = session_assets['session_id']
+    # session = 'behavior_716325_2024-05-31_10-31-14'
+    for session in session_list:
+        session_dir = session_dirs(session)
+        if session_dir['curated_dir_curated'] is not None:
+            data_type = 'curated'
+        else:
+            data_type = 'raw'
+        if session_dir[f'curated_dir_{data_type}'] is not None:
+            if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+                print(session)
+                # try:
+                plot_session_opto_drift(session, data_type, update_csv=True, plot=True)
+                    # except:
+                        # print(f'error in {session}')
+    # session = 'behavior_717121_2024-06-15_10-00-58'
+    # data_type = 'curated' 
+    # plot_session_opto_drift(session, data_type, update_csv=True)
 
 

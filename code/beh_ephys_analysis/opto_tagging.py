@@ -85,10 +85,14 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
                  'freqs': None, 
                  'stim_times': None, 
                  'opto_pass': False}
+
     if len(resp_pass_ind[0]) > 0:
         opto_tagging_dict['opto_pass'] = True
+        opto_pass = True
     else: # get max P(resp) if no pass
-        resp_pass_ind = np.argmax(resp_p)
+        opto_pass = False
+        p_max = np.nanmax(resp_p)
+        resp_pass_ind = np.where((resp_p >= p_max))
     # get the response p and latencies
     opto_tagging_dict['resp_p'] = resp_p[resp_pass_ind]
     opto_tagging_dict['resp_lat'] = resp_lat[resp_pass_ind]
@@ -102,7 +106,7 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
     # get all similarities
     opto_tagging_df = pd.DataFrame(opto_tagging_dict)
     # group by site, power, duration, pre_post and take maximum of resp_p and resp_lat
-    opto_tagging_df = opto_tagging_df.groupby(['unit_id', 'sites', 'powers', 'num_pulses', 'durations', 'freqs', 'stim_times']).agg({'resp_p': 'max', 'resp_lat': 'min'}).reset_index()
+    opto_tagging_df = opto_tagging_df.groupby(['unit_id', 'sites', 'powers', 'durations', 'stim_times']).agg({'resp_p': 'max', 'resp_lat': 'min'}).reset_index()
     
     euc_dist = []
     corr = []
@@ -135,6 +139,7 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
     opto_tagging_dict = {key: opto_tagging_df[key].values for key in opto_tagging_df.columns}
     opto_tagging_dict['unit_id'] = unit_id
     opto_tagging_dict['spike_times'] = spike_times
+    opto_tagging_dict['opto_pass'] = opto_pass
     opto_tagging_dict.update(qc_dict)
 
     
@@ -447,16 +452,16 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
         opto_tagging_df_sess = pd.concat([opto_tagging_df_sess, pd.DataFrame([opto_tagging_dict_curr])], ignore_index=True)
         target_pass_qc.append(pass_qc[unit_id])
         opto_pass_curr = True
-        if opto_tagging_dict_curr['resp_p'] is None:
-            opto_pass_curr = False
-        opto_pass.append(opto_pass_curr)
+        # if opto_tagging_dict_curr['opto_pass'] is None:
+        #     opto_pass_curr = False
+        opto_pass.append(opto_tagging_dict_curr['opto_pass'])
     if plot:
         merge_pdfs(session_dir[f'opto_dir_fig_{data_type}'], os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging.pdf'))
     # both pass qc and opto tagging
     unit_count_pass = np.sum(np.array(target_pass_qc) & np.array(opto_pass))
     print(f'{unit_count_pass} out of {len(target_pass_qc)} units pass quality control and opto tagging')
     opto_tagging_df_sess['default_qc'] = target_pass_qc
-    opto_tagging_df_sess['opto_pass'] = opto_pass
+    # opto_tagging_df_sess['opto_pass'] = opto_pass
     # target_qc['target_pass_qc'] = target_pass_qc
     if save:
         with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl'), 'wb') as f:
@@ -516,20 +521,30 @@ def opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None
 
 # %%
 if __name__ == "__main__":
-    session = 'behavior_717121_2024-06-15_10-00-58'
+
     target = 'soma'
     data_type = 'curated' 
     resp_thresh = 0.3
     lat_thresh = 0.02 
-    session_dir = session_dirs(session)
-    # final check  
-    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False, save=True)
+    # session level  
+    # session = 'behavior_717121_2024-06-15_10-00-58'
+    # opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
+    # session_dir = session_dirs(session)
 
-    # opto_tagging_df_sess.to_csv(os.path.join(session_dirs(session)[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.csv'), index=False)
-    # opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=None)
-    # first check
-    # opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True)
-    # opto_tagged_spike_stability(session, data_type, target, opto_tagging_df=opto_tagging_df_sess)
+
+    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_list = session_assets['session_id']
+    # session = 'behavior_716325_2024-05-31_10-31-14'
+    for session in session_list:
+        print(session)
+        session_dir = session_dirs(session)
+        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+            if session_dir['curated_dir_curated'] is not None:
+                data_type = 'curated'
+                opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False, save=True)
+            elif session_dir['curated_dir_raw'] is not None:
+                data_type = 'raw'
+                opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False, save=True)
 
 
 
