@@ -241,19 +241,22 @@ def convert_values(value):
 def load_drift(session, unit_id, data_type='curated'):
     session_dir = session_dirs(session)
     drift_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv')
-    opto_drift_tbl = pd.read_csv(drift_file)    
-    opto_drift_tbl.reset_index(drop=True, inplace=True)
-    if unit_id==None:
-        return opto_drift_tbl
+    if not os.path.exists(drift_file):
+        return None
     else:
-        if unit_id in opto_drift_tbl['unit_id'].values:
-            unit_drift = opto_drift_tbl[opto_drift_tbl['unit_id'] == unit_id].iloc[0].to_dict()
-            # Apply conversion
-            converted_data = {key: convert_values(val) for key, val in unit_drift.items()}
-            unit_drift = converted_data
-            return unit_drift
+        opto_drift_tbl = pd.read_csv(drift_file)    
+        opto_drift_tbl.reset_index(drop=True, inplace=True)
+        if unit_id==None:
+            return opto_drift_tbl
         else:
-            return None
+            if unit_id in opto_drift_tbl['unit_id'].values:
+                unit_drift = opto_drift_tbl[opto_drift_tbl['unit_id'] == unit_id].iloc[0].to_dict()
+                # Apply conversion
+                converted_data = {key: convert_values(val) for key, val in unit_drift.items()}
+                unit_drift = converted_data
+                return unit_drift
+            else:
+                return None
 
 def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, stepSize):
     bin_times = np.arange(pre_event, post_event, stepSize) - 0.5*stepSize

@@ -1036,9 +1036,7 @@ def get_session_tbl(session):
 
 def get_unit_tbl(session, data_type):
     session_dir = session_dirs(session)
-    unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl')
-    if not os.path.exists(unit_tbl_dir):
-        unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
+    unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
     with open(unit_tbl_dir, 'rb') as f:
         unit_tbl = pickle.load(f)
     return unit_tbl

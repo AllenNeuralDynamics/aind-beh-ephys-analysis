@@ -282,12 +282,12 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
                     ax.add_patch(rect)
 
             # plot waveform
-            gs_sub_waveform = gridspec.GridSpecFromSubplotSpec(6, 2, subplot_spec=gs[power_ind], hspace=0.75)
+            gs_sub_waveform = gridspec.GridSpecFromSubplotSpec(6, 2, subplot_spec=gs[power_ind], hspace=0.75)  
             ax = fig.add_subplot(gs_sub_waveform[3,0])
             if opto_wf is not None:
                 wf_resp = opto_wf.query('unit_id == @unit_id and site == @max_site and power == @curr_power and duration == @pulse_width and pre_post == @curr_pre_post')
                 wf_spont = opto_wf.query('unit_id == @unit_id and pre_post == @curr_pre_post and spont == 1')
-                if len(wf_resp) > 0:
+                if len(wf_spont) > 0:
                     ax.plot(wf_spont['peak_waveform'].values[0], color='black', alpha = 0.5)
                 if len(wf_resp) > 0:
                     # plot the response waveform
@@ -532,19 +532,23 @@ if __name__ == "__main__":
     # session_dir = session_dirs(session)
 
 
-    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
-    session_list = session_assets['session_id']
-    # session = 'behavior_716325_2024-05-31_10-31-14'
-    for session in session_list:
-        print(session)
-        session_dir = session_dirs(session)
-        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-            if session_dir['curated_dir_curated'] is not None:
-                data_type = 'curated'
-                opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False, save=True)
-            elif session_dir['curated_dir_raw'] is not None:
-                data_type = 'raw'
-                opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False, save=True)
+    # session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    # session_list = session_assets['session_id']
+    # ind = [i for i, session in enumerate(session_list) if session == 'behavior_751181_2025-02-25_12-12-35'] 
+    # ind = ind[0]
+    # # session = 'behavior_716325_2024-05-31_10-31-14'
+    # for session in session_list[ind+2:]:
+    #     print(session)
+    #     session_dir = session_dirs(session)
+    #     if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+    #         if session_dir['curated_dir_curated'] is not None:
+    #             data_type = 'curated'
+    #             opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
+    #         elif session_dir['curated_dir_raw'] is not None:
+    #             data_type = 'raw'
+    #             opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
+    session = 'behavior_751181_2025-02-25_12-12-35'
+    opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
 
 
 
