@@ -419,7 +419,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     # def process(unit_id):
     #     fig = plot_unit(unit_id) 
     #     if fig is not None: 
-    #         fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'unit_{unit_id}_{align_name}.pdf'))
+    #         fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'unit_{unit_id}_goCue.pdf'))
     #     plt.close(fig)
     #     time.sleep(1)
 
@@ -471,7 +471,7 @@ if __name__ == '__main__':
                                     model_name = model_name, formula=formula,
                                     pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
                                     units=None)
-    # session = 'behavior_717121_2024-06-15_10-00-58'
+    # session = 'behavior_751004_2024-12-19_11-50-37'
     # plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
     #                     model_name = model_name, formula=formula,
     #                     pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,

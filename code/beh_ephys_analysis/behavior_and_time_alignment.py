@@ -57,7 +57,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
             print('NWB file already exists.')
         else:
             print('Processing NWB:')
-            success, nwb_file = bonsai_to_nwb(session_json_file, os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
+            success, nwb = bonsai_to_nwb(session_json_file, os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
 
     # %%
 
@@ -119,7 +119,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     ax.hist(all_licks, bins=100, density=True, alpha=0.5, label='licks')
     ax.hist(df_trial['goCue_start_time'], bins=100, density=True, alpha=0.5, label='goCue')
     for i, unit_spike in enumerate(unit_spikes):
-        ax.hist(unit_spike, bins=100, density=True, alpha=0.2)
+        ax.hist(unit_spike, bins=100, density=True, alpha=0.2, color='k')
     ax.legend()
     figure.savefig(os.path.join(session_dir['alignment_dir'], 'lick_goCue_ephys_time.pdf'))
     if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]) and np.abs(np.mean(timestamps) - mean_spike_times) < 0.2*(timestamps[-1]-timestamps[0]): 
@@ -161,7 +161,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     log_file.close()
 
 if __name__ == "__main__":  
-    session = 'behavior_717121_2024-06-15_10-00-58'
+    session = 'behavior_754897_2025-03-15_11-32-18'
     ephys_cut = [0, 0]
     beh_and_time_alignment(session, ephys_cut=ephys_cut)
 

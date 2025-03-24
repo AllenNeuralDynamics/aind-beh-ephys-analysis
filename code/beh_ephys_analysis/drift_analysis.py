@@ -598,7 +598,8 @@ if __name__ == '__main__':
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
     session_list = session_assets['session_id']
     # session = 'behavior_716325_2024-05-31_10-31-14'
-    for session in session_list:
+    for session in session_list[46:]:
+        print(session)
         session_dir = session_dirs(session)
         if session_dir['curated_dir_curated'] is not None:
             data_type = 'curated'
