@@ -38,8 +38,8 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
     else:
         beh_nwb == None
     opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv'))
-    sorting_analyzer = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
-    sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
+    sorting_analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
+    sorting = si.load(session_dir[f'curated_dir_{data_type}'])
     unit_ids = sorting.get_unit_ids()
     spike_times = sorting.get_unit_spike_train(unit_id=unit_ids[0])
     spike_vector = sorting.to_spike_vector()
@@ -58,6 +58,7 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
     good_channel_ids = recording.channel_ids[
             np.in1d(recording.channel_ids, sorting_analyzer.channel_ids)
     ]
+    del sorting_analyzer
     recording = recording.select_channels(good_channel_ids)
 
     # find maximum spike sample number with 'pre'
@@ -229,6 +230,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     laser_line = 2
     # load all laser times
     events = recording.events
+    del recording
     laser_events = events[
                     (events.stream_name == 'PXIe-6341')
                     & (events.line == laser_line)
@@ -453,7 +455,7 @@ def ephys_opto_preprocessing(session, data_type, target):
 
     # %%
     # load waveforms info
-    we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
+    we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     print(f'Loaded session: {session}')
     unit_ids = we.sorting.get_unit_ids()
     all_templates = we.get_extension("templates").get_data(operator="average")
@@ -465,6 +467,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     unit_spartsiity = we.sparsity.unit_id_to_channel_ids
     channel_locations = we.get_channel_locations()
     unit_locations = we.get_extension("unit_locations").get_data(outputs="by_unit")
+    del we
     right_left = channel_locations[:, 0]<20
 
     # re-organize templates so that left and right separate
@@ -517,12 +520,24 @@ def ephys_opto_crosscorr(session, data_type):
 
 
 if __name__ == "__main__":
-    session = 'behavior_717121_2024-06-15_10-00-58'
+    # session = 'behavior_717121_2024-06-15_10-00-58'
     data_type = 'curated'
     target = 'soma'
-    ephys_opto_preprocessing(session, data_type, target)
-    # si.set_global_job_kwargs(n_jobs=-1)
-    # session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
-    # session_crosscorr(session, data_type, window_ms=2000, bin_ms=10, post_fix = 'long')
+    # ephys_opto_preprocessing(session, data_type, target)
+    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_list = session_assets['session_id']
+    session_list = [session for session in session_list if isinstance(session, str)]
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+    for session in [session_list[-1]]:
+        session_dir = session_dirs(session)
+        if session_dir['nwb_dir_curated'] is None:
+            continue
+        else: 
+            print(f'Processing {session}')
+            ephys_opto_preprocessing(session, data_type, target)
+            ephys_opto_crosscorr(session, data_type)
+            print(f'Finished {session}')
 
 

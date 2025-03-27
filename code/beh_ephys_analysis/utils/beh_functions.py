@@ -1038,6 +1038,7 @@ def get_unit_tbl(session, data_type):
     session_dir = session_dirs(session)
     unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
     with open(unit_tbl_dir, 'rb') as f:
-        unit_tbl = pickle.load(f)
+        unit_data = pickle.load(f)
+    unit_tbl = unit_data['opto_tagging_df']
     return unit_tbl
  

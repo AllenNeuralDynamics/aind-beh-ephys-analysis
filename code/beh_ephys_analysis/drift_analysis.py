@@ -15,7 +15,7 @@ import json
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import re
-from utils.beh_functions import session_dirs, get_history_from_nwb
+from utils.beh_functions import session_dirs, get_history_from_nwb, get_unit_tbl
 from utils.plot_utils import shiftedColorMap, template_reorder, plot_raster_bar,merge_pdfs, combine_pdf_big
 from session_preprocessing import ephys_opto_preprocessing
 from opto_tagging import opto_plotting_session
@@ -51,6 +51,8 @@ try:
     from spikeinterface.core.motion import Motion
 except:
     from spikeinterface.sortingcomponents.motion.motion_utils import Motion
+from joblib import Parallel, delayed
+import shutil
 
 def load_legacy_motion_info(folder):
     folder = Path(folder)
@@ -190,7 +192,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                     autowater_offered = autowater_offered,
                     trial_time = trial_time,
                     ax = ax2,
-                    legend=False,
+                    # legend=False,
                     ) 
     for ax in Axes:
         ax.set_xlim([temp_bins[0], temp_bins[-1]])
@@ -280,22 +282,18 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     plt.savefig(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_motion_drift.pdf'))
 
     # %%
-    if os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl')):
-        # load from pickle
-        with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'), 'rb') as f:
-            unit_tbl = pickle.load(f)
-    else: 
-        unit_tbl = opto_plotting_session(session, data_type, 'soma', plot=False, resp_thresh=0.3, lat_thresh=0.025) 
-        unit_tbl.to_pickle(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'))
+    unit_tbl = get_unit_tbl(session, data_type)
 
 
     # %%
     sorting_analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False) 
-    sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
+    sorting = si.load(session_dir[f'curated_dir_{data_type}'])
 
     # %%
     unit_locations = sorting_analyzer.get_extension('unit_locations').get_data(outputs="by_unit")
     spike_amplitudes = sorting_analyzer.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+
+    del sorting_analyzer
 
     # # %%
     # spike_pcs = sorting_analyzer.get_extension('principal_components')
@@ -565,20 +563,24 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                 'drift_unit': False}
 
     # %%
+
     units_to_plot = []
-    p_thresh = 0.4
+    p_thresh = 0.3
     lat_thresh = 0.02
     for i, row in unit_tbl.iterrows():
-        if row['resp_p'] is not None:
-            opto_pass = row['opto_pass']> 0
-            quality_pass = (row['isi_violations_ratio'] < 0.05) & (row['decoder_label'] != 'noise') & (row['decoder_label'] != 'artifact')
-            if opto_pass & quality_pass:
-                if np.where(np.array(row['resp_p']) > p_thresh)[0].size > 0:
-                    units_to_plot.append(row['unit_id'])
+        # opto_pass = row['opto_pass']> 0
+        # quality_pass = (row['isi_violations_ratio'] < 0.5) & (row['decoder_label'] != 'noise') & (row['decoder_label'] != 'artifact')
+        if row['opto_pass'] and row['default_qc']:
+            units_to_plot.append(row['unit_id'])
 
     # %%
     drift_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], 'drift')
+    if os.path.exists(drift_dir):
+        shutil.rmtree(drift_dir)
+
     os.makedirs(name=drift_dir, exist_ok=True)
+
+
     # os.mkdir(drift_dir, exist_ok=True)?
     opto_drift_tbl = pd.DataFrame()
     for unit in units_to_plot:                             
@@ -594,26 +596,31 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
         combine_pdf_big(drift_dir, os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_drift.pdf'))
     return opto_drift_tbl
 
+def update_unit_tbl_by_drift(session, data_type): 
+    session_dir = session_dirs(session)
+    opto_drift_tbl = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv'))
+    unit_tbl = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'))
+    for i, row in opto_drift_tbl.iterrows():
+        if row['r_squared_diff_abs_slow_rf'] > 0.1:
+            unit_tbl.loc[unit_tbl['unit_id'] == row['unit_id'], 'ephys_cut'] = [row['r_squared_diff_abs_slow_rf'], row['r_squared_diff_abs_fast_rf']]
+            unit_tbl.loc[unit_tbl['unit_id'] == row['unit_id'], 'drift_unit'] = True
+    unit_tbl.to_pickle(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'))
+    return unit_tbl
+
+
 if __name__ == '__main__':
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
-    session_list = session_assets['session_id']
-    # session = 'behavior_716325_2024-05-31_10-31-14'
-    for session in session_list[46:]:
+    session_list = session_assets['session_id'].values
+    session_list = [session for session in session_list if isinstance(session, str)]
+    session = 'behavior_716325_2024-05-31_10-31-14'
+    # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
+    def process(session):
         print(session)
         session_dir = session_dirs(session)
-        if session_dir['curated_dir_curated'] is not None:
-            data_type = 'curated'
-        else:
-            data_type = 'raw'
-        if session_dir[f'curated_dir_{data_type}'] is not None:
-            if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-                print(session)
-                # try:
-                plot_session_opto_drift(session, data_type, update_csv=True, plot=True)
-                    # except:
-                        # print(f'error in {session}')
-    # session = 'behavior_717121_2024-06-15_10-00-58'
-    # data_type = 'curated' 
-    # plot_session_opto_drift(session, data_type, update_csv=True)
+        if session_dir['nwb_dir_curated'] is not None:
+                plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
+
+
+    Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[-5:])
 
 
