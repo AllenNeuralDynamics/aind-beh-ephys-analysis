@@ -14,6 +14,8 @@ from natsort import natsorted
 from pdf2image import convert_from_path
 from PIL import Image
 import shutil
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 
 def shiftedColorMap(cmap, min_val, max_val, name):
     epsilon = 0.001
@@ -135,3 +137,9 @@ def combine_pdf_big(pdf_dir, output_pdf):
     else:
         print("No PDFs found in the directory!")
     shutil.rmtree(output_images_dir)
+
+def get_gradient_colors(max_p_values, floor=0, ceiling=1, cmap_name='Reds'):
+    norm = mcolors.Normalize(vmin=floor, vmax=ceiling)
+    cmap = cm.get_cmap(cmap_name)  # Use cm.get_cmap instead of colormaps[cmap_name]
+    colors = [cmap(norm(max(0, p))) for p in max_p_values]  
+    return colors, norm, cmap

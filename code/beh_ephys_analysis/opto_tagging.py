@@ -133,6 +133,7 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
     
     euc_dist = []
     corr = []
+    mean_p = []
     if opto_wf is not None:
         for _, row in opto_tagging_df.iterrows():
             wf_curr = opto_wf.query(
@@ -153,6 +154,14 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
 
             euc_dist.append(euc_dist_curr)
             corr.append(corr_curr)
+
+
+    for _, row in opto_tagging_df.iterrows():
+        curr_power_ind = np.where(np.array(opto_info['powers']) == row['powers'])[0][0]
+        curr_mean = np.nanmean(resp_p_bl[curr_power_ind])
+        mean_p.append(curr_mean)
+    
+    opto_tagging_df['mean_p'] = mean_p
     if len(euc_dist) > 0:
         opto_tagging_df['euclidean_norm'] = euc_dist
         opto_tagging_df['correlation'] = corr
@@ -583,7 +592,7 @@ if __name__ == "__main__":
     session_list = [session for session in session_list if isinstance(session, str)]
     ind = [i for i, session in enumerate(session_list) if session == 'behavior_751181_2025-02-25_12-12-35'] 
     ind = ind[0]
-    session = 'behavior_751004_2024-12-21_13-28-28'
+    session = 'behavior_754897_2025-03-13_11-20-42'
     import warnings
     # with warnings.catch_warnings():
     #     warnings.simplefilter("ignore")
@@ -599,8 +608,8 @@ if __name__ == "__main__":
             #     data_type = 'raw'
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
     # session = 'behavior_716325_2024-05-31_10-31-14'
-    # opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= [84], plot = True, ephys_cut = False, save=False)
-    
+    # opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids=None, plot = False, ephys_cut = False, save=True)
+     
     
     from joblib import Parallel, delayed
     def process(session):
@@ -609,14 +618,14 @@ if __name__ == "__main__":
         if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
             if session_dir['nwb_dir_curated'] is not None:
                 data_type = 'curated'
-                opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
+                opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, ephys_cut = False, save=True)
                 print(f'Finished {session}')
             else:
                 print(f'No curated data found for {session}')
             # elif session_dir['curated_dir_raw'] is not None:
             #     data_type = 'raw'
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    Parallel(n_jobs=10)(delayed(process)(session) for session in session_list[-5:])
+    Parallel(n_jobs=10)(delayed(process)(session) for session in session_list)
 
 
 

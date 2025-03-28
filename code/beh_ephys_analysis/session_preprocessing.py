@@ -530,7 +530,7 @@ if __name__ == "__main__":
     import warnings
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-    for session in [session_list[-1]]:
+    for session in [session_list[-1]]:  
         session_dir = session_dirs(session)
         if session_dir['nwb_dir_curated'] is None:
             continue
