@@ -13,7 +13,7 @@ from utils.beh_functions import *
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import plot_lick_analysis, cal_metrics, plot_met, load_data
-from harp.clock import decode_harp_clock
+from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
 from open_ephys.analysis import Session
 import datetime
 from aind_ephys_rig_qc.temporal_alignment import search_harp_line
@@ -40,7 +40,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     # %%
     print(session)
     session_dir = session_dirs(session)
-    aniID, datetime, string = parseSessionID(session)
+    aniID, date_time, string = parseSessionID(session)
     session_json_dir = os.path.join(session_dir['raw_dir'], 'behavior')
     session_json_files = []
     for dir, _, files in os.walk(session_json_dir):
@@ -136,7 +136,10 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
         print('Harp times saved to: {}'.format(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
         print('Local times saved to: {}'.format(os.path.join(session_dir['alignment_dir'], 'local_times.npy')))
     # %% find a stable time period
-    ephys_cut_new = [timestamps[0]+ephys_cut[0], timestamps[-1]-ephys_cut[1]]
+    ephys_cut_new = [recording.continuous[0].timestamps[0]+ephys_cut[0], recording.continuous[0].timestamps[-1]-ephys_cut[1]]
+    if not qm_dict['ephys_sync']:
+        ephys_cut_new = align_timestamps_to_anchor_points(np.array(ephys_cut_new), local_times, harp_times)
+        ephys_cut_new = list(ephys_cut_new)
     qm_dict['ephys_cut'] = ephys_cut_new
     # %%
     qm_file = os.path.join(session_dir['processed_dir'], f"{session}_qm.json")
@@ -148,7 +151,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     log_file.close()
 
 if __name__ == "__main__":
-    session = 'behavior_758017_2025-02-04_11-57-38'
+    session = 'behavior_716325_2024-05-31_10-31-14'
     ephys_cut = [0, 0]
     beh_and_time_alignment(session, ephys_cut=ephys_cut)
 

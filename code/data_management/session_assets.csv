@@ -1,4 +1,4 @@
-session_id,Note,raw_data,sorted,sorted_opto_highpass_curation,sorted_curated,sorted_opto_bandpass,sorted_opto_highpass_curation,model_stan
+session_id,Note,raw_data,sorted,sorted_opto_curation,sorted_curated,sorted_opto_bandpass,sorted_opto_highpass_curation,model_stan
 behavior_716325_2024-05-29_10-33-32,,8eda219a-7e5e-499c-b3d6-d6b1c4012beb,c3d9b46b-fbdb-4e54-8414-6bbc6d912b1f,,,,,d647e1b6-7bc9-478f-ab0c-24d349d087af
 behavior_716325_2024-05-30_11-33-46,,6df5d1fa-16bf-407d-961d-3515046271a0,bc671ca5-3665-46fb-92ca-ff946a6dffc8,,,,,d647e1b6-7bc9-478f-ab0c-24d349d087af
 behavior_716325_2024-05-31_10-31-14,,2d28ccd9-48ab-429e-92ef-7723135ee306,908c91c4-294d-48fc-893f-6b2a7bb3e34d,f0810b1a-3b23-450a-9ac7-ddf64d79520b,2d2014c0-d616-4381-8ca3-be516b028960,88148836-0e30-4d43-acd5-1a6f79347dea,8b2549e6-e396-49fd-9dff-11136925d51b,d647e1b6-7bc9-478f-ab0c-24d349d087af
@@ -18,7 +18,7 @@ behavior_714116_2024-08-27_11-29-48,"Good recording, Okay behavior (low motivati
 behavior_714116_2024-08-28_12-11-55,"Good recording, Bad behavior (many ignored trials), can be used for antirdomic stim data.",8c6f6dc0-ab81-45cc-bf5d-83bc7b80c815,e6fc5a41-34ca-418b-acf9-2d215db973de,,,,,
 behavior_714116_2024-08-29_11-46-43,"OK recording, Okay behavior (low motivation, a couple of manual reward)",968b9a8e-b85c-46d0-aabc-4c7a5eff4a03,17acbbc8-35e6-499d-b27f-1a21812f4070,,,,,
 behavior_722832_2024-09-13_11-55-58,"No harp sync, good behavior, quick drifts of recording.",8ed55fb2-3843-4140-82c0-d6307bc69139,88af23e7-ebd4-45a9-bac7-35ce7d23baec,,,,,
-behavior_724172_2024-10-01_11-20-11,"Almost no good behavior. Fast drift in ephys, not correctable.",3f340001-2d45-47ed-be8f-f7194ec829b0,0be05e63-c599-44df-8616-55517cc0b112,,,,,
+behavior_724172_2024-10-01_11-20-11,"Almost no good behavior. Fast drift in ephys, not correctable.",3f340001-2d45-47ed-be8f-f7194ec829b0,0be05e63-c599-44df-8616-55517cc0b112,,,                ,,
 behavior_724172_2024-10-03_11-02-53,"Almost no good behavior. check tagged neurons for stability and plot behavior in time. Fast drift in ephys, not correctable ",d361568a-9315-460e-9a48-59fa0f5cbf9b,8c98cfb6-e73a-4f35-bbdc-441af39639cc,,,,,
 behavior_739970_2024-10-15_10-04-12,"Behavior OK; Two recording sessions (need to be combined) before uploading, need to be sorted",b6798f3a-c01b-4b60-9ae0-fbcbf04d0aca,490303d7-a5d3-47ee-af11-51d1e548790b,,,,,
 behavior_739970_2024-10-16_12-15-24,"Maybe OK behavior. Fast drift in ephys, not correctable",9017cd0f-bfa0-4489-b4a1-85e27fc99a3f,800a28ac-58ac-4e48-bb9b-432a1b520c95,,,,,
@@ -32,11 +32,17 @@ behavior_751004_2024-12-20_13-26-11,"Good behavior, Good recording, videos are s
 behavior_751004_2024-12-21_13-28-28,"Good behavior (Slightly left biased), Good recording, videos are synced, major drift at the end",019cab81-ad4e-45e7-ba9b-8dac12480323,ba67f1a1-44a7-4f99-8a4d-13a64cd9f0e8,24c5da39-c065-4cb5-8f16-3e1416829ad6,e41d6b2a-8cfd-4fa7-b96b-5fb089d3e8eb,,,dee86390-9e3d-47d8-8b3c-dfc6c1172596
 behavior_751004_2024-12-22_13-09-17,"Good behavior, Good recording, videos are synced major drift at the end",1d0ed8bd-6b36-4c19-a8a4-dcb757abba8b,bc6b4df0-83db-4ba5-aa53-9596fa5a318e,5d8d79ea-9c6b-4bd4-93f0-99670fd08b5e,773d43dc-7f5a-4830-b490-aae48b305cb8,,,dee86390-9e3d-47d8-8b3c-dfc6c1172596
 behavior_751004_2024-12-23_14-20-03,"Left biased behavior, Good recording, videos are synced, drift only at the end",414a1912-d365-465a-83e0-f613c95c0c70,244fcaa9-14dd-4a0b-bd29-32cf6ef6faf2,1f28a1ac-7d93-49e1-9ecc-c9b304ac8f83,8ae61d7d-0e8b-4ba7-9aa2-dddceff8a829,,,dee86390-9e3d-47d8-8b3c-dfc6c1172596
-behavior_751769_2025-01-16_11-32-05,,e08f98e9-7319-4aa1-993e-e28e69604f5b,,,,,,
-behavior_751769_2025-01-17_11-37-39,,a4dae472-9a9b-4bd7-a920-9691a69869dc,9b2e786f-2bd9-4bb2-a423-9d50cb5dc584,,,,,
-behavior_751769_2025-01-18_10-15-25,,5a341fc5-eb96-4f7d-9de5-99a99a41a83b,8f806c5e-28a7-46fe-a654-cc6f7150dada,,,,,
-behavior_758017_2025-02-04_11-57-38,,75f7920a-17c9-4e0c-8259-aee69e0544b2,6a851057-6523-446c-8108-e57924bdca92,,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             , ,,
-behavior_758017_2025-02-05_11-42-34,,b4263e0d-c566-440e-9f82-f617b46adcd4,f4744bf9-ad36-4386-b9a0-a44549e56092,,,,,
-behavior_758017_2025-02-06_11-26-14,,,,,,,,
-behavior_758017_2025-02-07_14-11-08,,,,,,,,
-behavior_751766_2025-02-11_11-53-38,,,,,,,,
+behavior_751769_2025-01-16_11-32-05,,e08f98e9-7319-4aa1-993e-e28e69604f5b,a19ec68a-a660-44f2-a181-15c91794cbd2,c3b1ac16-070f-41d2-9093-7be8e5061ecb,3c454c46-7892-431d-a22e-a6a3785fb0c8,,,d0cf7f76-a4df-4c57-81cb-f7f0db0fee44
+behavior_751769_2025-01-17_11-37-39,,a4dae472-9a9b-4bd7-a920-9691a69869dc,2386f052-aeea-4834-8f82-ac87015b5e40,957e3598-1fae-4050-add6-2544a2e31f5d,5f7d9916-2ab0-492b-bb45-302e0390d704,,,d0cf7f76-a4df-4c57-81cb-f7f0db0fee44
+behavior_751769_2025-01-18_10-15-25,,5a341fc5-eb96-4f7d-9de5-99a99a41a83b,f314f755-6e4a-419e-b0c5-ea65b9d026af,0f6bfc98-db8f-4a9f-8e16-aa5c18610a1d,b0b09852-73fd-4cf5-a85e-c8f0fcd596b3,,,d0cf7f76-a4df-4c57-81cb-f7f0db0fee44
+behavior_758017_2025-02-04_11-57-38,,75f7920a-17c9-4e0c-8259-aee69e0544b2,6a851057-6523-446c-8108-e57924bdca92,f11b62e9-9ecb-441b-97ba-a7daa92e8060,c22f4d4e-12aa-4ad1-82ed-1301c279c270, ,,31745c8b-8315-4ead-bc29-7ef7cbf06255
+behavior_758017_2025-02-05_11-42-34,,b4263e0d-c566-440e-9f82-f617b46adcd4,866eb30b-9f08-49f2-89ab-9c9c452532e9,af56b78e-c68e-4348-9634-a97df05c2687,25c90e73-2455-490b-a58b-9a354c37244e,,,31745c8b-8315-4ead-bc29-7ef7cbf06255
+behavior_758017_2025-02-06_11-26-14,,a87270c0-16f7-4f7d-b086-1c9feacb00fc,732b9a07-96b3-47ab-bb27-9cbc9a2303e2,342caf28-710d-486c-ae78-20ead00c5f41,1c147ab8-4465-4684-bc58-448f9ba6a7aa,,,31745c8b-8315-4ead-bc29-7ef7cbf06255
+behavior_758017_2025-02-07_14-11-08,,80bed534-acda-40c9-b5a7-afba77b3e8d0,e00a7170-942e-45b0-888d-895c45fe538f,f47a249c-dc79-45dd-beae-d2f2bb180ba2,1a1d2f68-72a5-4b62-acab-41dfd94f9b7f,,,31745c8b-8315-4ead-bc29-7ef7cbf06255
+behavior_751766_2025-02-11_11-53-38,,1c088c3b-9448-4154-8fa2-11951c98cd35,8b40b587-af04-48fa-b515-01384778619a,51349876-5ce5-4d17-ab30-0b475e6aa700,1cc50ea6-a47a-4385-a1f6-0c7a435d5f78,,,859b3594-1518-4067-92be-5de9665cb318
+behavior_751766_2025-02-13_11-31-21,,e9b33712-d39e-41d1-af69-5913f9d17250,7ff07579-6598-4331-96f0-5edde32bb904,e9b97d5a-79a6-4565-8008-6ba1e044b412,3253d0d2-7b36-4587-8926-8a97a32b8579,,,859b3594-1518-4067-92be-5de9665cb318
+behavior_751766_2025-02-14_11-37-11,,15579857-ae7f-4621-ab7d-17eb65144e10,33df9c9a-382b-4692-ae49-28b87d5863f4,8e4c2549-0957-4815-b517-e3dc42e2a339,aa75deb4-3218-4575-bdda-4ecc79791998,,,859b3594-1518-4067-92be-5de9665cb318
+behavior_751766_2025-02-15_12-08-11,,c235d536-a2c0-443c-bb79-a7f613b210be,5d467871-68ec-494b-8df8-653ae21c42f6,,,,,859b3594-1518-4067-92be-5de9665cb318
+behavior_751181_2025-02-25_12-12-35,,15ea1711-625b-4e3f-887e-589e03fc7ebc,6488efdd-ba29-4dca-b040-389e8566e917,,,,,
+behavior_751181_2025-02-26_11-51-19,,1ce38424-f3cd-434c-b0af-18d3d0179cf1,bde95604-9cb4-4e1d-ae90-fc76dcc69ce4,,,,,
+behavior_751181_2025-02-27_11-24-47,,,,,,,,
