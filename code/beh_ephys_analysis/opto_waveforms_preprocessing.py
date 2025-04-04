@@ -33,6 +33,7 @@ import spikeinterface.preprocessing as spre
 import spikeinterface.postprocessing as spost
 from tqdm import tqdm
 import shutil
+from utils.beh_functions import get_unit_tbl
 
 def load_and_preprocess_recording(session_folder, stream_name):
     ephys_path = os.path.dirname(session_folder)
@@ -41,7 +42,8 @@ def load_and_preprocess_recording(session_folder, stream_name):
     recording = si.read_zarr(recording_zarr)
     # preprocess
     recording_processed = spre.phase_shift(recording)
-    recording_processed = spre.highpass_filter(recording_processed)    
+    # recording_processed = spre.highpass_filter(recording_processed)
+    recording_processed = spre.bandpass_filter(recording_processed, freq_min=300, freq_max=6000)    
     recording_processed = spre.common_reference(recording_processed)
     return recording_processed
 # %%
@@ -390,27 +392,138 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     sys.stdout = sys.__stdout__
     # Close the file
     log_file.close()
+
+def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, opto_only=True):
+    session_dir = session_dirs(session)
+    bin_size = 10*60*30000 # 10 minutes,in samples
+    max_spikes_per_unit_spontaneous = 200
+    waveform_zarr_folder = f'{session_dir[f"ephys_dir_{data_type}"]}/waveforms_session.zarr'
+    if load_sorting_analyzer:
+        if not os.path.exists(waveform_zarr_folder):
+            print("Analyzer doesn't exist, computing first.")
+            load_sorting_analyzer = False
+    
+    if not load_sorting_analyzer:
+        shutil.rmtree(waveform_zarr_folder, ignore_errors=True)
+        # recording info
+        sorting = si.load(session_dir[f'curated_dir_{data_type}'])
+        sorting_analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
+        # amplitudes = sorting_analyzer.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+        if opto_only:
+            unit_tbl = get_unit_tbl(session, data_type)
+            unit_ids = unit_tbl.query('opto_pass == 1')['unit_id'].values
+            sorting = sorting.select_units(unit_ids)
+            sorting_analyzer = sorting_analyzer.select_units(unit_ids)                
+        spike_vector = sorting.to_spike_vector()
+        unit_ids = sorting.unit_ids
+        num_units = len(sorting.unit_ids)
+        # %%
+        # Spike indices
+        spike_indices = spike_vector["sample_index"]
+        # unit_ids
+        spike_unit_ids = spike_vector["unit_index"]
+        # session_length
+        session_length = spike_indices[-1]
+        # devide session into 5 equal parts
+        edges = np.arange(0, session_length+bin_size, bin_size)
+        new_unit_ids = []
+        new_vector = []
+        for bin_ind in range(len(edges)-1):
+            start = int(edges[bin_ind])
+            end = int(edges[bin_ind+1])
+            indices = np.where((spike_indices > start) & (spike_indices <= end))[0]
+            curr_vector = spike_vector[indices].copy()
+            curr_vector_copy = curr_vector.copy()
+            curr_vector_copy['unit_index'] = curr_vector_copy['unit_index'] + bin_ind*num_units
+            curr_unit_ids = [f'{unit_id}-{bin_ind}' for unit_id in unit_ids]
+            new_unit_ids += curr_unit_ids
+            new_vector.append(curr_vector_copy)
+        spikes_binned = np.concatenate(new_vector)
+        # %% make new sorting
+        sorting_binned = si.NumpySorting(spikes_binned, 
+                                    unit_ids=new_unit_ids,
+                                    sampling_frequency=30000)
+
+
+        # %%
+        random_spike_indices = random_spikes_selection(sorting_binned, method="uniform",
+                                                    max_spikes_per_unit=max_spikes_per_unit_spontaneous)
+        selected_spikes_binned = spikes_binned[random_spike_indices]
+        sorting_binned_selected = si.NumpySorting(selected_spikes_binned, 
+                                    unit_ids=new_unit_ids,
+                                    sampling_frequency=30000)
+
+        # %%
+        recording_processed = load_and_preprocess_recording(session_dir['session_dir'], 'ProbeA')
+        good_channel_ids = recording_processed.channel_ids[
+            np.in1d(recording_processed.channel_ids, sorting_analyzer.channel_ids)
+        ]
+
+        recording_processed_good = recording_processed.select_channels(good_channel_ids)
+        print(f"Num good channels: {recording_processed_good.get_num_channels()}")
+
+        # %%
+        sparsity_mask_all = np.tile(sorting_analyzer.sparsity.mask, (len(edges)-1, 1))
+        sparsity_all = si.ChannelSparsity(
+            sparsity_mask_all,
+            unit_ids=sorting_binned_selected.unit_ids,
+            channel_ids=recording_processed_good.channel_ids
+        )
+        si.set_global_job_kwargs(n_jobs=-1, progress_bar=True)
+
+        # %%
+        analyzer_binned = si.create_sorting_analyzer(
+            # sorting_all.select_units(ROI_unit_ids),
+            sorting_binned_selected,
+            recording_processed_good,
+            sparsity=sparsity_all
+        )
+
+        # %%
+        min_spikes_per_unit = 50
+        keep_unit_ids = []
+        count_spikes = sorting_binned_selected.count_num_spikes_per_unit()
+        for unit_id, count in count_spikes.items():
+            if count >= min_spikes_per_unit:
+                keep_unit_ids.append(unit_id)
+        analyzer = analyzer_binned.select_units(keep_unit_ids)
+
+        # %%
+        _ = analyzer.compute("random_spikes", method="all", max_spikes_per_unit=max_spikes_per_unit_spontaneous)
+
+        # %%
+        _ = analyzer.compute(["waveforms", "templates"])
+        analyzer.save_as(format='zarr', folder = waveform_zarr_folder)
+        print(f'Saved as {waveform_zarr_folder}')
+    else:
+        analyzer_all = si.load(waveform_zarr_folder, load_extensions=False)
+        print(f'Loaded {waveform_zarr_folder}')
+
     
 if __name__ == "__main__":
     # session = 'behavior_751004_2024-12-20_13-26-11'
-    data_type = 'raw'
+    data_type = 'curated'
     target = 'soma'
     load_sorting_analyzer = True
     # session = 'behavior_754897_2025-03-14_11-28-53'
     # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
 
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
-    session_list = session_assets['session_id']
+    session_list = session_assets['session_id'].values
     ind = [i for i, session in enumerate(session_list) if session == 'behavior_751769_2025-01-16_11-32-05']
     ind = ind[0]
-
-    for session in session_list[-5:]: 
+    # print(session_list[-2])
+    # session = 'behavior_758017_2025-02-06_11-26-14'
+    # waveform_recompute_session(session, data_type, load_sorting_analyzer=False, opto_only=   rue)
+    for session in session_list[56:-1]: 
         print(session)
         session_dir = session_dirs(session)
-        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')): 
             if session_dir['curated_dir_curated'] is not None:
                 data_type = 'curated'
-                opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
-            # elif session_dir['nwb_dir_raw'] is not None:
-            #     data_type = 'raw'
-            #     opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+                # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+                waveform_recompute_session(session, data_type, load_sorting_analyzer=False, opto_only=True)
+
+    #         # elif session_dir['nwb_dir_raw'] is not None:
+    #         #     data_type = 'raw'
+    #         #     opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)

@@ -6,7 +6,6 @@ pip uninstall -y traitlets
 # pip install -e git+https://github.com/AllenNeuralDynamics/aind_multisession_ephys.git#egg=aind-multisession-ephys
 pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO
 pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis@plot_session_in_time_sue
-pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind_multisession_ephys.git
 
 # move VS code data directory into capsule, so it persists
 ln -s /root/capsule/code/.vscode/ /.vscode

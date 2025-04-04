@@ -12,7 +12,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import colormaps
 from natsort import natsorted
 from pdf2image import convert_from_path
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import shutil
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
@@ -55,8 +55,9 @@ def interpolate_waveform(waveform):
             interpolated_waveform[:, col_ind] = waveform[:, col_ind]
     return interpolated_waveform
     
-def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-30, 60], y_neighbors_to_keep = 3, orginal_loc = False):
-    peak_ind = np.argmin(np.min(template, axis=0))
+def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-30, 60], y_neighbors_to_keep = 3, orginal_loc = False, peak_ind = None):
+    if peak_ind is None:
+        peak_ind = np.argmin(np.min(template, axis=0))
     peak_channel = all_channels_int[peak_ind]
     peak_sample = np.argmin(template[:, peak_ind])  
     peak_group = np.arange(peak_channel - 2*y_neighbors_to_keep, peak_channel + 2*y_neighbors_to_keep + 1, 2)
@@ -69,7 +70,7 @@ def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-
     # get the reordered template: major column on left, minor column on right
     reordered_template = np.full((2*y_neighbors_to_keep + 1, 2*(sample_to_keep[1] - sample_to_keep[0])), np.nan)
     if peak_sample+sample_to_keep[1] > template.shape[0] or peak_sample+sample_to_keep[0] < 0:
-        peak_sample = 89
+        peak_sample = np.round(1/3 * template.shape[0]).astype(int)
     for channel_int, channel_curr in enumerate(peak_group):
         if channel_curr in all_channels_int:
             reordered_template[channel_int, :(sample_to_keep[1] - sample_to_keep[0])] = template[(peak_sample+sample_to_keep[0]):(peak_sample+sample_to_keep[1]), np.argwhere(all_channels_int == channel_curr)[0][0]].T
@@ -109,25 +110,64 @@ def merge_pdfs(input_dir, output_filename='merged.pdf'):
 
     print(f"PDF files in '{input_dir}' merged into '{output_filename}' successfully.")
 
-def combine_pdf_big(pdf_dir, output_pdf):
+def combine_pdf_big(pdf_dir, output_pdf, add_title= 'default'):
     png_images = []
+    
     # Ensure the output directory exists
     output_images_dir = os.path.join(pdf_dir, "converted_images")
     os.makedirs(output_images_dir, exist_ok=True)
+
+    # Load a default font (adjust size as needed)
+    try:
+        font = ImageFont.truetype("arial.ttf", 40)  # Ensure you have Arial installed
+    except IOError:
+        font = ImageFont.load_default()
+
     # Convert each PDF to PNG
     files = os.listdir(pdf_dir)
-    files = natsorted(files)
+    files = natsorted(files)  # Ensure order
     print(f'Processing {len(files)} files in {pdf_dir}')
-    for file in files:  # Sort to maintain order
-        # print(f'Processing file: {file}')
+
+    for i, file in enumerate(files):
         if file.lower().endswith(".pdf"):
             pdf_path = os.path.join(pdf_dir, file)
             images = convert_from_path(pdf_path, dpi=300)  # High-quality conversion
-            
+
             for i, img in enumerate(images):
+                # Add title text on each page
+                draw = ImageDraw.Draw(img)
+                if add_title == 'default':
+                    pattern = r'\d{6}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}'
+                    # Find all matches
+                    matches = re.search(pattern, file)
+                    if matches:
+                        title = matches.group(0)
+                    else:
+                        title = str(i)
+                elif isinstance(add_title, list) and len(add_title) == len(files):
+                    title = add_title[i]
+                elif isinstance(add_title, str):
+                    matches = re.search(pattern, file)
+                    if matches:
+                        title = matches.group(0) + f'_{add_title}'
+                    else:
+                        title = add_title
+                else: 
+                    title = str(i)
+                text_position = (50, 50)  # Adjust position as needed
+                text_color = "black"
+
+                # Add background for better visibility
+                text_size = draw.textbbox((0, 0), title, font=font)  # Bounding box of text
+                bg_x1, bg_y1, bg_x2, bg_y2 = text_size
+                draw.rectangle([text_position, (text_position[0] + bg_x2, text_position[1] + bg_y2)], fill="white")
+                
+                draw.text(text_position, title, fill=text_color, font=font)
+
+                # Save the modified image
                 img_path = os.path.join(output_images_dir, f"{file[:-4]}_page_{i+1}.png")
                 img.save(img_path, "PNG")
-                png_images.append(img_path)  # Store paths for merging later
+                png_images.append(img_path)
 
     # Combine all PNGs into a single PDF
     if png_images:
@@ -136,7 +176,10 @@ def combine_pdf_big(pdf_dir, output_pdf):
         print(f"Combined PDF saved as: {os.path.join(pdf_dir, output_pdf)}")
     else:
         print("No PDFs found in the directory!")
+
+    # Cleanup temporary images
     shutil.rmtree(output_images_dir)
+
 
 def get_gradient_colors(max_p_values, floor=0, ceiling=1, cmap_name='Reds'):
     norm = mcolors.Normalize(vmin=floor, vmax=ceiling)

@@ -39,6 +39,7 @@ from joblib import Parallel, delayed
 from multiprocessing import Pool
 from functools import partial
 import time
+import shutil 
 
 def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue', curate_time=True, 
                         model_name = 'stan_qLearning_5params', 
@@ -54,11 +55,13 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     if not os.path.exists(pdf_dir):
         os.makedirs(pdf_dir, exist_ok=True)
     # remove all files in pdf_dir if exists
-    if os.path.exists(pdf_dir):
-        files = glob.glob(pdf_dir + '/*')
-        if len(files) > 0:
-            for f in files:
-                os.remove(f)      
+    for f in os.listdir(pdf_dir):
+        path = os.path.join(pdf_dir, f)
+        if os.path.isfile(path) or os.path.islink(path):
+            os.remove(path)  # Remove files
+        elif os.path.isdir(path):
+            shutil.rmtree(path)  # Remove subdirectories
+        
     # %%
     qm_dir = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
     with open(qm_dir, 'r') as f:
@@ -96,7 +99,8 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
         if len(session_df_curr) == 0:
             # return None and exit function
             print(f'No session data for unit {unit_id}')
-            return None
+            fig = plt.figure(figsize=(20, 10))
+            plt.suptitle(f'Unit{str(unit_id)} Aligned to {align_name} default qc: {qc_pass} maybe opto: {opto_pass} No behavior', fontsize = 20)
         else:
             print(f'Plotting unit {unit_id}')      
             if align_name == 'go_cue':
@@ -123,10 +127,10 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
             _, axes = plot_foraging_session(  # noqa: C901
                                             choice_history,
                                             reward_history,
-                                            p_reward = p_reward,
+                                            p_reward = p_reward,  
                                             autowater_offered = autowater_offered,
                                             ax = ax,
-                                            legend=False,
+                                            # legend=False,
                                             vertical=True,
                                             ) 
             for ax in axes:
@@ -335,39 +339,49 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                 spike_counts = [np.sum(events_id==curr_id) for curr_id in range(len(align_time))]
                 spike_counts = stats.zscore(np.array(spike_counts))
                 trials_back = [0, 2]
-                coeffs, pvals, tvals, conf_int = regression_rwd(spike_counts, vector, trials_back = trials_back)
-
                 ax = fig.add_subplot(gs[1, 5])
-                ax.plot(range(trials_back[0], trials_back[1] + 1), coeffs, c = 'k', lw = 2)
-                ax.fill_between(range(trials_back[0], trials_back[1] + 1), conf_int[:, 0], conf_int[:, 1], color = 'k', alpha = 0.25, edgecolor = None)
-                ax.axhline(y=0, color = 'r', ls = '--')
-                ax.scatter(np.array(range(trials_back[0], trials_back[1] + 1))[pvals<0.05], coeffs[pvals<0.05], c = 'r', s = 10, zorder = 2)
-                ax.set_title('Spikes~rwd history', fontsize = fs+2)
-                ax.set_xlabel('Trials back')
+                try:
+                    coeffs, pvals, tvals, conf_int = regression_rwd(spike_counts, vector, trials_back = trials_back)
+                    ax.plot(range(trials_back[0], trials_back[1] + 1), coeffs, c = 'k', lw = 2)
+                    ax.fill_between(range(trials_back[0], trials_back[1] + 1), conf_int[:, 0], conf_int[:, 1], color = 'k', alpha = 0.25, edgecolor = None)
+                    ax.axhline(y=0, color = 'r', ls = '--')
+                    ax.scatter(np.array(range(trials_back[0], trials_back[1] + 1))[pvals<0.05], coeffs[pvals<0.05], c = 'r', s = 10, zorder = 2)
+                    ax.set_title('Spikes~rwd history', fontsize = fs+2)
+                    ax.set_xlabel('Trials back')
+                except:
+                    ax.plot(range(trials_back[0], trials_back[1] + 1), np.zeros(trials_back[1]-trials_back[0]+1), c = 'k', lw = 2, label = 'failed')
+                    ax.set_title('Spikes~rwd history failed', fontsize = fs+2)
+
 
                 # only on left trials
                 trials_back = [0, 2]
+                ax = fig.add_subplot(gs[1, 6])
+                ax.set_title('Spikes~rwd hist L/R', fontsize = fs+2)
+                ax.set_xlabel('Trials back')
                 if np.sum(session_df_curr['choice'].values == 0) >= 40:
-                    coeffs, pvals, tvals, conf_int = regression_rwd(spike_counts, vector, trials_back = trials_back, sub_selection=session_df_curr['choice'].values == 0)
-                    ax = fig.add_subplot(gs[1, 6])
-                    ax.plot(range(trials_back[0], trials_back[1] + 1), coeffs, c = 'm', lw = 2, label = 'left')
-                    ax.fill_between(range(trials_back[0], trials_back[1] + 1), conf_int[:, 0], conf_int[:, 1], color = 'm', alpha = 0.25, edgecolor = None)
-                    ax.scatter(np.array(range(trials_back[0], trials_back[1] + 1))[pvals<0.05], coeffs[pvals<0.05], c = 'r', s = 10)
-                    ax.axhline(y=0, color = 'r', ls = '--')
-                    ax.set_title('Spikes~rwd hist L/R', fontsize = fs+2)
-                    ax.set_xlabel('Trials back')
-                    ax.legend()
+                    try:
+                        coeffs, pvals, tvals, conf_int = regression_rwd(spike_counts, vector, trials_back = trials_back, sub_selection=session_df_curr['choice'].values == 0)
+                        ax.plot(range(trials_back[0], trials_back[1] + 1), coeffs, c = 'm', lw = 2, label = 'left')
+                        ax.fill_between(range(trials_back[0], trials_back[1] + 1), conf_int[:, 0], conf_int[:, 1], color = 'm', alpha = 0.25, edgecolor = None)
+                        ax.scatter(np.array(range(trials_back[0], trials_back[1] + 1))[pvals<0.05], coeffs[pvals<0.05], c = 'r', s = 10)
+                        ax.axhline(y=0, color = 'r', ls = '--')
+                        ax.legend()
+                    except:
+                        ax.plot(range(trials_back[0], trials_back[1] + 1), np.zeros(trials_back[1]-trials_back[0]+1), c = 'm', lw = 2, label = 'left failed')
 
                 # only on right trials
                 if np.sum(session_df_curr['choice'].values == 1) >= 40:
-                    coeffs, pvals, tvals, conf_int = regression_rwd(spike_counts, vector, trials_back = trials_back, sub_selection=session_df_curr['choice'].values == 1)
-                    ax.plot(range(trials_back[0], trials_back[1] + 1), coeffs, c = 'c', lw = 2, label = 'right')
-                    ax.fill_between(range(trials_back[0], trials_back[1] + 1), conf_int[:, 0], conf_int[:, 1], color = 'c', alpha = 0.25, edgecolor = None)
-                    ax.scatter(np.array(range(trials_back[0], trials_back[1] + 1))[pvals<0.05], coeffs[pvals<0.05], c = 'r', s = 10)
-                    ax.axhline(y=0, color = 'r', ls = '--')
-                    ax.set_title('Spikes~rwd hist L/R', fontsize = fs+2)
-                    ax.set_xlabel('Trials back')
-                    ax.legend()
+                    try:
+                        coeffs, pvals, tvals, conf_int = regression_rwd(spike_counts, vector, trials_back = trials_back, sub_selection=session_df_curr['choice'].values == 1)
+                        ax.plot(range(trials_back[0], trials_back[1] + 1), coeffs, c = 'c', lw = 2, label = 'right')
+                        ax.fill_between(range(trials_back[0], trials_back[1] + 1), conf_int[:, 0], conf_int[:, 1], color = 'c', alpha = 0.25, edgecolor = None)
+                        ax.scatter(np.array(range(trials_back[0], trials_back[1] + 1))[pvals<0.05], coeffs[pvals<0.05], c = 'r', s = 10)
+                        ax.axhline(y=0, color = 'r', ls = '--')
+                        ax.set_title('Spikes~rwd hist L/R', fontsize = fs+2)
+                        ax.set_xlabel('Trials back')
+                        ax.legend()
+                    except:
+                        ax.plot(range(trials_back[0], trials_back[1] + 1), np.zeros(trials_back[1]-trials_back[0]+1), c = 'c', lw = 2, label = 'right failed')
 
                 # plot regresssions
                 gs = gridspec.GridSpec(3, 7, height_ratios=[1, 1, 1], wspace=0.3, hspace=0.3)
@@ -395,33 +409,33 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                     ax.set_title('p-value', fontsize = fs)
                 except:
                     print(f'Failed to fit model for unit {unit_id}')
-                plt.suptitle(f'Unit{str(unit_id)} Aligned to {align_name} default qc: {qc_pass} maybe opto: {opto_pass}', fontsize = 20) 
+            plt.suptitle(f'Unit{str(unit_id)} Aligned to {align_name} default qc: {qc_pass} maybe opto: {opto_pass}', fontsize = 20) 
             # plt.tight_layout()  
-            return fig
+        return fig
 
 # %%
     log_record_file = os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'{session}_unit_beh.log')
-    def process(unit_id): 
-        try:
-            fig = plot_unit(unit_id) 
-            if fig is not None:
-                fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'unit_{unit_id}_goCue.pdf'))
-            plt.close(fig)
-            # write to log
-            with open(log_record_file, 'a') as f:
-                f.write(f'Unit {unit_id} plotted\n')
-            # pause for 1 second
-        except:
-            with open(log_record_file, 'a') as f:
-                f.write(f'Unit {unit_id} failed\n')
-        time.sleep(1)
-
-    # def process(unit_id):
-    #     fig = plot_unit(unit_id) 
-    #     if fig is not None: 
-    #         fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'unit_{unit_id}_goCue.pdf'))
-    #     plt.close(fig)
+    # def process(unit_id): 
+    #     try:
+    #         fig = plot_unit(unit_id) 
+    #         if fig is not None:
+    #             fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'unit_{unit_id}_goCue.pdf'))
+    #         plt.close(fig)
+    #         # write to log
+    #         with open(log_record_file, 'a') as f:
+    #             f.write(f'Unit {unit_id} plotted\n')
+    #         # pause for 1 second
+    #     except:
+    #         with open(log_record_file, 'a') as f:
+    #             f.write(f'Unit {unit_id} failed\n')
     #     time.sleep(1)
+
+    def process(unit_id):
+        fig = plot_unit(unit_id) 
+        if fig is not None: 
+            fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'unit_{unit_id}_goCue.pdf')) 
+        plt.close(fig)
+        time.sleep(1)
 
 
 
@@ -430,7 +444,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     if units is None:
         units= unit_tbl['unit_id'].values
 
-    Parallel(n_jobs=-1)(
+    Parallel(n_jobs=8)(
         delayed(process)(unit_id)
         for unit_id in units
     )
@@ -450,30 +464,40 @@ if __name__ == '__main__':
 
     df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
     session_ids = df['session_id'].values
+    session_ids = [session_id for session_id in session_ids if isinstance(session_id, str)]  # filter only behavior sessions
     model_name = 'stan_qLearning_5params'
     data_type = 'curated'
     curate_time = True
-    align_name = 'go_cue'
+    align_name = 'response'
     formula = 'spikes ~ 1 + outcome + choice + Qchosen'
-    for session in session_ids:
+    for session in session_ids[37:-1]:
         print(session)
         session_dir = session_dirs(session)
         if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
             if session_dir['curated_dir_curated'] is not None:
-                if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_curated'],f'{session}_unit_beh_{align_name}.pdf')):
-                    plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, 
-                                model_name = model_name, formula=formula,
-                                pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-                                units=None)
-            elif session_dir['curated_dir_raw'] is not None:
-                if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
-                    plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
-                                    model_name = model_name, formula=formula,
-                                    pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-                                    units=None)
+                # if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_curated'],f'{session}_unit_beh_{align_name}.pdf')):
+                plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, 
+                            model_name = model_name, formula=formula,
+                            pre_event=-1.5, post_event=3, binSize=0.2, stepSize=0.05,
+                            units=None)
+                # else:
+                #     print(f'Already plotted {session} for curated data')
+            else:
+                print(f'No curated data for {session}')
+            # elif session_dir['curated_dir_raw'] is not None:
+            #     if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
+            #         plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
+            #                         model_name = model_name, formula=formula,
+            #                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+            #                         units=None)
     # session = 'behavior_751004_2024-12-19_11-50-37'
     # plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
     #                     model_name = model_name, formula=formula,
     #                     pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
     #                     units=None)
+
+    # plot_unit_beh_session('behavior_754897_2025-03-14_11-28-53', data_type = 'curated', align_name = align_name, curate_time=curate_time, 
+    #             model_name = model_name, formula=formula,
+    #             pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+    #             units=[82])
 

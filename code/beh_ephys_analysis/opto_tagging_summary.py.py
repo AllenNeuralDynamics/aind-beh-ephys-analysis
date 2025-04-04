@@ -81,7 +81,7 @@ def opto_summary(session, data_type, target, save=True):
         count = pd.DataFrame(count)
         count_curr_all = []
         for row in count.iterrows():
-            count_curr = np.sum(np.array(row[1]['resp_p_bl']) > 0.3)
+            count_curr = np.sum(np.array(row[1]['resp_p_bl']) >= 0.3)
             count_curr_all.append(count_curr)
         pass_count.append(np.max(count_curr_all))
 
@@ -110,7 +110,7 @@ def opto_summary(session, data_type, target, save=True):
                                 'real_unit': real_unit,
                                 'y_loc': y_loc, 
                                 'pass_count': pass_count})
-    opto_tag_tbl_summary = pd.merge(opto_tag_tbl, unit_tbl, on='unit_id')
+    opto_tag_tbl_summary = pd.merge(opto_tag_tbl, unit_tbl.drop(columns=['opto_pass']), on='unit_id')
 
     # %%
     pairplot = sns.pairplot(opto_tag_tbl, hue='real_unit', corner=True, diag_kind='kde', plot_kws={'alpha': 0.25})
@@ -234,30 +234,42 @@ def opto_summary(session, data_type, target, save=True):
     mid_thresh = 0.4
 
     unit_tag = (opto_tag_tbl['p_max']>mid_thresh) & (opto_tag_tbl['p_mean']>0.1) & (opto_tag_tbl['pass_count'] >=2) &\
-                (opto_tag_tbl['lat_max_p']<0.02) & (opto_tag_tbl['lat_max_p']>0.007) &\
+                (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) &\
                 (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02) &\
                 (opto_tag_tbl['real_unit']) &\
                 (opto_tag_tbl['euc_max_p']<=0.3)
     
     mask = (opto_tag_tbl['p_max']>0.2) & (opto_tag_tbl['pass_count'] >=1)&\
             (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) &\
-            (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<10*0.02) &\
+            (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02) &\
             (opto_tag_tbl['real_unit']) &\
             (opto_tag_tbl['euc_max_p']<=0.3)
                 
 
     LC_range = opto_tag_tbl[mask]['y_loc'].values
 
-    if np.sum(mask) > 1:
+    if np.sum(mask) > 1: 
         center = np.quantile(opto_tag_tbl[mask]['y_loc'].values, 0.5)
+        # LC_range = LC_range[(LC_range<=center+500) & (LC_range>=center-500)]
+        if len(LC_range[(LC_range<=center+500) & (LC_range>=center-500)])/len(LC_range) > 0.7:
+            LC_range = LC_range[(LC_range<=center+500) & (LC_range>=center-500)]
+        elif np.max(np.diff(np.sort(LC_range))) > 500:
+            gap_ind = np.argmax(np.diff(np.sort(LC_range)))
+            gap_loc = np.sort(LC_range)[gap_ind]
+            LC_range = LC_range[LC_range<=gap_loc]
+            center = np.quantile(LC_range, 0.5)
+            LC_range = LC_range[(LC_range<=center+500) & (LC_range>=center-500)]
+
+        opto_tag_tbl_summary['LC_range_top'] = np.max(LC_range)
+        opto_tag_tbl_summary['LC_range_bottom'] = np.min(LC_range)
         top = opto_tag_tbl[(opto_tag_tbl['p_max']>mid_thresh) & mask]['y_loc'].max()
         bottom = opto_tag_tbl[(opto_tag_tbl['p_max']>mid_thresh) & mask]['y_loc'].min()
-        # top = np.min([top, center+500])
+        top = np.min([top, center+500])
         bottom = np.max([bottom, center-500])
-        unit_tag_loc = (opto_tag_tbl['p_max']>=low_thresh) & (opto_tag_tbl['p_mean']>0.1) & (opto_tag_tbl['pass_count'] >=3) & \
+        unit_tag_loc = (opto_tag_tbl['p_max']>=low_thresh) & (opto_tag_tbl['p_mean']>0.1) & (opto_tag_tbl['pass_count'] >=2) & \
                     (opto_tag_tbl['y_loc']<=top) & (opto_tag_tbl['y_loc']>=bottom) & \
-                    (opto_tag_tbl['lat_max_p']<0.02) & (opto_tag_tbl['lat_max_p']>0.005) & \
-                    (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<10*0.02)& \
+                    (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) & \
+                    (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02)& \
                     (opto_tag_tbl['real_unit']) &\
                     (opto_tag_tbl['euc_max_p']<=0.3)
 
@@ -281,6 +293,8 @@ def opto_summary(session, data_type, target, save=True):
         w.ax.axhline(bottom, color='k', linestyle='--')
     else:
         unit_tag_loc = 0
+        opto_tag_tbl_summary['LC_range_top'] = None
+        opto_tag_tbl_summary['LC_range_bottom'] = None
 
     plt.suptitle(f'{session} {data_type} {target} {np.sum(unit_tag)} maybe, {np.sum(unit_tag_loc)} with location info')
 
@@ -307,7 +321,7 @@ def opto_summary(session, data_type, target, save=True):
 
 
 if __name__ == '__main__':
-    session = 'behavior_754897_2025-03-13_11-20-42'
+    session = 'behavior_754897_2025-03-12_12-23-15'
     data_type = 'curated'
     target = 'soma'
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -333,10 +347,10 @@ if __name__ == '__main__':
             # elif session_dir['curated_dir_raw'] is not None:
             #     data_type = 'raw'
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    Parallel(n_jobs=10)(delayed(process)(session) for session in session_list[:-1])
-    # for session in session_list[:-1]:
+    # Parallel(n_jobs=10)(delayed(process)(session) for session in session_list[-5:-1])
+    # for session in session_list[-5:-1]:
     #     process(session)
-    # process('behavior_751004_2024-12-23_14-20-03')
+    process(session)
 
 
 
