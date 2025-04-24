@@ -15,6 +15,7 @@ from sklearn.cluster import KMeans
 import re
 from utils.beh_functions import parseSessionID, session_dirs
 from utils.plot_utils import shiftedColorMap, template_reorder
+from utils.ephys_functions import load_drift
 from open_ephys.analysis import Session##
 import spikeinterface as si
 import spikeinterface.extractors as se
@@ -34,20 +35,24 @@ import spikeinterface.postprocessing as spost
 from tqdm import tqdm
 import shutil
 from utils.beh_functions import get_unit_tbl
+from joblib import Parallel, delayed
 
 def load_and_preprocess_recording(session_folder, stream_name):
+    si.set_global_job_kwargs(n_jobs=5, progress_bar=True)
     ephys_path = os.path.dirname(session_folder)
     compressed_folder = os.path.join(ephys_path, 'ecephys_compressed')
-    recording_zarr = [os.path.join(compressed_folder, f) for f in os.listdir(compressed_folder) if stream_name in f][0]
+    recording_zarr = [os.path.join(compressed_folder, f) for f in os.listdir(compressed_folder) if stream_name in f and 'LFP' not in f][0]
+    
     recording = si.read_zarr(recording_zarr)
     # preprocess
     recording_processed = spre.phase_shift(recording)
-    # recording_processed = spre.highpass_filter(recording_processed)
-    recording_processed = spre.bandpass_filter(recording_processed, freq_min=300, freq_max=6000)    
+    recording_processed = spre.highpass_filter(recording_processed)
+    # recording_processed = spre.bandpass_filter(recording_processed, freq_min=300, freq_max=6000)    
     recording_processed = spre.common_reference(recording_processed)
     return recording_processed
 # %%
 def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = True):
+    max_spikes_per_unit_spontaneous = 250
     # %%
     session_dir = session_dirs(session)
     output_file = os.path.join(session_dir['processed_dir'], f"{session}_process_record.txt")
@@ -84,12 +89,10 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     if not load_sorting_analyzer:
         # recording info
         sorting = si.load(session_dir[f'curated_dir_{data_type}'])
-        max_spikes_per_unit_spontaneous = 500
         spike_vector = sorting.to_spike_vector()
         unit_ids = sorting.unit_ids
         num_units = len(sorting.unit_ids)
         print(f"Total {len(sorting.unit_ids)} units")
-        max_spikes_per_unit_spontaneous = 500
 
         # %%
         # Spike indices
@@ -216,10 +219,6 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
             unit_ids=sorting_all.unit_ids,
             channel_ids=recording_processed_good.channel_ids
         )
-        si.set_global_job_kwargs(n_jobs=-1, progress_bar=True)
-
-        # %%
-        si.set_global_job_kwargs(n_jobs=-1, progress_bar=True)
 
         # %%
         # create analyzer
@@ -321,6 +320,8 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
             template = row['template']
             peak_channel = row['peak_channel']
             unit_id = row['unit_id']
+            if unit_id == '62':
+                print(unit_id)
             pre_post = row['pre_post']
             
             spont_unit = waveform_metrics.query("spont == 1 and unit_id == @unit_id and pre_post == @pre_post")
@@ -342,7 +343,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
             correlation = np.corrcoef(peak_waveform_resp.reshape(-1), peak_waveform_spont.reshape(-1))[0, 1]
             waveform_metrics.at[index, 'correlation'] = correlation
             # euclidean distance
-            focus_ind = np.array(range(np.max(np.array([peak_samp_ind-10, 0])), np.min(np.array([peak_samp_ind+20, len(peak_waveform_spont)]))))
+            focus_ind = np.array(range(np.max(np.array([peak_samp_ind-20, 0])), np.min(np.array([peak_samp_ind+40, len(peak_waveform_spont)]))))
 
             euc_dist = np.linalg.norm(
                 peak_waveform_resp[focus_ind]
@@ -376,10 +377,11 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
         if len(resp) > 0:
             wf_resp = resp['peak_waveform'].values
             wf_powers = resp['power'].values
+            wf_powers = [float(wf_power) for wf_power in wf_powers]
             ax = fig.add_subplot(gs[count])
             ax.plot(wf_spont, color='k', linewidth=2, alpha = 0.5)
             for wf, power in zip(wf_resp, wf_powers):
-                ax.plot(wf, color=colormaps['hot'](int(power)/100), linewidth=1)
+                ax.plot(wf, color=colormaps['hot'](power/max(wf_powers)), linewidth=1)
             ax.set_frame_on(False)
             count = count + 1
             ax.set_title(unit_id)
@@ -393,7 +395,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     # Close the file
     log_file.close()
 
-def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, opto_only=True):
+def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, opto_only=True, plot=True, save=True):
     session_dir = session_dirs(session)
     bin_size = 10*60*30000 # 10 minutes,in samples
     max_spikes_per_unit_spontaneous = 200
@@ -411,7 +413,22 @@ def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, o
         # amplitudes = sorting_analyzer.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
         if opto_only:
             unit_tbl = get_unit_tbl(session, data_type)
-            unit_ids = unit_tbl.query('opto_pass == 1')['unit_id'].values
+            unit_ids = list(unit_tbl.query('opto_pass == 1')['unit_id'].values)
+            unit_ids = [int(unit_id) for unit_id in unit_ids]
+            if len(unit_ids) == 0:
+                print(f'No opto units in session {session}')
+                all_tagged_units = list(unit_tbl.query('opto_pass == True and default_qc == True')['unit_id'].values)
+                all_tagged_units = [int(unit_id) for unit_id in all_tagged_units]
+                waveform_recompute = pd.DataFrame({'unit_id': all_tagged_units, 'amplitude_opt': None, 'peak_wf_opt': None, 'mat_wf_opt': None})
+                if save: 
+                    if 'peak_wf_opt' in unit_tbl.columns:
+                        unit_tbl = unit_tbl.drop(waveform_recompute.columns.tolist(), axis=1) 
+                    unit_tbl['unit_id']= unit_tbl['ks_unit_id']
+                    unit_tbl = unit_tbl.merge(waveform_recompute, on='unit_id', how='left')
+                    unit_tbl_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
+                    with open(unit_tbl_file, 'wb') as f:
+                        pickle.dump(unit_tbl, f)
+                return waveform_recompute
             sorting = sorting.select_units(unit_ids)
             sorting_analyzer = sorting_analyzer.select_units(unit_ids)                
         spike_vector = sorting.to_spike_vector()
@@ -469,7 +486,7 @@ def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, o
             unit_ids=sorting_binned_selected.unit_ids,
             channel_ids=recording_processed_good.channel_ids
         )
-        si.set_global_job_kwargs(n_jobs=-1, progress_bar=True)
+        
 
         # %%
         analyzer_binned = si.create_sorting_analyzer(
@@ -486,44 +503,335 @@ def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, o
         for unit_id, count in count_spikes.items():
             if count >= min_spikes_per_unit:
                 keep_unit_ids.append(unit_id)
-        analyzer = analyzer_binned.select_units(keep_unit_ids)
+        analyzer_binned = analyzer_binned.select_units(keep_unit_ids)
 
         # %%
-        _ = analyzer.compute("random_spikes", method="all", max_spikes_per_unit=max_spikes_per_unit_spontaneous)
-
-        # %%
-        _ = analyzer.compute(["waveforms", "templates"])
-        analyzer.save_as(format='zarr', folder = waveform_zarr_folder)
+        _ = analyzer_binned.compute("random_spikes", method="all", max_spikes_per_unit=max_spikes_per_unit_spontaneous)
+        _ = analyzer_binned.compute(["waveforms", "templates"])
+        analyzer_binned.save_as(format='zarr', folder = waveform_zarr_folder)
         print(f'Saved as {waveform_zarr_folder}')
     else:
-        analyzer_all = si.load(waveform_zarr_folder, load_extensions=False)
+        analyzer_binned = si.load(waveform_zarr_folder, load_extensions=True)
         print(f'Loaded {waveform_zarr_folder}')
 
+
+    # take re-computed waveforms and pick templates
+    analyzer_binned = si.load(waveform_zarr_folder, load_extensions=True)
+    analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
+
+    unit_ids = analyzer.sorting.get_unit_ids()
+    unit_ids_binned = analyzer_binned.sorting.get_unit_ids()
+    bin_inds = list(set([int(curr_id.split('-')[-1]) for curr_id in unit_ids_binned])) 
+    all_channels = analyzer.sparsity.channel_ids
+    if all_channels[0].startswith('AP'):
+        all_channels_int = np.array([int(channel.split('AP')[-1]) for channel in all_channels])
+    else:
+        all_channels_int = np.array([int(channel.split('CH')[-1]) for channel in all_channels])
+    unit_spartsiity = analyzer.sparsity.unit_id_to_channel_ids
+    channel_locations = analyzer.get_channel_locations()
+    unit_locations = analyzer.get_extension("unit_locations").get_data(outputs="by_unit")
+    right_left = channel_locations[:, 0]<20 
+
+    # %%
+    qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
+    with open(qm_file) as f:
+        qm_dict = json.load(f)
+    start = qm_dict['ephys_cut'][0]
+    end = qm_dict['ephys_cut'][1]
+
+    # %%
+    # re-organize templates so that left and right separate
+    colors = ["blue", "white", "red"]
+    b_w_r_cmap = LinearSegmentedColormap.from_list("b_w_r", colors)
+    # load wfs
+    waveform_info_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveform_params.json')
+    with open(waveform_info_file) as f:
+        waveform_info = json.load(f)
+    y_neighbors_to_keep = waveform_info['y_neighbors_to_keep']
+    samples_to_keep = waveform_info['samples_to_keep']
+    orginal_loc = True
     
-if __name__ == "__main__":
+    channel_loc_dict = {channel: channel_loc for channel, channel_loc in zip(all_channels_int, channel_locations)}
+
+    wf_ext = analyzer_binned.get_extension("waveforms")
+    temp_ext = analyzer_binned.get_extension("templates")
+    temp_ext_mean = analyzer.get_extension("templates")
+
+    extreme_channel_indices_binned = si.get_template_extremum_channel(analyzer_binned, mode = "at_index", outputs = "index")
+    extreme_channels_binned = si.get_template_extremum_channel(analyzer_binned) 
+
+    extreme_channel_indices = si.get_template_extremum_channel(analyzer, mode = "at_index", outputs = "index")
+    extreme_channels = si.get_template_extremum_channel(analyzer) 
+
+    # recompute extreme channel binned so that they are from the same column
+    units_in_binned = [unit_id.split('-')[0] for unit_id in unit_ids_binned]
+    for unit_id in unit_ids:
+        curr_peak_ori = extreme_channel_indices[unit_id]
+        for curr_bin_ind in bin_inds:
+            curr_unit_id = f'{unit_id}-{curr_bin_ind}'
+            if curr_unit_id in unit_ids_binned:
+                curr_peak_opt = extreme_channel_indices_binned[curr_unit_id]
+                if right_left[curr_peak_ori] != right_left[curr_peak_opt]:
+                    # recompute if changed column
+                    channel_inds_same_col = np.where(right_left == right_left[curr_peak_ori])[0]
+                    temp_same = temp_ext.get_unit_template(curr_unit_id, operator='average')[:, channel_inds_same_col]
+                    peak_ind = np.argmax(np.abs(temp_same[30, :]))
+                    extreme_channel_indices_binned[curr_unit_id] = channel_inds_same_col[peak_ind]
+
+    # %% get unit templates and peak wf for each bin
+    unit_tbl = get_unit_tbl(session, data_type)
+    all_wfs = []
+    all_amps_ori = []
+    all_wfs_ori = []
+    all_peak_wf = []
+    all_peak_wf_ori = []
+    all_counts = np.zeros((len(unit_ids), len(bin_inds)))
+    presence_score = np.ones((len(unit_ids), len(bin_inds)))
+    euc_dis = np.zeros((len(unit_ids), len(bin_inds)))
+    all_units = []
+    if opto_only:
+        all_tagged_units = list(unit_tbl.query('opto_pass == True and default_qc == True')['unit_id'].values)
+        all_tagged_units = [int(unit_id) for unit_id in all_tagged_units]
+    else:
+        all_tagged_units = list(unit_tbl.query('default_qc == True')['unit_id'].values)
+        all_tagged_units = [int(unit_id) for unit_id in all_tagged_units]
+
+    for unit_ind, unit_id in enumerate(all_tagged_units):
+        curr_wfs_bins = []
+        curr_wfs_bins_ori = []
+        curr_peak_bins = []
+        curr_peak_bins_ori = []
+        drift = load_drift(session, unit_id, data_type=data_type)
+        temp_mean_curr = temp_ext_mean.get_unit_template(unit_id, operator='average') 
+        peak_mean_curr = temp_mean_curr[:,extreme_channel_indices[unit_id]]
+        amp_curr = peak_mean_curr[90]
+        for curr_ind in bin_inds:
+            curr_unit_id = f'{unit_id}-{curr_ind}'
+            curr_time_bin = [curr_ind * 10 * 60 + start, (curr_ind + 1) * 10 * 60 + start]
+            if drift is not None:
+                if drift['ephys_cut'] is not None:
+                    if drift['ephys_cut'][0] is not None:
+                        if drift['ephys_cut'][0] > curr_time_bin[0] + 5 * 60:
+                            presence_score[unit_ind, curr_ind] = 0
+                    if drift['ephys_cut'][1] is not None:
+                        if drift['ephys_cut'][1] < curr_time_bin[1] - 5 * 60:
+                            presence_score[unit_ind, curr_ind] = 0
+            if curr_unit_id in unit_ids_binned:
+                curr_temp = temp_ext.get_unit_template(curr_unit_id, operator='average')
+                # curr_std  = temp_ext.get_unit_template(curr_unit_id, operator='std')
+                curr_wfs = wf_ext.get_waveforms_one_unit(curr_unit_id)
+                all_counts[unit_ind, curr_ind] = len(curr_wfs)
+                reordered_template = template_reorder(curr_temp, right_left, all_channels_int, 
+                                                    sample_to_keep = samples_to_keep, y_neighbors_to_keep = y_neighbors_to_keep, orginal_loc = True, 
+                                                    peak_ind=extreme_channel_indices_binned[curr_unit_id])
+                curr_wfs_bins.append(reordered_template)
+                orginal_template = template_reorder(curr_temp, right_left, all_channels_int, 
+                                                    sample_to_keep = samples_to_keep, y_neighbors_to_keep = y_neighbors_to_keep, orginal_loc = True, 
+                                                    peak_ind=extreme_channel_indices[unit_id])
+                curr_peak_wf_curr_bin = curr_temp[:, all_channels_int[extreme_channel_indices_binned[curr_unit_id]]]
+                curr_peak_wf_curr_ori = curr_temp[:, all_channels_int[extreme_channel_indices[unit_id]]]
+                # euclidean distance
+                euc_dist = np.linalg.norm(
+                    curr_peak_wf_curr_bin
+                    - peak_mean_curr[60:150])
+                # energy
+                energy = np.linalg.norm(peak_mean_curr[60:150])
+                euc_dist_norm = euc_dist / energy
+                euc_dis[unit_ind, curr_ind] = euc_dist_norm
+
+                if euc_dist_norm>1:
+                    curr_peak_wf_curr_bin = peak_mean_curr[60:150]
+                
+
+                curr_wfs_bins_ori.append(orginal_template)
+                curr_peak_bins.append(curr_peak_wf_curr_bin)
+                curr_peak_bins_ori.append(curr_peak_wf_curr_ori)
+            else:
+                curr_wfs_bins.append(np.array([]))
+                curr_wfs_bins_ori.append(np.array([]))
+                curr_peak_bins.append(np.array([]))
+                curr_peak_bins_ori.append(np.array([]))
+
+        non_empty_shape = next(arr.shape for arr in curr_wfs_bins if arr.size > 0)
+        curr_wfs_bins = [arr if arr.size > 0 else np.full(non_empty_shape, np.nan) for arr in curr_wfs_bins]
+        curr_wfs_bins_ori = [arr if arr.size > 0 else np.full(non_empty_shape, np.nan) for arr in curr_wfs_bins_ori]
+
+        non_empty_shape = next(arr.shape for arr in curr_peak_bins if arr.size > 0)
+        curr_peak_bins = [arr if arr.size > 0 else np.full(non_empty_shape, np.nan) for arr in curr_peak_bins]
+        curr_peak_bins_ori = [arr if arr.size > 0 else np.full(non_empty_shape, np.nan) for arr in curr_peak_bins_ori]
+
+        all_wfs.append(curr_wfs_bins)  
+        all_wfs_ori.append(curr_wfs_bins_ori)
+        all_peak_wf.append(curr_peak_bins)
+        all_peak_wf_ori.append(curr_peak_bins_ori)
+        all_amps_ori.append(amp_curr)
+
+
+    # %% pick the best bin to get representative wf
+    all_peak_wf_opt = []
+    all_mat_wfs_opt = []
+    all_amp_opt = []
+    for unit_ind, unit in enumerate(all_tagged_units):
+        mat_wfs = all_wfs[unit_ind]
+        peak_wfs = all_peak_wf[unit_ind]
+        presence = presence_score[unit_ind]
+        count = all_counts[unit_ind]
+        # find both presence and count
+        if any(p and c > 100 for p, c in zip(presence, count)):
+            val_bins = np.where((presence > 0) & (count > 0))[0]
+            curr_peaks = np.array([peak_wf[30] if peak_wf.size > 0 else 0 for peak_wf in peak_wfs])
+            max_ind = np.argmax(np.abs(curr_peaks[val_bins]))
+            unit_amp = curr_peaks[val_bins[max_ind]]
+            unit_peak = peak_wfs[val_bins[max_ind]]
+            unit_peak_mat = mat_wfs[val_bins[max_ind]]
+        elif any(c > 100 for c in count):
+            val_bins = np.where(count > 0)[0]
+            curr_peaks = np.array([peak_wf[30] for peak_wf in peak_wfs if peak_wf.size > 0])
+            max_ind = np.argmax(np.abs(curr_peaks[val_bins]))
+            unit_amp = curr_peaks[val_bins[max_ind]]
+            unit_peak = peak_wfs[val_bins[max_ind]]
+            unit_peak_mat = mat_wfs[val_bins[max_ind]]
+        else:
+            unit_amp = 0
+            unit_peak = np.zeros(len(all_channels_int))
+            unit_peak_mat = np.zeros((len(all_channels_int), 2 * y_neighbors_to_keep + 1)) 
+        all_amp_opt.append(unit_amp)
+        all_peak_wf_opt.append(unit_peak)
+        all_mat_wfs_opt.append(unit_peak_mat)
+
+    waveform_recompute = pd.DataFrame({'unit_id': all_tagged_units, 'amplitude_opt': all_amp_opt, 'peak_wf_opt': all_peak_wf_opt, 'mat_wf_opt': all_mat_wfs_opt})
+    if save: 
+        if 'peak_wf_opt' in unit_tbl.columns:
+            unit_tbl = unit_tbl.drop(waveform_recompute.columns.tolist(), axis=1) 
+        unit_tbl['unit_id']= unit_tbl['ks_unit_id']
+        unit_tbl = unit_tbl.merge(waveform_recompute, on='unit_id', how='left')
+        unit_tbl_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
+        with open(unit_tbl_file, 'wb') as f:
+            pickle.dump(unit_tbl, f)
+
+
+    # %%
+    if plot: 
+        fig = plt.figure(figsize=(20, 4*len(all_tagged_units)))
+        gs = gridspec.GridSpec(2*len(all_tagged_units)+2, len(bin_inds)+1, figure=fig)
+        for unit_ind, unit_id in enumerate(all_tagged_units):
+            if unit_ind == 379:
+                print('stop')
+            ax_wf_ori = fig.add_subplot(gs[unit_ind*2, len(bin_inds)])
+            ax_wf_reo = fig.add_subplot(gs[unit_ind*2+1, len(bin_inds)])
+            temp_mean_curr = temp_ext_mean.get_unit_template(unit_id, operator='average') 
+            peak_mean_curr = temp_mean_curr[:,extreme_channel_indices[unit_id]]
+            ax_wf_ori.plot(peak_mean_curr[60:150], color='r', alpha=0.5, linewidth=1)  
+            ax_wf_reo.plot(all_peak_wf_opt[unit_ind], color='r', alpha=0.5, linewidth=1)
+
+            all_temps_bins = all_wfs[unit_ind]
+            all_temps_bins_ori = all_wfs_ori[unit_ind]  
+            all_peak_bins = all_peak_wf[unit_ind]
+            all_peak_bins_ori = all_peak_wf_ori[unit_ind]  
+            # find min and mac of all templates
+            min_reo = np.nanmin(np.array(all_temps_bins))
+            max_reo = np.nanmax(np.array(all_temps_bins))
+            min_ori = np.nanmin(np.array(all_temps_bins_ori))
+            max_ori = np.nanmax(np.array(all_temps_bins_ori))
+            min_all = min(min_reo, min_ori)
+            max_all = max(max_reo, max_ori)
+            if max_all == 0:
+                max_all = np.nanmax(peak_mean_curr)
+            if min_all == 0:
+                min_all = np.nanmin(peak_mean_curr)    
+            shifted_cmap = shiftedColorMap(b_w_r_cmap, min_all, max_all, 'shifted_b_w_r')
+            for curr_ind in bin_inds:
+                # original template
+                ax = fig.add_subplot(gs[unit_ind*2, curr_ind])
+                curr_temp = all_temps_bins_ori[curr_ind]
+                im = ax.imshow(curr_temp, extent=[samples_to_keep[0], 
+                                                samples_to_keep[0] + 2 * (samples_to_keep[1] - samples_to_keep[0]), 
+                                                2 * y_neighbors_to_keep + 1, 0], 
+                                                cmap=shifted_cmap, interpolation='nearest',
+                                                vmin=min_all, vmax=max_all, aspect='auto')
+                ax.axvline(0, color='black', linestyle='--', linewidth=0.5)
+                ax.axvline(samples_to_keep[1] - samples_to_keep[0], color='black', linestyle='--', linewidth=0.5)
+                if curr_ind == 0:
+                    ax.set_title(f'Unit_id: {unit_id} b: {curr_ind} c: {all_counts[unit_ind, curr_ind]} e: {euc_dis[unit_ind, curr_ind]:.2f}')
+                    fig.colorbar(im, ax=ax)
+                    ax.set_ylabel('Original Template')
+                else:
+                    ax.set_title(f'b: {curr_ind} c: {all_counts[unit_ind, curr_ind]} e: {euc_dis[unit_ind, curr_ind]:.2f}')
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax_wf_ori.plot(all_peak_bins_ori[curr_ind], color='black', alpha=0.1)
+
+                # reordered template
+                ax = fig.add_subplot(gs[unit_ind*2+1, curr_ind])
+                curr_temp = all_temps_bins[curr_ind]
+                im = ax.imshow(curr_temp, extent=[samples_to_keep[0], 
+                                                samples_to_keep[0] + 2 * (samples_to_keep[1] - samples_to_keep[0]), 
+                                                2 * y_neighbors_to_keep + 1, 0], 
+                                                cmap=shifted_cmap, interpolation='nearest',
+                                                vmin=min_all, vmax=max_all, aspect='auto')
+                ax.axvline(0, color='black', linestyle='--', linewidth=0.5)
+                ax.axvline(samples_to_keep[1] - samples_to_keep[0], color='black', linestyle='--', linewidth=0.5)
+                if curr_ind == 0:
+                    ax.set_title(f'Unit_id: {unit_id} bin: {curr_ind} present: {presence_score[unit_ind, curr_ind]}')
+                    fig.colorbar(im, ax=ax)
+                    ax.set_ylabel('Reordred Template')
+                else:
+                    ax.set_title(f'bin: {curr_ind} present: {presence_score[unit_ind, curr_ind]}')
+                ax.spines['top'].set_visible(False) 
+                ax.spines['right'].set_visible(False)
+                ax_wf_reo.plot(all_peak_bins[curr_ind], color='black', alpha=0.1)
+
+        ax = fig.add_subplot(gs[2*len(all_tagged_units):, 0:2])
+        ax.scatter(all_amp_opt, all_amps_ori)
+        all_max = max(max(all_amps_ori), max(all_amp_opt))
+        all_min = min(min(all_amps_ori), min(all_amp_opt))
+        ax.plot([all_min, all_max], [all_min, all_max], color='black', linestyle='--', linewidth=0.5)
+        ax.set_xlabel('Amplitude - recomputed')
+        ax.set_ylabel('Amplitude - original')
+
+        plt.tight_layout()
+        fig.savefig(fname=f'{session_dir[f"ephys_dir_{data_type}"]}/waveforms_recompute.pdf')
+        print('Saved figure')
+
+    return waveform_recompute
+
+
+    
+if __name__ == "__main__": 
     # session = 'behavior_751004_2024-12-20_13-26-11'
+    # suppress warnings from spikeinterface package
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module='spikeinterface')
+
     data_type = 'curated'
     target = 'soma'
     load_sorting_analyzer = True
-    # session = 'behavior_754897_2025-03-14_11-28-53'
+    session = 'behavior_751181_2025-02-27_11-24-47'
     # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
-
+ 
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
     session_list = session_assets['session_id'].values
     ind = [i for i, session in enumerate(session_list) if session == 'behavior_751769_2025-01-16_11-32-05']
     ind = ind[0]
     # print(session_list[-2])
-    # session = 'behavior_758017_2025-02-06_11-26-14'
-    # waveform_recompute_session(session, data_type, load_sorting_analyzer=False, opto_only=   rue)
-    for session in session_list[56:-1]: 
+    # session = 'behavior_751004_2024-12-21_13-28-28'
+    # waveform_recompute_session(session, data_type, load_sorting_analyzer=True, opto_only=True, plot=True, save=False)
+    def process(session):
         print(session)
         session_dir = session_dirs(session)
-        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')): 
-            if session_dir['curated_dir_curated'] is not None:
-                data_type = 'curated'
-                # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
-                waveform_recompute_session(session, data_type, load_sorting_analyzer=False, opto_only=True)
+        # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')): 
+        if session_dir['curated_dir_curated'] is not None:
+            data_type = 'curated'
+            # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+            outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= True, opto_only=True, plot=True, save=True)
+            del outcome
+            # elif session_dir['nwb_dir_raw'] is not None:
+            #     data_type = 'raw'
+            #     opto_wf_p reprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+    
+    
 
-    #         # elif session_dir['nwb_dir_raw'] is not None:
-    #         #     data_type = 'raw'
-    #         #     opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+    # Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[:17])
+    for session in session_list: 
+        process(session)
+    # process('behavior_754897_2025-03-15_11-32-18') 

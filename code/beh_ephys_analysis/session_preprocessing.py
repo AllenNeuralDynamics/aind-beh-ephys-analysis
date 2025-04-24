@@ -29,6 +29,7 @@ from matplotlib import colormaps
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 import pickle
 import datetime
+from joblib import Parallel, delayed
 
 def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = None):
     # loading info
@@ -64,6 +65,9 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
     # find maximum spike sample number with 'pre'
     pre_end = opto_df.loc[opto_df['pre_post']== 'pre']['laser_onset_samples'].max()
     post_start = opto_df.loc[opto_df['pre_post']== 'post']['laser_onset_samples'].min()
+    if len(opto_df['pre_post'].unique) == 1:
+        post_start =  opto_df.loc[opto_df['pre_post']== 'pre']['laser_onset_samples'].min()
+        pre_end = 1
     spike_indices_laser = (spike_indices <= pre_end) | (spike_indices >= post_start)
 
     # make sorting_analyzer for laser and no laser periods
@@ -173,58 +177,52 @@ def ephys_opto_preprocessing(session, data_type, target):
     qm['ephys_local_sync'] = True
 
     # %%
-    # # if needs re-alignment
-    # ignore_after_time = 1712 # seconds
-    # recording.add_sync_line(1,            # TTL line number
-    #                         100,          # processor ID
-    #                         'ProbeA-AP',  # stream name
-    #                         main=True,    # set as the main stream
-    #                         ignore_intervals = [(ignore_after_time * 30000, np.inf)])    
+    if np.sum(np.diff(timestamps)<0)/len(timestamps)>0.01:
+        qm['ephys_local_sync'] = False
+        # if needs re-alignment
+        ignore_after_time = min(recording.continuous[0].sample_numbers[0], recording.continuous[0].sample_numbers[-1])/30000 # seconds
+        if len(recording.continuous) == 3:
+            recording.add_sync_line(1,            # TTL line number
+                                    100,          # processor ID
+                                    'ProbeA-AP',  # stream name
+                                    main=True,    # set as the main stream
+                                    ignore_intervals = [(ignore_after_time * 30000, np.inf)])    
 
-    # recording.add_sync_line(1,            # TTL line number                                       
-    #                         100,          # processor ID
-    #                         'ProbeA-LFP', # stream name
-    #                         ignore_intervals = [(ignore_after_time * 2500, np.inf)])
+            recording.add_sync_line(1,            # TTL line number                                       
+                                    100,          # processor ID
+                                    'ProbeA-LFP', # stream name
+                                    ignore_intervals = [(ignore_after_time * 2500, np.inf)])
 
-    # recording.add_sync_line(1,            # TTL line number
-    #                         103,          # processor ID
-    #                         'PXIe-6341',   # stream name
-    #                         ignore_intervals = [(ignore_after_time * 30000, np.inf)])
+            recording.add_sync_line(1,            # TTL line number
+                                    103,          # processor ID
+                                    'PXIe-6341',   # stream name
+                                    ignore_intervals = [(ignore_after_time * 30000, np.inf)])
+        else:
+            recording.add_sync_line(1,            # TTL line number
+                                    100,          # processor ID
+                                    'ProbeA',  # stream name
+                                    main=True,    # set as the main stream
+                                    ignore_intervals = [(ignore_after_time * 30000, np.inf)])    
 
-    # recording.compute_global_timestamps(overwrite=True)
+            recording.add_sync_line(1,            # TTL line number
+                                    124,          # processor ID
+                                    'PXIe-6341',   # stream name
+                                    ignore_intervals = [(ignore_after_time * 30000, np.inf)])
 
-    # timestamps = recording.continuous[0].timestamps
-    # fig = plt.Figure(figsize=(10,2))
-    # plt.plot(timestamps[:])
-    # plt.title(f'Recording timestamps: length {len(timestamps)/30000} s')
-    # plt.show()
+        recording.compute_global_timestamps(overwrite=True)
+        timestamps = recording.continuous[0].timestamps
+        fig = plt.Figure(figsize=(10,2))
+        plt.subplot(1,2,1)
+        plt.plot(timestamps[:])
+        plt.title('Timestamps')
+        plt.subplot(1,2,2)
+        plt.plot(recording.continuous[0].sample_numbers)
+        plt.title('Sample numbers')
+        plt.suptitle(f'Corrected {session} s: length {len(timestamps)/30000} s')
+        plt.savefig(os.path.join(session_dir['alignment_dir'], f'{session}_timestamps_corrected.pdf'))
+        plt.show()
 
-
-    # %%
-    # # for NP2.0 if needs re-alignment
-    # ignore_after_time = 200*60 # seconds
-    # recording.add_sync_line(1,            # TTL line number
-    #                         100,          # processor ID
-    #                         'ProbeA',  # stream name
-    #                         main=True,    # set as the main stream
-    #                         ignore_intervals = [(ignore_after_time * 30000, np.inf)])    
-
-    # recording.add_sync_line(1,            # TTL line number
-    #                         124,          # processor ID
-    #                         'PXIe-6341',   # stream name
-    #                         ignore_intervals = [(ignore_after_time * 30000, np.inf)])
-
-    # recording.compute_global_timestamps(overwrite=True)
-
-    # timestamps = recording.continuous[0].timestamps
-    # fig = plt.Figure(figsize=(10,2))
-    # plt.plot(timestamps[:])
-    # plt.title(f'Recording timestamps: length {len(timestamps)/30000} s')
-    # plt.show()
-
-    # %% [markdown]
-    # ## Laser 
-
+    qm['ephys_cut'] = [np.min(timestamps), timestamps[-1]]
     # %%
     # extract laser times
     laser_line = 2
@@ -270,7 +268,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     # adjustment
     if len(laser_times) > len(opto_df):
         qm['laser_same_count'] = False
-        Print(f'{session} has more laser triggers than opto_df')
+        print(f'{session} has more laser triggers than opto_df')
         laser_times = laser_times[1:]
         opto_df = opto_df[:len(laser_times)].copy()
         fig = plt.Figure(figsize=(6,3))
@@ -288,6 +286,9 @@ def ephys_opto_preprocessing(session, data_type, target):
     # %% 
 
     # %%
+    sorting = si.load(session_dir[f'curated_dir_{data_type}'])
+    unit_ids = sorting.get_unit_ids()
+    unit_spikes  = [timestamps[sorting.get_unit_spike_train(unit_id=unit_id)] for unit_id in unit_ids]
     nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
     unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label']]
 
@@ -298,8 +299,8 @@ def ephys_opto_preprocessing(session, data_type, target):
         print('No preprocessed quality metrics found. Run behavior_and_time_alignment.py frist.')
     with open(preprosess_qm, 'r') as f:
         preprosess_qm = json.load(f)
-    unit_spikes = nwb.units[:]['spike_times']
-    unit_ids = nwb.units[:]['ks_unit_id']
+    # unit_spikes = nwb.units[:]['spike_times']
+    # unit_ids = nwb.units[:]['ks_unit_id']
     if preprosess_qm['ephys_sync']:
         print('Ephys synced, getting spike times from nwb')
     else:
@@ -309,8 +310,14 @@ def ephys_opto_preprocessing(session, data_type, target):
         # to be updated
         unit_spikes = [align_timestamps_to_anchor_points(spike_times, local_sync_time, harp_sync_time) for spike_times in unit_spikes]
         laser_times = align_timestamps_to_anchor_points(laser_times, local_sync_time, harp_sync_time)
-    opto_df.loc[laser_times < timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'pre'
-    opto_df.loc[laser_times >= timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'post'
+    if len(np.where(np.diff(laser_times) > 20*60)[0]) > 0:
+        # find max time difference
+        max_ind = np.argmax(np.diff(laser_times))
+        laser_cut = laser_times[max_ind]
+        opto_df.loc[laser_times <= laser_cut, 'pre_post'] = 'pre'
+        opto_df.loc[laser_times > laser_cut, 'pre_post'] = 'post'
+    else:
+        opto_df['pre_post'] = 'post'
     unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
         pickle.dump(unit_spikes, f)
@@ -356,7 +363,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     opto_df['time'] = laser_times
     laser_onset_samples = np.searchsorted(timestamps, laser_times)
     opto_df['laser_onset_samples'] = laser_onset_samples
-    if 'emission_location' in opto_df.columns:
+    if 'emission_location' in opto_df.columns and (len(opto_df['site'].unique()) < 2 or 'site' not in opto_df.columns):
         opto_df = opto_df.drop(columns=['site'])
         opto_df['site'] = opto_df['emission_location']
     opto_df.to_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv'), index=False)
@@ -370,9 +377,8 @@ def ephys_opto_preprocessing(session, data_type, target):
     # save all focus laser conditions
     if target == 'soma':
         resp_win = 25/1000 # seconds
-        if 'emission_location' in opto_df.columns:
-            opto_df_target = opto_df.query('site == "surface" or site == "surface_LC"')
-        else:
+        opto_df_target = opto_df.query('site == "surface" or site == "surface_LC"')
+        if len(opto_df_target)==0:
             opto_df_target = opto_df
     elif target == 'axon':
         resp_win = 50/1000 # seconds
@@ -385,8 +391,8 @@ def ephys_opto_preprocessing(session, data_type, target):
     opto_df_target.to_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_{target}.csv'), index=False)
 
     opto_info_target = {
-        'sites': list(opto_df_target['site'].unique()),
-        'powers': list(map(int,np.sort(opto_df_target['power'].unique()))),
+        'sites': [int(x) if isinstance(x, (int, np.integer)) else x for x in opto_df_target['site'].unique()],
+        'powers': list(map(float,np.sort(opto_df_target['power'].unique()))),
         'freqs': list(map(int, np.sort(opto_df_target['freq'].unique()))),  # Convert to Python int
         'durations': list(map(int, np.sort(opto_df_target['duration'].unique()))),
         'num_pulses': list(map(int, np.sort(opto_df_target['num_pulses'].unique()))),
@@ -530,14 +536,17 @@ if __name__ == "__main__":
     import warnings
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-    for session in [session_list[-1]]:  
+ 
+    def process(session): 
         session_dir = session_dirs(session)
-        if session_dir['nwb_dir_curated'] is None:
-            continue
-        else: 
+        if session_dir['nwb_dir_curated'] is not None: 
             print(f'Processing {session}')
             ephys_opto_preprocessing(session, data_type, target)
-            ephys_opto_crosscorr(session, data_type)
+            plt.close('all')
+            # ephys_opto_crosscorr(session, data_type)
             print(f'Finished {session}')
+    
+    # Parallel(n_jobs=10)(delayed(process)(session) for session in session_list[:10])
+    process(session_list[12])
 
 

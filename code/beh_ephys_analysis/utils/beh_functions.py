@@ -603,21 +603,33 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         if len(nwbs) == 1:
             nwb_dir_raw = os.path.join(nwb_dir_temp, nwbs[0])
         elif len(nwbs)>1:
-            print('There are multiple recordings in the curated nwb directory. Please specify the recording you would like to use.')
-        else:
-            print('There is no nwb file in the curated directory.')
-    # curated version
-    nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
-    if os.path.exists(nwb_dir_temp):
-        nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
-        if len(nwbs) == 1:
-            nwb_dir_curated = os.path.join(nwb_dir_temp, nwbs[0])
-        elif len(nwbs)>1:
-            nwb_dir = None
             print('There are multiple recordings in the raw nwb directory. Please specify the recording you would like to use.')
         else:
-            nwb_dir = None
             print('There is no nwb file in the raw directory.')
+    nwb_dir_curated = None
+    # curated version
+    if os.path.exists(sorted_dir):
+        nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
+        if os.path.exists(nwb_dir_temp):
+            nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
+            if len(nwbs) == 1:
+                nwb_dir_curated = os.path.join(nwb_dir_temp, nwbs[0])
+            elif len(nwbs)>1:
+                print('There are multiple recordings in the curated nwb directory. Picked one with units.')
+                for nwb in nwbs:
+                    if 'units' in os.listdir(os.path.join(nwb_dir_temp, nwb)):
+                        nwb_dir_curated = os.path.join(nwb_dir_temp, nwb)
+                        break
+            else:
+                nwb_dir_curated = None
+                print('There is no nwb file in the curated directory.')
+        else:
+            nwb_dir_temp = [path for path in os.listdir(sorted_dir) if path.endswith('.nwb')]
+            if len(nwb_dir_temp) == 1:
+                nwb_dir_curated = os.path.join(sorted_dir, nwb_dir_temp[0])
+            else:
+                nwb_dir_curated = None
+                print('There is no nwb file in the curated directory.')
 
     # postprocessed dirs
     postprocessed_dir_raw = None
@@ -1030,21 +1042,28 @@ def plot_session_glm(session, tMax = 10, cut = [0, np.nan]):
 def get_session_tbl(session):
     session_dir = session_dirs(session)
     nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
-    nwb = load_nwb_from_filename(nwb_file)
-    tbl = nwb.trials.to_dataframe()
+    if os.path.exists(nwb_file):
+        nwb = load_nwb_from_filename(nwb_file)
+        tbl = nwb.trials.to_dataframe()
+    else:
+        tbl = None
     return tbl
 
-def get_unit_tbl(session, data_type):
+def get_unit_tbl(session, data_type, summary = True):
     session_dir = session_dirs(session)
     unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
-    if os.path.exists(unit_tbl_summary):
-        with open(unit_tbl_summary, 'rb') as f:
-            unit_data = pickle.load(f)
-        unit_tbl = unit_data
-    else: 
-        unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
+    unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
+    if summary: 
+        if os.path.exists(unit_tbl_summary):
+            with open(unit_tbl_summary, 'rb') as f:
+                unit_data = pickle.load(f)
+            unit_tbl = unit_data
+        else: 
+            with open(unit_tbl_dir, 'rb') as f:
+                unit_data = pickle.load(f)
+            unit_tbl = unit_data['opto_tagging_df']
+        return unit_tbl
+    else:
         with open(unit_tbl_dir, 'rb') as f:
             unit_data = pickle.load(f)
-        unit_tbl = unit_data['opto_tagging_df']
-    return unit_tbl
- 
+        return unit_data['opto_tagging_df']

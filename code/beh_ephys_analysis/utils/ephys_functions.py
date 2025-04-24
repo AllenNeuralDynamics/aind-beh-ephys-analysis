@@ -246,17 +246,18 @@ def load_drift(session, unit_id, data_type='curated'):
     else:
         opto_drift_tbl = pd.read_csv(drift_file)    
         opto_drift_tbl.reset_index(drop=True, inplace=True)
-        if unit_id==None:
+        if len(opto_drift_tbl) == 0:
+            return None
+        elif unit_id==None:
             return opto_drift_tbl
+        elif unit_id in opto_drift_tbl['unit_id'].values:
+            unit_drift = opto_drift_tbl[opto_drift_tbl['unit_id'] == unit_id].iloc[0].to_dict()
+            # Apply conversion
+            converted_data = {key: convert_values(val) for key, val in unit_drift.items()}
+            unit_drift = converted_data
+            return unit_drift
         else:
-            if unit_id in opto_drift_tbl['unit_id'].values:
-                unit_drift = opto_drift_tbl[opto_drift_tbl['unit_id'] == unit_id].iloc[0].to_dict()
-                # Apply conversion
-                converted_data = {key: convert_values(val) for key, val in unit_drift.items()}
-                unit_drift = converted_data
-                return unit_drift
-            else:
-                return None
+            return None
 
 def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, stepSize):
     bin_times = np.arange(pre_event, post_event, stepSize) - 0.5*stepSize

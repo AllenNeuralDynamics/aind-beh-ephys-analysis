@@ -47,7 +47,7 @@ def opto_summary(session, data_type, target, save=True):
     y_loc = we.get_extension('unit_locations').get_data()[:,1]
 
      # %%
-    unit_tbl = get_unit_tbl(session, data_type)
+    unit_tbl = get_unit_tbl(session, data_type, summary=True)
     opto_tag = opto_metrics(session, data_type)
     unit_ids = unit_tbl['unit_id'].values.tolist()
     unit_ids = [int(unit_id) for unit_id in unit_ids]
@@ -60,7 +60,8 @@ def opto_summary(session, data_type, target, save=True):
     euc_max_p = []
     corr_max_p = []
     bl_max_p = []
-    pass_count = []
+    pass_count = [] 
+    # check if this session has a unit opto tagged at all by checking if resp_lat exists
     for unit_id in unit_ids:
         curr_opto = opto_tag.load_unit(unit_id)
         # find ones with respond latencies
@@ -89,11 +90,42 @@ def opto_summary(session, data_type, target, save=True):
 
         lat_max_p.append(np.nanmin(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['resp_lat'].values))
         lat_mean.append(curr_opto['resp_lat'].mean(skipna=True))
-        euc_max_p.append(np.nanmin(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['euclidean_norm'].values))
-        corr_max_p.append(np.nanmin(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['correlation'].values))
+        if np.all(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['euclidean_norm'].values == None):
+            euc_max_p.append(np.nan)
+            corr_max_p.append(np.nan)
+        else:
+            euc_max_p.append(np.nanmin(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['euclidean_norm'].values))
+            corr_max_p.append(np.nanmin(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['correlation'].values))
         bl_max_p.append(curr_opto.loc[p_max_ind]['resp_p'] - curr_opto.loc[p_max_ind]['resp_p_bl'])
-    amp = [np.max(temp) - np.min(temp) for temp in unit_tbl['waveform_mean']]
-    peak = [-np.min(temp) for temp in unit_tbl['waveform_mean']]
+    peak_channel = [np.argmax(np.abs(temp[90,:])) for temp in unit_tbl['waveform_mean']]
+    peak_wf = [temp[90-30:90+60, peak_C] for temp, peak_C in zip(unit_tbl['waveform_mean'], peak_channel)]
+    # recompute 2d waveform
+    # load wfs
+    waveform_info_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveform_params.json')
+    with open(waveform_info_file) as f:
+        waveform_info = json.load(f)
+    y_neighbors_to_keep = waveform_info['y_neighbors_to_keep']
+    samples_to_keep = waveform_info['samples_to_keep']
+    orginal_loc = True
+    analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
+    extreme_channel_indices = si.get_template_extremum_channel(analyzer, mode = "at_index", outputs = "index")
+    unit_locations = analyzer.get_extension("unit_locations").get_data(outputs="by_unit")
+    channel_locations = analyzer.get_channel_locations()
+    right_left = channel_locations[:, 0]<20 
+    all_channels = analyzer.sparsity.channel_ids
+    if all_channels[0].startswith('AP'):
+        all_channels_int = np.array([int(channel.split('AP')[-1]) for channel in all_channels])
+    else:
+        all_channels_int = np.array([int(channel.split('CH')[-1]) for channel in all_channels])
+
+    temp_ext = analyzer.get_extension("templates")
+    temps = temp_ext.get_templates(operator='average')
+    wf_2d = [template_reorder(curr_temp, right_left, all_channels_int, 
+                                    sample_to_keep = samples_to_keep, y_neighbors_to_keep = y_neighbors_to_keep, orginal_loc = orginal_loc, 
+                                    peak_ind=curr_peak) 
+                                    for curr_temp, curr_peak in zip(list(temps), list(extreme_channel_indices.values()))]
+    amp = [np.max(temp[:, peak_C]) - np.min(temp[:, peak_C]) for temp, peak_C in zip(unit_tbl['waveform_mean'], peak_channel)]
+    peak = [temp[90,peak_C] for temp, peak_C in zip(unit_tbl['waveform_mean'], peak_channel)]
     label = unit_tbl['decoder_label'].values
     real_unit = label != 'artifact'
     opto_tag_tbl = pd.DataFrame({'unit_id': unit_ids, 
@@ -109,8 +141,17 @@ def opto_summary(session, data_type, target, save=True):
                                 'peak': peak,
                                 'real_unit': real_unit,
                                 'y_loc': y_loc, 
-                                'pass_count': pass_count})
-    opto_tag_tbl_summary = pd.merge(opto_tag_tbl, unit_tbl.drop(columns=['opto_pass']), on='unit_id')
+                                'pass_count': pass_count,
+                                })
+    
+    unit_tbl_tmp = unit_tbl.copy()
+    unit_tbl_tmp.drop(columns=opto_tag_tbl.columns.difference(['unit_id']), inplace=True, errors='ignore')
+    unit_tbl_tmp['peak_wf'] = peak_wf
+    unit_tbl_tmp['wf_2d'] = wf_2d
+    opto_tag_tbl_summary = pd.merge(opto_tag_tbl, unit_tbl_tmp, on='unit_id')
+
+    # add 2D waveform:
+
 
     # %%
     pairplot = sns.pairplot(opto_tag_tbl, hue='real_unit', corner=True, diag_kind='kde', plot_kws={'alpha': 0.25})
@@ -295,6 +336,8 @@ def opto_summary(session, data_type, target, save=True):
         unit_tag_loc = 0
         opto_tag_tbl_summary['LC_range_top'] = None
         opto_tag_tbl_summary['LC_range_bottom'] = None
+        opto_tag_tbl_summary['tagged_loc'] = None
+        opto_tag_tbl_summary['tagged'] = None
 
     plt.suptitle(f'{session} {data_type} {target} {np.sum(unit_tag)} maybe, {np.sum(unit_tag_loc)} with location info')
 
@@ -312,6 +355,7 @@ def opto_summary(session, data_type, target, save=True):
 
     print(f"PDF saved as {pdf_filename}")
 
+    
     if save:
         with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_{target}_opto_tagging_summary.pkl'), 'wb') as f:
             pickle.dump(opto_tag_tbl_summary, f)
@@ -321,7 +365,7 @@ def opto_summary(session, data_type, target, save=True):
 
 
 if __name__ == '__main__':
-    session = 'behavior_754897_2025-03-12_12-23-15'
+    session = 'behavior_717121_2024-06-15_10-00-58'
     data_type = 'curated'
     target = 'soma'
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -337,20 +381,23 @@ if __name__ == '__main__':
     def process(session):
         print(f'Starting {session}')
         session_dir = session_dirs(session)
-        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-            if session_dir['nwb_dir_curated'] is not None:
-                data_type = 'curated'
-                opto_summary(session, data_type, target, save=True)
-                print(f'Finished {session}')
-            else:
-                print(f'No curated data found for {session}')
-            # elif session_dir['curated_dir_raw'] is not None:
-            #     data_type = 'raw'
-            #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    # Parallel(n_jobs=10)(delayed(process)(session) for session in session_list[-5:-1])
-    # for session in session_list[-5:-1]:
-    #     process(session)
-    process(session)
+        # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+        if session_dir['curated_dir_curated'] is not None:
+            data_type = 'curated'
+            opto_summary(session, data_type, target, save=True)
+            print(f'Finished {session}')
+        else:
+            print(f'No curated data found for {session}')
+        # elif session_dir['curated_dir_raw'] is not None:
+        #     data_type = 'raw'
+        #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
+    Parallel(n_jobs=10)(delayed(process)(session) for session in session_list[19:])
+    # for session in session_list:
+    #     try:
+    #         process(session)
+    #     except:
+    #         print(f'Failed {session}')
+    # process('behavior_751004_2024-12-20_13-26-11')
 
 
 

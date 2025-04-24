@@ -87,20 +87,29 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     # ephys_opto_preprocessing(session, 'curated', 'soma')
 
     # %%
-    motion_path = f'/root/capsule/data/{session}_sorted/preprocessed/motion/experiment1_Record Node 104#Neuropix-PXI-100.ProbeA_recording1'
-    all_files = os.listdir(motion_path)
-    if 'motion.npy' in all_files:
-        motion_info = load_legacy_motion_info(motion_path)
-    else:
-        motion_info = load_motion_info(motion_path)
+    motion_root = f'/root/capsule/data/{session}_sorted/preprocessed/motion/'
+    if os.path.exists(motion_root):
+        all_files = [file for file in os.listdir(motion_root) if 'recording' in file]
+        motion_path = os.path.join(motion_root, all_files[0])
+
+        all_files = os.listdir(motion_path)
+        if 'motion.npy' in all_files:
+            motion_info = load_legacy_motion_info(motion_path)
+        else:
+            motion_info = load_motion_info(motion_path)
 
     # %%
     # sampling 
     bin_sampling = 10
     bin_short = 100
     # get start and end of recording
-    start = Session(session_dir['session_dir']).recordnodes[0].recordings[0].continuous[0].timestamps[0]
-    stop = Session(session_dir['session_dir']).recordnodes[0].recordings[0].continuous[0].timestamps[-1]
+    qm_dir = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
+    with open(qm_dir) as f:
+        qm_dict = json.load(f)
+    start = qm_dict['ephys_cut'][0]
+    stop = qm_dict['ephys_cut'][1]
+    # start = Session(session_dir['session_dir']).recordnodes[0].recordings[0].continuous[0].timestamps[0]
+    # stop = Session(session_dir['session_dir']).recordnodes[0].recordings[0].continuous[0].timestamps[-1]
     probe_location = np.linspace(2500, 0,  96)
     map_time = motion_info['motion'].temporal_bins_s
     if np.abs(np.mean(map_time)-0.5*(start+stop)) > 10*60:
@@ -183,19 +192,20 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     # ax2 = plt.subplot(gs[1, 0])
     ax2 = fig.add_subplot(gs[2, 0], sharex=ax1) 
     nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
-    nwb = load_nwb_from_filename(nwb_file)
-    choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(nwb)
-    _, Axes = plot_foraging_session(  # noqa: C901
-                    choice_history,
-                    reward_history,
-                    p_reward = p_reward,
-                    autowater_offered = autowater_offered,
-                    trial_time = trial_time,
-                    ax = ax2,
-                    # legend=False,
-                    ) 
-    for ax in Axes:
-        ax.set_xlim([temp_bins[0], temp_bins[-1]])
+    if os.path.exists(nwb_file):
+        nwb = load_nwb_from_filename(nwb_file)
+        choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(nwb)
+        _, Axes = plot_foraging_session(  # noqa: C901
+                        choice_history,
+                        reward_history,
+                        p_reward = p_reward,
+                        autowater_offered = autowater_offered,
+                        trial_time = trial_time,
+                        ax = ax2,
+                        # legend=False,
+                        ) 
+        for ax in Axes:
+            ax.set_xlim([temp_bins[0], temp_bins[-1]])
 
     ax3 = plt.subplot(gs[1, 1])
     cbar_ax = plt.subplot(gs[0, 1])
@@ -221,11 +231,15 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
             post_start = np.min(opto_times_post)
             y_rand = np.random.uniform(0, 1, len(opto_times_post))
             ax4.scatter(opto_times_post, y_rand, c='b', label='post', s=10, edgecolors=None)    
-
-        if len(opto_df[~opto_df['site'].str.contains('LC', na=False)]['time'].values)>0:
-            opto_surf = opto_df[~opto_df['site'].str.contains('LC', na=False)]['time'].values
-            y_rand = np.random.uniform(0, 1, len(opto_surf)) 
-            ax4.scatter(opto_surf, y_rand, label='surf', s=10, edgecolors='k', facecolors='none', linewidth=2)
+        sites = opto_df['site'].values
+        # if len(opto_df[~opto_df['site'].str.contains('LC', na=False)]['time'].values)>0:
+        #     opto_surf = opto_df[~opto_df['site'].str.contains('LC', na=False)]['time'].values
+        #     y_rand = np.random.uniform(0, 1, len(opto_surf)) 
+        #     ax4.scatter(opto_surf, y_rand, label='surf', s=10, edgecolors='k', facecolors='none', linewidth=2)
+        # elif len(opto_df[~opto_df['site'].str.contains('surface', na=False)]['time'].values)>0:
+        #     opto_surf = opto_df[~opto_df['site'].str.contains('surface', na=False)]['time'].values
+        #     y_rand = np.random.uniform(0, 1, len(opto_surf)) 
+        #     ax4.scatter(opto_surf, y_rand, label='surf', s=10, edgecolors='k', facecolors='none', linewidth=2)
             
         ax4.set_xlabel('Time (s)')
         ax4.set_xlim([temp_bins_slow[0], temp_bins_slow[-1]])
@@ -612,15 +626,21 @@ if __name__ == '__main__':
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
     session_list = session_assets['session_id'].values
     session_list = [session for session in session_list if isinstance(session, str)]
-    session = 'behavior_716325_2024-05-31_10-31-14'
+    session = 'behavior_717121_2024-06-15_10-00-58'
     # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
     def process(session):
-        print(session)
         session_dir = session_dirs(session)
-        if session_dir['nwb_dir_curated'] is not None:
-                plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
+        if session_dir['curated_dir_curated'] is not None:
+            # try:
+            plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
+            print(f'{session} done')
+            # except:
+            #     print(f'{session} error')
 
 
-    Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[-5:])
+    # Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[10:17])
+    process(session_list[14])
+    # for session in session_list[12:17]:
+    #     process(session)
 
 
