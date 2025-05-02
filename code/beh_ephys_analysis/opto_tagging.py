@@ -584,7 +584,7 @@ if __name__ == "__main__":
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
     # Parallel(n_jobs=11)(delayed(process)(session) for session in session_list[19:])
     # process('behavior_751004_2024-12-20_13-26-11')
-    for session in session_list[19:]:
+    for session in session_list[63:]:
         process(session)
 
 

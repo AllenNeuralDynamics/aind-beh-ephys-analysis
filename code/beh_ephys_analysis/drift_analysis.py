@@ -53,6 +53,10 @@ except:
     from spikeinterface.sortingcomponents.motion.motion_utils import Motion
 from joblib import Parallel, delayed
 import shutil
+import warnings
+warnings.filterwarnings('ignore')
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+
 
 def load_legacy_motion_info(folder):
     folder = Path(folder)
@@ -95,8 +99,13 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
         all_files = os.listdir(motion_path)
         if 'motion.npy' in all_files:
             motion_info = load_legacy_motion_info(motion_path)
+            print(f'Legacy motion info for {session}')
         else:
             motion_info = load_motion_info(motion_path)
+            print(f'New motion info for {session}')
+    else:
+        print(f'No motion info found for {session}')
+        return
 
     # %%
     # sampling 
@@ -112,13 +121,27 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     # stop = Session(session_dir['session_dir']).recordnodes[0].recordings[0].continuous[0].timestamps[-1]
     probe_location = np.linspace(2500, 0,  96)
     map_time = motion_info['motion'].temporal_bins_s
-    if np.abs(np.mean(map_time)-0.5*(start+stop)) > 10*60:
-        mis_align = np.mean(map_time) - 0.5*(start+stop)
-        temp_bins_sampling = np.arange(start+mis_align, stop+mis_align, bin_sampling)
-        temp_bins = np.arange(start, stop, bin_short)
+    
+    # correction to take care of cases:
+    # 1. Ephys time was re-aligned to harp time:  the mean of the map_time is not close to the middle of the session
+    # 2. Legacy motion info starts at 1.0 seconds, which is not the start of the session
+    # 3. NPopto: motion info starts at 0.5 seconds, which is not the start of the session
+    if (np.abs(np.mean(map_time[0])-0.5*(start+stop)) > 10*60) or (map_time[0][0] == 0.5) or (map_time[0][0] == 1.0):
+        if (map_time[0][0] == 0.5) or (map_time[0][0] == 1.0):
+            mis_align = -start
+        else: 
+            mis_align = map_time[0][0] - start
+        print(f'Correction. time_diff {np.abs(np.mean(map_time)-0.5*(start+stop))}')
+        print(f'Drift start: {map_time[0][0]}')
+        print(f'Session start: {start}')
     else:
-        temp_bins_sampling = np.arange(start, stop, bin_sampling)
-        temp_bins = np.arange(start, stop, bin_short)
+        mis_align = 0
+        print(f'No correction. time_diff {np.abs(np.mean(map_time)-0.5*(start+stop))}')
+        print(f'Drift start: {map_time[0][0]}')
+        print(f'Session start: {start}')
+    
+    temp_bins_sampling = np.arange(start+mis_align, stop+mis_align, bin_sampling)
+    temp_bins = np.arange(start, stop, bin_short)
 
     drift_sampling = np.zeros(shape=(len(probe_location), len(temp_bins_sampling)))
     for i, t in enumerate(temp_bins_sampling): 
@@ -126,8 +149,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
             drift_sampling[j, i] = motion_info['motion'].get_displacement_at_time_and_depth([t], [p])
     
     # resest drift sampling time
-    if np.abs(np.mean(map_time)-0.5*(start+stop)) > 10*60:
-        temp_bins_sampling = temp_bins_sampling - mis_align
+    temp_bins_sampling = temp_bins_sampling - mis_align
 
     # %%
     # fast dynamics
@@ -135,7 +157,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
 
     drift = np.full((len(probe_location), len(temp_bins)), np.nan)
     for i, t in enumerate(temp_bins): 
-        for j, p in enumerate(probe_location):
+        for j, p in enumerate(probe_location): 
             curr_ind = np.where((temp_bins_sampling >= t-bin_short/2) & (temp_bins_sampling < t+bin_short/2))[0]
             if curr_ind.size > 0:
                 drift[j, i] = np.mean(drift_sampling[j, curr_ind])
@@ -610,6 +632,134 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
         combine_pdf_big(drift_dir, os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_drift.pdf'))
     return opto_drift_tbl
 
+def mode_by_bins(data, bins):
+    """
+    Calculate the mode of data within specified bins.
+    
+    Parameters:
+    data (array-like): Input data to calculate the mode from.
+    
+    Returns:
+    array: Mode of the data within each bin.
+    """
+    if isinstance(bins, list):
+        bin_edges = np.array(bins)
+    elif isinstance(bins, int):
+        bin_edges = np.linspace(np.min(data), np.max(data), bins + 1)
+    elif isinstance(bins, float):
+        bin_edges = np.arange(np.min(data), np.max(data) + bins, bins)
+
+    counts = np.histogram(data, bins=bin_edges)[0]
+    max_bin = np.argmax(counts)
+    mode = np.mean(data[(data>=bin_edges[max_bin]) & (data<bin_edges[max_bin+1])])
+
+    return mode, [bin_edges[max_bin], bin_edges[max_bin + 1]]
+
+def generate_session_opto_drift_trial_table(session, data_type, opto_only = True, save = True):
+    session_dir = session_dirs(session)
+    # load qm
+    qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
+    with open(qm_file) as f:
+        qm_dict = json.load(f)
+    # load motion  
+    motion_root = f'/root/capsule/data/{session}_sorted/preprocessed/motion/'
+    if os.path.exists(motion_root):
+        all_files = [file for file in os.listdir(motion_root) if 'recording' in file]
+        motion_path = os.path.join(motion_root, all_files[0])
+
+        all_files = os.listdir(motion_path)
+        if 'motion.npy' in all_files:
+            motion_info = load_legacy_motion_info(motion_path)
+        else:
+            motion_info = load_motion_info(motion_path)
+    # load amp
+    # %%
+    sorting_analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False) 
+    sorting = si.load(session_dir[f'curated_dir_{data_type}'])
+
+    # %%
+    unit_locations = sorting_analyzer.get_extension('unit_locations').get_data(outputs="by_unit")
+    spike_amplitudes = sorting_analyzer.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
+
+    del sorting_analyzer
+    
+    session_tbl = get_session_tbl(session)
+    unit_tbl = get_unit_tbl(session, data_type)
+    if opto_only:
+        unit_tbl = unit_tbl[(unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)]
+
+    trials_starts = session_tbl['goCue_start_time'].values
+    # convert back to raw time if ephys was aligned to harp time
+    # if not qm_dict['ephys_sync']:
+    #     trials_starts_raw = align_timestamps_to_anchor_points(trials_starts, np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')))
+    # else:
+    #     trials_starts_raw = trials_starts
+
+    map_time = motion_info['motion'].temporal_bins_s
+    start = qm_dict['ephys_cut'][0]
+    stop = qm_dict['ephys_cut'][1]
+    # correction to take care of cases:
+    # 1. Ephys time was re-aligned to harp time:  the mean of the map_time is not close to the middle of the session
+    # 2. Legacy motion info starts at 1.0 seconds, which is not the start of the session
+    # 3. NPopto: motion info starts at 0.5 seconds, which is not the start of the session
+    if (np.abs(np.mean(map_time[0])-0.5*(start+stop)) > 10*60) or (map_time[0][0] == 0.5) or (map_time[0][0] == 1.0):
+        if (map_time[0][0] == 0.5) or (map_time[0][0] == 1.0):
+            mis_align = -start
+        else: 
+            mis_align = map_time[0][0] - start
+    else:
+        mis_align = 0
+
+    trials_starts_raw = trials_starts + mis_align
+    
+    drift_data = pd.DataFrame()
+    bin_size = 60
+    step_num = 5
+    step = np.arange(-step_num, step_num+1, 1) * bin_size/step_num
+    samp = [trials_starts_raw + step[i] for i in range(len(step))]
+    samp = np.concatenate(samp)
+    for i, row in unit_tbl.iterrows():
+        unit_id = row['unit_id']
+        unit_location = unit_locations[unit_id][1]
+        spike_amplitude = spike_amplitudes[unit_id]
+        spike_times = unit_tbl.query('unit_id == @unit_id')['spike_times'].values[0]
+
+        # get drifts
+        unit_drift_raw = motion_info['motion'].get_displacement_at_time_and_depth(trials_starts_raw, np.full(len(trials_starts_raw), unit_location))
+        unit_drift = motion_info['motion'].get_displacement_at_time_and_depth(samp, np.full(len(samp), unit_location))
+        unit_drift = [np.mean(unit_drift[i::len(trials_starts_raw)]) for i in range(len(trials_starts_raw))]
+
+        # get amp
+        unit_amp = np.full(len(trials_starts_raw), np.mean(spike_amplitude))
+        motion_info['motion'].temporal_bin_edges_s
+        for i, t in enumerate(trials_starts):
+            inds = np.where((spike_times >= t-bin_size) & (spike_times < t+bin_size))[0]
+            if inds.size > 5:
+                temp = spike_amplitude[inds]
+                cut_off = np.percentile(temp, [5, 95])
+                temp = temp[(temp >= cut_off[0]) & (temp <= cut_off[1])]
+                if temp.size > 0:
+                    unit_amp[i] = np.mean(temp)
+        
+        amp_mode, _ = mode_by_bins(unit_amp, 10.0)
+        _, time_edges = mode_by_bins(spike_times, 60*10.0)
+        loc_mode = np.mean(motion_info['motion'].get_displacement_at_time_and_depth(np.linspace(time_edges[0], time_edges[1], 10), np.full(10, unit_location)))
+        amp_abs = np.abs(unit_amp - amp_mode)
+        unit_drift_abs = np.abs(unit_drift - loc_mode)
+
+        unit_drift_data = pd.DataFrame({'motion' : unit_drift,
+                                'motion_abs': unit_drift_abs,
+                                'amp': unit_amp,
+                                'amp_abs': amp_abs,
+                                'unit_id': unit_id, 
+                                'trial_ind': range(len(trials_starts)),
+                                'trial_time': trials_starts})
+        drift_data = pd.concat([drift_data, unit_drift_data], axis=0, ignore_index=True)
+
+    
+    if save:
+        drift_data.to_csv(os.path.join(session_dir[f'ephys_dir_{data_type}'], f'{session}_drift_trial_table.csv'), index=False)
+
 def update_unit_tbl_by_drift(session, data_type): 
     session_dir = session_dirs(session)
     opto_drift_tbl = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv'))
@@ -621,6 +771,36 @@ def update_unit_tbl_by_drift(session, data_type):
     unit_tbl.to_pickle(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'))
     return unit_tbl
 
+class load_trial_drift:
+    def __init__(self, session, data_type):
+        """Initialize the object with a DataFrame."""
+        session_dir = session_dirs(session)
+        drift_tbl_dir = os.path.join(session_dir[f'ephys_dir_{data_type}'], f'{session}_drift_trial_table.csv')
+        if not os.path.exists(drift_tbl_dir):
+            drift_data = None
+        else:
+            drift_data = pd.read_csv(drift_tbl_dir)
+        self.drift_data = drift_data
+
+    def load_unit(self, unit_id, trial_range = None, cat = None):
+        """Load the drift data for a specific unit."""
+        """Load the drift data for a specific unit."""
+        if self.drift_data is None:
+            raise ValueError("Drift data is not available. Please generate drift data first.")
+        unit_drift_data = self.drift_data[self.drift_data['unit_id'] == unit_id].sort_values(by='trial_ind')
+        if trial_range is not None:
+            if isinstance(trial_range, int):
+                trial_range = [trial_range]
+            elif isinstance(trial_range, list):
+                trial_range = np.array(trial_range)
+            else:
+                raise ValueError("trial_range should be an integer or a list of integers.")
+            unit_drift_data = unit_drift_data[unit_drift_data['trial_ind'].isin(trial_range)]
+        if cat is not None:
+            if cat not in unit_drift_data.columns:
+                raise ValueError(f"Category '{cat}' not found in drift data.")
+            unit_drift_data = unit_drift_data[cat]
+        return unit_drift_data
 
 if __name__ == '__main__':
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -630,17 +810,19 @@ if __name__ == '__main__':
     # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
     def process(session):
         session_dir = session_dirs(session)
-        if session_dir['curated_dir_curated'] is not None:
+        if session_dir['curated_dir_curated'] is not None and os.path.exists(session_dir['nwb_beh']):
             # try:
-            plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
+            print(session)
+            # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
+            generate_session_opto_drift_trial_table(session, 'curated', opto_only=True, save=True)
             print(f'{session} done')
             # except:
             #     print(f'{session} error')
 
 
-    # Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[10:17])
-    process(session_list[14])
-    # for session in session_list[12:17]:
-    #     process(session)
-
-
+    Parallel(n_jobs=2)(delayed(process)(session) for session in session_list[17:])
+    # process(session)
+    # for session in session_list:
+        # process(session)
+    # generate_session_opto_drift_trial_table('behavior_716325_2024-05-31_10-31-14', 'curated', opto_only=True, save=True)
+    # plot_session_opto_drift(session, 'curated', update_csv=False, plot=False)

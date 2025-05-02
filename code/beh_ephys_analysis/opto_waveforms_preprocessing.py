@@ -822,9 +822,9 @@ if __name__ == "__main__":
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')): 
         if session_dir['curated_dir_curated'] is not None:
             data_type = 'curated'
-            # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
-            outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= True, opto_only=True, plot=True, save=True)
-            del outcome
+            opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+            # outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= True, opto_only=True, plot=True, save=True)
+            # del outcome
             # elif session_dir['nwb_dir_raw'] is not None:
             #     data_type = 'raw'
             #     opto_wf_p reprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
@@ -832,6 +832,6 @@ if __name__ == "__main__":
     
 
     # Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[:17])
-    for session in session_list: 
-        process(session)
-    # process('behavior_754897_2025-03-15_11-32-18') 
+    # for session in session_list: 
+    #     process(session)
+    process('behavior_758017_2025-02-06_11-26-14') 

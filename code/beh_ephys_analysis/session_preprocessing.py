@@ -65,7 +65,7 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
     # find maximum spike sample number with 'pre'
     pre_end = opto_df.loc[opto_df['pre_post']== 'pre']['laser_onset_samples'].max()
     post_start = opto_df.loc[opto_df['pre_post']== 'post']['laser_onset_samples'].min()
-    if len(opto_df['pre_post'].unique) == 1:
+    if len(opto_df['pre_post'].unique()) == 1:
         post_start =  opto_df.loc[opto_df['pre_post']== 'pre']['laser_onset_samples'].min()
         pre_end = 1
     spike_indices_laser = (spike_indices <= pre_end) | (spike_indices >= post_start)
