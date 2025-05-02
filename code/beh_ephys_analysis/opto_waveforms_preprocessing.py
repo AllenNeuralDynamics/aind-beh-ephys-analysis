@@ -398,7 +398,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
 def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, opto_only=True, plot=True, save=True):
     session_dir = session_dirs(session)
     bin_size = 10*60*30000 # 10 minutes,in samples
-    max_spikes_per_unit_spontaneous = 200
+    max_spikes_per_unit_spontaneous = 500
     waveform_zarr_folder = f'{session_dir[f"ephys_dir_{data_type}"]}/waveforms_session.zarr'
     if load_sorting_analyzer:
         if not os.path.exists(waveform_zarr_folder):
@@ -507,7 +507,7 @@ def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, o
 
         # %%
         _ = analyzer_binned.compute("random_spikes", method="all", max_spikes_per_unit=max_spikes_per_unit_spontaneous)
-        _ = analyzer_binned.compute(["waveforms", "templates"])
+        _ = analyzer_binned.compute("templates", ms_before=1.5, ms_after=2.5)
         analyzer_binned.save_as(format='zarr', folder = waveform_zarr_folder)
         print(f'Saved as {waveform_zarr_folder}')
     else:
@@ -628,8 +628,10 @@ def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, o
                 orginal_template = template_reorder(curr_temp, right_left, all_channels_int, 
                                                     sample_to_keep = samples_to_keep, y_neighbors_to_keep = y_neighbors_to_keep, orginal_loc = True, 
                                                     peak_ind=extreme_channel_indices[unit_id])
-                curr_peak_wf_curr_bin = curr_temp[:, all_channels_int[extreme_channel_indices_binned[curr_unit_id]]]
-                curr_peak_wf_curr_ori = curr_temp[:, all_channels_int[extreme_channel_indices[unit_id]]]
+                # curr_peak_wf_curr_bin = curr_temp[:, all_channels_int[extreme_channel_indices_binned[curr_unit_id]]]
+                # curr_peak_wf_curr_ori = curr_temp[:, all_channels_int[extreme_channel_indices[unit_id]]]
+                curr_peak_wf_curr_bin = curr_temp[:, extreme_channel_indices_binned[curr_unit_id]]
+                curr_peak_wf_curr_ori = curr_temp[:, extreme_channel_indices[unit_id]]
                 # euclidean distance
                 euc_dist = np.linalg.norm(
                     curr_peak_wf_curr_bin
@@ -698,11 +700,23 @@ def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, o
         all_amp_opt.append(unit_amp)
         all_peak_wf_opt.append(unit_peak)
         all_mat_wfs_opt.append(unit_peak_mat)
+    
+    peak_ind = [np.argmin(wf) for wf in all_peak_wf_opt]
+    all_peak_wf_opt_aligned = [
+        np.concatenate((
+            np.full(max(30 - peak_ind_curr, 0), np.nan),
+            temp[max(peak_ind_curr - 30, 0) : min(peak_ind_curr + 60, temp.shape[0])],
+            np.full(max((peak_ind_curr + 60) - temp.shape[0], 0), np.nan)
+        ))
+        for temp, peak_ind_curr in zip(all_peak_wf_opt, peak_ind)
+    ]
 
-    waveform_recompute = pd.DataFrame({'unit_id': all_tagged_units, 'amplitude_opt': all_amp_opt, 'peak_wf_opt': all_peak_wf_opt, 'mat_wf_opt': all_mat_wfs_opt})
+    waveform_recompute = pd.DataFrame({'unit_id': all_tagged_units, 'amplitude_opt': all_amp_opt, 'peak_wf_opt': all_peak_wf_opt, 'mat_wf_opt': all_mat_wfs_opt, 'peak_wf_opt_aligned': all_peak_wf_opt_aligned})
     if save: 
         if 'peak_wf_opt' in unit_tbl.columns:
-            unit_tbl = unit_tbl.drop(waveform_recompute.columns.tolist(), axis=1) 
+            # find common columns
+            common_cols = list(set(unit_tbl.columns) & set(waveform_recompute.columns))
+            unit_tbl = unit_tbl.drop(common_cols, axis=1) 
         unit_tbl['unit_id']= unit_tbl['ks_unit_id']
         unit_tbl = unit_tbl.merge(waveform_recompute, on='unit_id', how='left')
         unit_tbl_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
@@ -794,7 +808,7 @@ def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, o
         print('Saved figure')
 
     return waveform_recompute
-
+    
 
     
 if __name__ == "__main__": 
@@ -819,10 +833,10 @@ if __name__ == "__main__":
     def process(session):
         print(session)
         session_dir = session_dirs(session)
-        # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')): 
+        # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):   
         if session_dir['curated_dir_curated'] is not None:
             data_type = 'curated'
-            # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+            # opto_wf_preprocessing(session, data_type, target, load_sort ing_analyzer = load_sorting_analyzer)
             outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= True, opto_only=True, plot=True, save=True)
             del outcome
             # elif session_dir['nwb_dir_raw'] is not None:
@@ -831,7 +845,7 @@ if __name__ == "__main__":
     
     
 
-    # Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[:17])
-    for session in session_list: 
-        process(session)
-    # process('behavior_754897_2025-03-15_11-32-18') 
+    # Parallel(n_jobs=4)(delayed(process)(session) for session in  session_list[10:17]) 
+    # for session in session_list[16:17]: 
+    #     process(session) 
+    process('behavior_754897_2025-03-15_11-32-18') 

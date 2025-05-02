@@ -47,7 +47,7 @@ def opto_summary(session, data_type, target, save=True):
     y_loc = we.get_extension('unit_locations').get_data()[:,1]
 
      # %%
-    unit_tbl = get_unit_tbl(session, data_type, summary=True)
+    unit_tbl = get_unit_tbl(session, data_type, summary=False)
     opto_tag = opto_metrics(session, data_type)
     unit_ids = unit_tbl['unit_id'].values.tolist()
     unit_ids = [int(unit_id) for unit_id in unit_ids]
@@ -98,7 +98,17 @@ def opto_summary(session, data_type, target, save=True):
             corr_max_p.append(np.nanmin(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['correlation'].values))
         bl_max_p.append(curr_opto.loc[p_max_ind]['resp_p'] - curr_opto.loc[p_max_ind]['resp_p_bl'])
     peak_channel = [np.argmax(np.abs(temp[90,:])) for temp in unit_tbl['waveform_mean']]
+    peak_index = [np.argmin(temp[:, peakC]) for temp, peakC in zip(unit_tbl['waveform_mean'], peak_channel)]
     peak_wf = [temp[90-30:90+60, peak_C] for temp, peak_C in zip(unit_tbl['waveform_mean'], peak_channel)]
+    peak_wf_aligned = [
+        np.concatenate((
+            np.full(max(30 - peak_ind, 0), np.nan),
+            temp[max(peak_ind - 30, 0) : min(peak_ind + 60, temp.shape[0]), peak_C],
+            np.full(max((peak_ind + 60) - temp.shape[0], 0), np.nan)
+        ))
+        for temp, peak_ind, peak_C in zip(unit_tbl['waveform_mean'], peak_index, peak_channel)
+    ]
+
     # recompute 2d waveform
     # load wfs
     waveform_info_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveform_params.json')
@@ -147,6 +157,7 @@ def opto_summary(session, data_type, target, save=True):
     unit_tbl_tmp = unit_tbl.copy()
     unit_tbl_tmp.drop(columns=opto_tag_tbl.columns.difference(['unit_id']), inplace=True, errors='ignore')
     unit_tbl_tmp['peak_wf'] = peak_wf
+    unit_tbl_tmp['peak_wf_aligned'] = peak_wf_aligned
     unit_tbl_tmp['wf_2d'] = wf_2d
     opto_tag_tbl_summary = pd.merge(opto_tag_tbl, unit_tbl_tmp, on='unit_id')
 
@@ -386,18 +397,21 @@ if __name__ == '__main__':
             data_type = 'curated'
             opto_summary(session, data_type, target, save=True)
             print(f'Finished {session}')
-        else:
+        else: 
             print(f'No curated data found for {session}')
         # elif session_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw'
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    Parallel(n_jobs=10)(delayed(process)(session) for session in session_list[19:])
+    # Parallel(n_jobs=4)(delayed(process)(session) for session in session_list)
+    # print(session_list[10:17])
     # for session in session_list:
-    #     try:
-    #         process(session)
-    #     except:
-    #         print(f'Failed {session}')
-    # process('behavior_751004_2024-12-20_13-26-11')
+    #     if session == 'ecephys_713854_2024-03-08_17-15-58':
+    #         continue
+    #     # try:
+    #     process(session)
+        # except:
+        #     print(f'Failed {session}')
+    process('behavior_754897_2025-03-15_11-32-18')
 
 
 

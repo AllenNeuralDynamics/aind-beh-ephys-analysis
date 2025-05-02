@@ -143,8 +143,8 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
                     'site': row['sites'],
                     'power': row['powers'],
                     'duration': row['durations'],
-                    'pre_post': row['stim_times'],
-                    # 'pre_post': 'post', # hard code for no behavior np2.0
+                    # 'pre_post': row['stim_times'],
+                    'pre_post': 'post', # hard code for no behavior np2.0
                     'unit_id': unit_id
                 }
             )
@@ -406,7 +406,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     # load quality metrics from nwb
     if os.path.exists(session_dir[f'nwb_dir_{data_type}']):
         nwb = load_nwb(session_dir[f'nwb_dir_{data_type}'])
-        unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label', 'depth']]
+        unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label', 'depth', 'snr']]
     else:
         print('No nwb file found.') 
     
@@ -582,10 +582,10 @@ if __name__ == "__main__":
             # elif session_dir['curated_dir_raw'] is not None:
             #     data_type = 'r aw' 
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    # Parallel(n_jobs=11)(delayed(process)(session) for session in session_list[19:])
-    # process('behavior_751004_2024-12-20_13-26-11')
-    for session in session_list[19:]:
-        process(session)
+    # Parallel(n_jobs=11)(delayed(process)(session) for session in session_list[:10])
+    process('behavior_758017_2025-02-05_11-42-34')
+    # for session in session_list[63:]:
+    #     process(session)
 
 
 # %%

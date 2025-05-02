@@ -470,7 +470,7 @@ if __name__ == '__main__':
     curate_time = True
     align_name = 'response'
     formula = 'spikes ~ 1 + outcome + choice + Qchosen'
-    for session in session_ids[37:-1]:
+    for session in ['behavior_751769_2025-01-18_10-15-25']:
         print(session)
         session_dir = session_dirs(session)
         if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):

@@ -1045,6 +1045,7 @@ def get_session_tbl(session):
     if os.path.exists(nwb_file):
         nwb = load_nwb_from_filename(nwb_file)
         tbl = nwb.trials.to_dataframe()
+        tbl['trial_ind'] = tbl.index
     else:
         tbl = None
     return tbl
@@ -1056,7 +1057,7 @@ def get_unit_tbl(session, data_type, summary = True):
     if summary: 
         if os.path.exists(unit_tbl_summary):
             with open(unit_tbl_summary, 'rb') as f:
-                unit_data = pickle.load(f)
+                  unit_data = pickle.load(f)
             unit_tbl = unit_data
         else: 
             with open(unit_tbl_dir, 'rb') as f:
