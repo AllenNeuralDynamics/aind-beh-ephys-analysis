@@ -1045,6 +1045,7 @@ def get_session_tbl(session):
     if os.path.exists(nwb_file):
         nwb = load_nwb_from_filename(nwb_file)
         tbl = nwb.trials.to_dataframe()
+        tbl['lick_lat'] = tbl['reward_outcome_time'] - tbl['goCue_start_time']
         tbl['trial_ind'] = tbl.index
     else:
         tbl = None

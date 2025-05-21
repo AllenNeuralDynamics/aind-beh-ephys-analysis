@@ -771,37 +771,6 @@ def update_unit_tbl_by_drift(session, data_type):
     unit_tbl.to_pickle(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'))
     return unit_tbl
 
-class load_trial_drift:
-    def __init__(self, session, data_type):
-        """Initialize the object with a DataFrame."""
-        session_dir = session_dirs(session)
-        drift_tbl_dir = os.path.join(session_dir[f'ephys_dir_{data_type}'], f'{session}_drift_trial_table.csv')
-        if not os.path.exists(drift_tbl_dir):
-            drift_data = None
-        else:
-            drift_data = pd.read_csv(drift_tbl_dir)
-        self.drift_data = drift_data
-
-    def load_unit(self, unit_id, trial_range = None, cat = None):
-        """Load the drift data for a specific unit."""
-        """Load the drift data for a specific unit."""
-        if self.drift_data is None:
-            raise ValueError("Drift data is not available. Please generate drift data first.")
-        unit_drift_data = self.drift_data[self.drift_data['unit_id'] == unit_id].sort_values(by='trial_ind')
-        if trial_range is not None:
-            if isinstance(trial_range, int):
-                trial_range = [trial_range]
-            elif isinstance(trial_range, list):
-                trial_range = np.array(trial_range)
-            else:
-                raise ValueError("trial_range should be an integer or a list of integers.")
-            unit_drift_data = unit_drift_data[unit_drift_data['trial_ind'].isin(trial_range)]
-        if cat is not None:
-            if cat not in unit_drift_data.columns:
-                raise ValueError(f"Category '{cat}' not found in drift data.")
-            unit_drift_data = unit_drift_data[cat]
-        return unit_drift_data
-
 if __name__ == '__main__':
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
     session_list = session_assets['session_id'].values

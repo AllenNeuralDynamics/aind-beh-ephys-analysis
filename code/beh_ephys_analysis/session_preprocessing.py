@@ -527,7 +527,7 @@ def ephys_opto_crosscorr(session, data_type):
 
 if __name__ == "__main__":
     # session = 'behavior_717121_2024-06-15_10-00-58'
-    data_type = 'curated'
+    data_type = 'raw'
     target = 'soma'
     # ephys_opto_preprocessing(session, data_type, target)
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -539,7 +539,7 @@ if __name__ == "__main__":
  
     def process(session): 
         session_dir = session_dirs(session)
-        if session_dir['nwb_dir_curated'] is not None: 
+        if session_dir[f'nwb_dir_{data_type}'] is not None: 
             print(f'Processing {session}')
             ephys_opto_preprocessing(session, data_type, target)
             plt.close('all')
@@ -547,6 +547,6 @@ if __name__ == "__main__":
             print(f'Finished {session}')
     
     # Parallel(n_jobs=10)(delayed(process)(session) for session in session_list[:10])
-    process(session_list[12])
+    process('behavior_761038_2025-04-15_10-25-11')
 
 

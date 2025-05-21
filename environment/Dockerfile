@@ -39,7 +39,8 @@ RUN pip install -U --no-cache-dir \
     codeocean==0.2.0 \
     requests==2.32.3 \
     pdf2image \
-    seaborn
+    seaborn \
+    trimesh
 
 COPY postInstall /
 RUN /postInstall
