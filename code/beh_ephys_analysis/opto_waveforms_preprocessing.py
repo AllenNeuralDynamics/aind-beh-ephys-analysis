@@ -327,31 +327,33 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
             spont_unit = waveform_metrics.query("spont == 1 and unit_id == @unit_id and pre_post == @pre_post")
             if len(spont_unit) == 0:
                 template_spont = np.nan
-                waveform_spont = np.nan
-                channel_spont = np.nan
+                peak_waveform_spont = np.nan
+                peak_channel_spont = np.nan
+                waveform_metrics.at[index, 'correlation'] = np.nan
+                waveform_metrics.at[index, 'euclidean_norm'] = np.nan
             else:
                 template_spont = spont_unit['template'].values[0]
                 peak_waveform_spont = spont_unit['peak_waveform'].values[0]
                 peak_channel_spont = spont_unit['peak_channel'].values[0]
             
-            peak_channel_ind = np.argmin(np.min(template_spont, 0))
-            peak_waveform_resp = template[:, peak_channel_ind]
-            waveform_metrics.at[index, 'peak_waveform'] = peak_waveform_resp
-            peak_samp_ind = np.argmin(peak_waveform_spont)
+                peak_channel_ind = np.argmin(np.min(template_spont, 0))
+                peak_waveform_resp = template[:, peak_channel_ind]
+                waveform_metrics.at[index, 'peak_waveform'] = peak_waveform_resp
+                peak_samp_ind = np.argmin(peak_waveform_spont)
 
-            # correlation 
-            correlation = np.corrcoef(peak_waveform_resp.reshape(-1), peak_waveform_spont.reshape(-1))[0, 1]
-            waveform_metrics.at[index, 'correlation'] = correlation
-            # euclidean distance
-            focus_ind = np.array(range(np.max(np.array([peak_samp_ind-20, 0])), np.min(np.array([peak_samp_ind+40, len(peak_waveform_spont)]))))
+                # correlation 
+                correlation = np.corrcoef(peak_waveform_resp.reshape(-1), peak_waveform_spont.reshape(-1))[0, 1]
+                waveform_metrics.at[index, 'correlation'] = correlation
+                # euclidean distance
+                focus_ind = np.array(range(np.max(np.array([peak_samp_ind-20, 0])), np.min(np.array([peak_samp_ind+40, len(peak_waveform_spont)]))))
 
-            euc_dist = np.linalg.norm(
-                peak_waveform_resp[focus_ind]
-                - peak_waveform_spont[focus_ind])
-            # energy
-            energy = np.linalg.norm(peak_waveform_spont[focus_ind])
-            euc_dist_norm = euc_dist / energy
-            waveform_metrics.at[index, 'euclidean_norm'] = euc_dist_norm
+                euc_dist = np.linalg.norm(
+                    peak_waveform_resp[focus_ind]
+                    - peak_waveform_spont[focus_ind])
+                # energy
+                energy = np.linalg.norm(peak_waveform_spont[focus_ind])
+                euc_dist_norm = euc_dist / energy
+                waveform_metrics.at[index, 'euclidean_norm'] = euc_dist_norm
 
     with open(f"{session_dir[f'opto_dir_{data_type}']}/{session}_opto_waveform_metrics.pkl", 'wb') as f:
         pickle.dump(waveform_metrics, f)
@@ -836,8 +838,8 @@ if __name__ == "__main__":
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):   
         if session_dir['curated_dir_curated'] is not None:
             data_type = 'curated'
-            # opto_wf_preprocessing(session, data_type, target, load_sort ing_analyzer = load_sorting_analyzer)
-            outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= True, opto_only=True, plot=True, save=True)
+            outcome = opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+            # outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= True, opto_only=True, plot=True, save=True)
             del outcome
             # elif session_dir['nwb_dir_raw'] is not None:
             #     data_type = 'raw'
@@ -846,6 +848,6 @@ if __name__ == "__main__":
     
 
     # Parallel(n_jobs=4)(delayed(process)(session) for session in  session_list[10:17]) 
-    # for session in session_list[16:17]: 
-    #     process(session) 
-    process('behavior_754897_2025-03-15_11-32-18') 
+    for session in session_list[-14:-3]:
+        process(session) 
+    # process('behavior_754897_2025-03-15_11-32-18') 

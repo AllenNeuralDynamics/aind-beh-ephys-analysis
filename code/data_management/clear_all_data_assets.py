@@ -13,6 +13,4 @@ results_rm = client.capsules.detach_data_assets(
 )
 print(f'Removed all {len(ids)} data assets.')
 
-
-
 # %%

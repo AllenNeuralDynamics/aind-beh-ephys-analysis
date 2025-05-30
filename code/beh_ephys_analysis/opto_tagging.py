@@ -537,7 +537,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
 if __name__ == "__main__":
 
     target = 'soma'
-    data_type = 'raw' 
+    data_type = 'curated' 
     resp_thresh = 0.3
     lat_thresh = 0.02 
     # session level  
@@ -575,15 +575,15 @@ if __name__ == "__main__":
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
         print(session_dir[f'curated_dir_{data_type}'])
         if session_dir[f'curated_dir_{data_type}'] is not None:
-            opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= [1], plot = True, ephys_cut = False, save=True)
+            opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
             print(f'Finished {session}')
         else:
             print(f'No curated data found for {session}') 
             # elif session_dir['curated_dir_raw'] is not None:
             #     data_type = 'r aw' 
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    # Parallel(n_jobs=11)(delayed(process)(session) for session in session_list[:10])
-    process('behavior_761038_2025-04-15_10-25-11')
+    Parallel(n_jobs=11)(delayed(process)(session) for session in session_list[-14:-3])
+    # process('behavior_761038_2025-04-15_10-25-11')
     # for session in session_list[69:]:
     #     process(session)
 
