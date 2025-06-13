@@ -275,8 +275,6 @@ def plot_filled_sem(time, y_mat, color, ax, label):
 
 def plot_raster_rate(
     spike_times,
-    currArray,
-    slide_times,
     align_events, # sorted by certain value
     map_value,
     bins,
@@ -286,9 +284,15 @@ def plot_raster_rate(
     subplot_spec,
     tb=-2,
     tf=3,
+    time_bin = 0.1,
 ):
     n_colors = len(bins)-1
     color_list = [colormap(i / (n_colors - 1)) for i in range(n_colors)]
+    """ get spike matrix"""
+    # get spike matrix
+    currArray, slide_times = get_spike_matrix(spike_times_curr, align_events, 
+                                            pre_event=tb, post_event=tf, 
+                                            binSize=time_bin, stepSize=0.5*time_bin)
 
     """Plot raster and rate aligned to events"""
     nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, height_ratios= [3, 1], subplot_spec=subplot_spec)

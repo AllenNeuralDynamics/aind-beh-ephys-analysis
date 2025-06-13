@@ -589,8 +589,10 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
     session_dir = os.path.join(raw_dir, 'ecephys_clipped')
+    session_dir_raw = os.path.join(raw_dir, 'ecephys_compressed')
     if not os.path.exists(session_dir):
         session_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
+        session_dir_raw = os.path.join(raw_dir, 'ecephys', 'ecephys_compressed')
     sorted_dir = os.path.join(data_dir, session_id+'_sorted_curated')
     sorted_raw_dir = os.path.join(data_dir, session_id+'_sorted')
     # nwb files
@@ -714,6 +716,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'datetime': date_obj,
                 'raw_dir': raw_dir,
                 'session_dir': session_dir,
+                'session_dir_raw': session_dir_raw,
                 'processed_dir': processed_dir,
                 'alignment_dir': alignment_dir,
                 'beh_fig_dir': beh_fig_dir,

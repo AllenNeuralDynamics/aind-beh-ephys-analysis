@@ -582,10 +582,11 @@ if __name__ == "__main__":
             # elif session_dir['curated_dir_raw'] is not None:
             #     data_type = 'r aw' 
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    Parallel(n_jobs=11)(delayed(process)(session) for session in session_list[-14:-3])
+    # Parallel(n_jobs=11)(delayed(process)(session) for session in session_list[-14:-3])
     # process('behavior_761038_2025-04-15_10-25-11')
-    # for session in session_list[69:]:
-    #     process(session)
+    for session in [session_list[-6]]:
+        process(session)
 
+    
 
 # %%

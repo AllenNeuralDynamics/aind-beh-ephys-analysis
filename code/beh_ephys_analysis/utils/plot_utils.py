@@ -57,9 +57,9 @@ def interpolate_waveform(waveform):
     
 def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-30, 60], y_neighbors_to_keep = 3, orginal_loc = False, peak_ind = None):
     if peak_ind is None:
-        peak_ind = np.argmin(np.min(template, axis=0))
+        peak_ind = np.argmax(np.max(template, axis=0) - np.min(template, axis=0))
     peak_channel = all_channels_int[peak_ind]
-    peak_sample = np.argmin(template[:, peak_ind])  
+    peak_sample = np.argmax(np.abs(template[:, peak_ind]))  
     peak_group = np.arange(peak_channel - 2*y_neighbors_to_keep, peak_channel + 2*y_neighbors_to_keep + 1, 2)
     if right_left[peak_ind]: # peak is on the right
         sub_peak_channel = peak_channel - 1 

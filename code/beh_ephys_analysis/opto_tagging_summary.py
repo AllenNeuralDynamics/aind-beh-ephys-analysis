@@ -402,7 +402,7 @@ if __name__ == '__main__':
         # elif session_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw'
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    # Parallel(n_jobs=4)(delayed(process)(session) for session in session_list)
+    Parallel(n_jobs=4)(delayed(process)(session) for session in session_list[-14:-3])
     # print(session_list[10:17])
     # for session in session_list:
     #     if session == 'ecephys_713854_2024-03-08_17-15-58':
@@ -411,7 +411,7 @@ if __name__ == '__main__':
     #     process(session)
         # except:
         #     print(f'Failed {session}')
-    process('behavior_754897_2025-03-15_11-32-18')
+    # process('behavior_754897_2025-03-15_11-32-18')
 
 
 

@@ -84,7 +84,7 @@ def load_legacy_motion_info(folder):
     return motion_info
 
 # %%
-def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
+def plot_session_opto_drift(session, data_type, plot=True, update_csv = False, update_cut = True):
     session_dir = session_dirs(session)
 
     # %%
@@ -192,12 +192,12 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
     with open(qm_file) as f:
         qm_dict = json.load(f)
     
-    if not qm_dict['ephys_sync'] and '717121' not in session:
-        temp_bins = align_timestamps_to_anchor_points(temp_bins, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
-        temp_bins_slow = align_timestamps_to_anchor_points(temp_bins_slow, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
+    # if not qm_dict['ephys_sync'] and '717121' not in session:
+    #     temp_bins = align_timestamps_to_anchor_points(temp_bins, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
+    #     temp_bins_slow = align_timestamps_to_anchor_points(temp_bins_slow, np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy')), np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
 
     # %% plot
-    range_max = np.max(np.abs(drift)) 
+    range_max = np.max(np.abs(drift))
     fig = plt.figure(figsize=(20, 10))
     gs = gridspec.GridSpec(3, 5, height_ratios=[0.25, 3, 1])
     ax1 = plt.subplot(gs[1, 0]) 
@@ -331,14 +331,12 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
 
     del sorting_analyzer
 
-    # # %%
-    # spike_pcs = sorting_analyzer.get_extension('principal_components')
+    if update_cut:
+        opto_drift_tbl_exist = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv'))
 
-    # # %%
-    # pcs_unit = spike_pcs.get_projections_one_unit(10)
 
     # %%
-    def plot_drift(unit_id, plot=True):
+    def plot_drift(unit_id, plot=plot):
         spike_times = unit_tbl[unit_tbl['unit_id'] == unit_id]['spike_times'].values[0]
         spike_amplitude = spike_amplitudes[unit_id]
         # firing rate
@@ -405,6 +403,27 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                     amplitude_slow[i] = np.mean(temp)
         # sd.mean
         sd = np.std(spike_counts_slow[np.where(~np.isnan(spike_counts_slow))[0]])/np.nanmean(spike_counts_slow)
+        if update_cut:
+            nan = None
+            ephys_cut = opto_drift_tbl_exist.query('unit_id == @unit_id')['ephys_cut'].values[0]
+            ephys_cut = eval(ephys_cut)
+            spike_counts_slow_cut = spike_counts_slow.copy()
+            temp_bins_slow_spike_cut = temp_bins_slow_spike.copy()
+            if ephys_cut[0] is not None:
+                spike_counts_slow_cut = spike_counts_slow_cut[temp_bins_slow_spike_cut >= ephys_cut[0]]
+                temp_bins_slow_spike_cut = temp_bins_slow_spike_cut[temp_bins_slow_spike_cut >= ephys_cut[0]]
+            
+            if ephys_cut[1] is not None:
+                spike_counts_slow_cut = spike_counts_slow_cut[temp_bins_slow_spike_cut <= ephys_cut[1]]
+                temp_bins_slow_spike_cut = temp_bins_slow_spike_cut[temp_bins_slow_spike_cut <= ephys_cut[1]]
+            if len(spike_counts_slow_cut) >=2:
+                sd_updated_cut = np.std(spike_counts_slow_cut[np.where(~np.isnan(spike_counts_slow_cut))[0]])/np.nanmean(spike_counts_slow_cut)
+            else:
+                sd_updated_cut = np.nan
+                print(f'{session} {unit_id} too short after cut.')
+        else:
+            sd_updated_cut = sd
+
         ## prepare all matrices for regression
         # slow
         X_slow = np.column_stack((drift_slow[closest_ybin], amplitude_slow))
@@ -425,10 +444,41 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
         
         ## linear regression for slow dynamics
 
-        model = LinearRegression()
-        model.fit(X_slow[nan_inds_slow], z_slow[nan_inds_slow])
-        r_squared = model.score(X_slow[nan_inds_slow], z_slow[nan_inds_slow])
+        if len(nan_inds_slow) >= 2:
+            model = LinearRegression()
+            model.fit(X_slow[nan_inds_slow], z_slow[nan_inds_slow])
+            r_squared = model.score(X_slow[nan_inds_slow], z_slow[nan_inds_slow])
+        else:
+            r_squared = np.nan
+            print(f'{session} {unit_id} too short.')
 
+        ## linear regression for slow dynamics after cut if update
+        if update_cut:
+            nan = None
+            ephys_cut = opto_drift_tbl_exist.query('unit_id == @unit_id')['ephys_cut'].values[0]
+            ephys_cut = eval(ephys_cut)
+            X_slow_cut = X_slow.copy()
+            z_slow_cut = z_slow.copy()
+            temp_bins_slow_spike_cut = temp_bins_slow_spike.copy()
+            if ephys_cut[0] is not None:
+                X_slow_cut = X_slow[temp_bins_slow_spike_cut >= ephys_cut[0]]
+                z_slow_cut = z_slow[temp_bins_slow_spike_cut >= ephys_cut[0]]
+                temp_bins_slow_spike_cut = temp_bins_slow_spike_cut[temp_bins_slow_spike_cut >= ephys_cut[0]]
+            
+            if ephys_cut[1] is not None:
+                X_slow_cut = X_slow_cut[temp_bins_slow_spike_cut <= ephys_cut[1]]
+                z_slow_cut = z_slow_cut[temp_bins_slow_spike_cut <= ephys_cut[1]]
+                temp_bins_slow_spike_cut = temp_bins_slow_spike_cut[temp_bins_slow_spike_cut <= ephys_cut[1]]
+            
+            nan_inds_slow_cut = np.where(~np.isnan(z_slow_cut) & np.all(~np.isnan(X_slow_cut), axis=1))[0]
+            if len(nan_inds_slow_cut) >= 2:
+                model_cut = LinearRegression()
+                model_cut.fit(X_slow_cut[nan_inds_slow_cut], z_slow_cut[nan_inds_slow_cut])
+                r_squared_updated = model_cut.score(X_slow_cut[nan_inds_slow_cut], z_slow_cut[nan_inds_slow_cut])
+            else:
+                r_squared_updated = np.nan
+        else:
+            r_squared_updated = r_squared
         
         ## random forest model for fast dynamics
 
@@ -458,6 +508,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
         z_pred_fast = model_fast.predict(X_diff_abs_fast[nan_inds_abs_fast])
         r2_diff_abs_fast = model_fast.score(X_diff_abs_fast[nan_inds_abs_fast], z_diff_abs_fast[nan_inds_abs_fast])
         coeffs_diff_abs_fast = model_fast.coef_
+
         
         if plot: 
             fig = plt.figure(figsize=(20, 20))
@@ -472,21 +523,42 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
             if 'opto_surf' in locals():
                 plt.axvline(x=np.min(opto_surf), color='k', linestyle='--', linewidth=2)
             plt.title('Firing rate')
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             ax = plt.subplot(gs[1, 0])
             plt.plot(temp_bins, spike_counts_fast, label='fast')
             plt.plot(temp_bins_slow_spike, spike_counts_slow, label='slow', c = 'r')
             plt.legend()
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)       
 
             ax = plt.subplot(gs[2, 0])
             plt.plot(temp_bins, (spike_counts_fast-spike_counts_slow_pre)/(0.5*(spike_counts_fast+spike_counts_slow_pre)), label='fast-slow')
             plt.plot(temp_bins_slow_spike, (spike_counts_slow_post - spike_counts_slow_pre)/(0.5*(spike_counts_slow_pre + spike_counts_slow_post)), label = 'diff(slow)', c='r')
             plt.legend()
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             ax = plt.subplot(gs[3, 0])
             plt.plot(temp_bins, np.abs(spike_counts_fast - spike_counts_slow_pre)/(0.5*(spike_counts_fast+spike_counts_slow_pre)), label='abs(fast-slow)')
             plt.plot(temp_bins_slow_spike, np.abs(spike_counts_slow_post - spike_counts_slow_pre)/(0.5*(spike_counts_slow_pre + spike_counts_slow_post)), label = 'abs(diff(slow))', c='r')
             plt.legend()
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
+
             # drift
             ax = plt.subplot(gs[0, 1])
             plt.title('Esitimated motion')
@@ -501,16 +573,31 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
             if 'opto_surf' in locals():
                 plt.axvline(x=np.min(opto_surf), color='k', linestyle='--', linewidth=2)
             # plt.plot(motion_info['motion'].get_displacement_at_time_and_depth(times_s, locations_um))
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
+
             ax = plt.subplot(gs[2, 1])
             plt.plot(temp_bins, (drift[closest_ybin, :] - drift_slow[closest_ybin,:]), label='fast-slow')
             plt.plot(temp_bins, drift_slow_post[closest_ybin, :] - drift_slow[closest_ybin,:], label='diff(slow)', c = 'r')
             plt.legend()
-
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             ax = plt.subplot(gs[3, 1])
             plt.plot(temp_bins, np.abs(drift[closest_ybin, :] - drift_slow[closest_ybin,:]), label='abs(fast-slow)')
             plt.plot(temp_bins, np.abs(drift_slow_post[closest_ybin, :] - drift_slow[closest_ybin,:]), label='abs(diff(slow))', c = 'r')
             plt.legend()
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             ax = plt.subplot(gs[0, 2])
             plt.scatter(spike_times, spike_amplitude, c='k', s=0.5, alpha=0.25)
@@ -522,31 +609,58 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                 plt.axvline(x=np.min(opto_surf), color='k', linestyle='--', linewidth=2)
             plt.title('Spike amplitude')
             # plt.legend()
-
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             ax = plt.subplot(gs[1, 2])
             plt.plot(temp_bins, amplitude_fast, label='fast')
             plt.plot(temp_bins, amplitude_slow, label='slow', c = 'r')
             plt.legend()
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             ax = plt.subplot(gs[2, 2])
             plt.plot(temp_bins, amplitude_fast - amplitude_slow_pre, label='fast-slow')
             # ax = ax.twinx()
             plt.plot(temp_bins_slow, amplitude_slow_post - amplitude_slow_pre, label='diff(slow)', c='r')
             plt.legend()
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             ax = plt.subplot(gs[3, 2])
             plt.plot(temp_bins, np.abs(amplitude_fast - amplitude_slow_pre), label='abs(fast-slow)')
             plt.plot(temp_bins_slow, np.abs(amplitude_slow_post - amplitude_slow_pre), label = 'abs(diff(slow))', c='r')
             plt.legend()
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             gs_model = gridspec.GridSpecFromSubplotSpec(1, 5, gs[4, :])
             ax = plt.subplot(gs_model[0])
             plt.plot(temp_bins, spike_counts_slow, label='data', c='r')
+            if len(nan_inds_slow) >= 2:
+                plt.plot(temp_bins[nan_inds_slow], model.predict(X_slow[nan_inds_slow]), label='prediction', c='b')
             plt.plot(temp_bins[nan_inds_slow], model.predict(X_slow[nan_inds_slow]), label='prediction', c='b')
             plt.legend()
             plt.xlabel('Time (s)')
             plt.title(f"Slow FR: LR R²: {r_squared:.2f}")
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
+                plt.title(f"R²: {r_squared:.2f} Updated: {r_squared_updated:.2f}")
 
             ax = plt.subplot(gs_model[1])
             plt.plot(temp_bins, z_diff_abs_slow, label='data', c='r')
@@ -555,6 +669,12 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
             plt.xlabel('Time (s)')
             plt.legend()
             plt.title(f"Slow abs(diff(FR)): LR: {r2_diff_abs_slow:.1f} RF R²: {r2_rf_diff_abs_slow:.1f}")
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
+
 
             ax = plt.subplot(gs_model[2])
             plt.plot(temp_bins, z_diff_abs_fast, label='data', c='r')
@@ -563,6 +683,11 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
             plt.legend()
             plt.xlabel('Time (s)')
             plt.title(f"Fast abs(diff(FR)): LR: {r2_diff_abs_fast:.1f} RF: {r2_rf_diff_abs_fast:.1f}")
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
 
             # # Print coefficients and intercept
             # print(f"Coefficients: {model.coef_}")
@@ -578,6 +703,11 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
             plt.title(f"SD/mean: {sd:.2f}")
             plt.xlabel('Time (s)')
             plt.legend()
+            if update_cut:
+                if ephys_cut[0] is not None:
+                    plt.axvline(x=ephys_cut[0], color='g', linestyle='--', linewidth=2)
+                if ephys_cut[1] is not None:
+                    plt.axvline(x=ephys_cut[1], color='g', linestyle='--', linewidth=2)
     
             plt.suptitle(f'{unit_id} y loc {unit_locations[unit_id][1] :.2f} um')
             plt.rcParams.update({'font.size': 8})
@@ -590,13 +720,15 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
                 'r_squared_diff_abs_slow_rf': r2_rf_diff_abs_slow,
                 'r_squared_diff_abs_fast_rf': r2_rf_diff_abs_fast,
                 'sd/mean': sd, 
+                'sd/mean_updated': sd_updated_cut,
                 'importances_diff_abs_slow': importances_diff_abs_slow,
                 'importances_diff_abs_fast': importances_diff_abs_fast,
                 'coeffs_diff_abs_slow': coeffs_diff_abs_slow,
                 'coeffs_diff_abs_fast': coeffs_diff_abs_fast, 
                 'regressors': ['drift', 'amplitude', 'drift*fr'],
                 'ephys_cut': [np.nan, np.nan],
-                'drift_unit': False}
+                'drift_unit': False,
+                'r_squared_slow_corrected': r_squared_updated}
 
     # %%
 
@@ -625,6 +757,16 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False):
         if plot:
             plt.savefig(os.path.join(drift_dir, f'{unit}_drift.pdf'))
             plt.show()
+    if update_cut:
+        nan = np.nan
+        for ind, row in opto_drift_tbl.iterrows():
+            unit_id = row['unit_id']
+            if unit_id not in opto_drift_tbl_exist['unit_id'].values:
+                continue
+            ephys_cut = opto_drift_tbl_exist.query('unit_id == @unit_id')['ephys_cut'].values[0]
+            ephys_cut = eval(ephys_cut)
+            opto_drift_tbl.at[ind, 'ephys_cut'] = ephys_cut
+            opto_drift_tbl.at[ind, 'drift_unit'] = opto_drift_tbl_exist.query('unit_id == @unit_id')['drift_unit'].values[0]
     if update_csv:
         opto_drift_tbl.to_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv'))
     if plot:
@@ -759,6 +901,7 @@ def generate_session_opto_drift_trial_table(session, data_type, opto_only = True
     
     if save:
         drift_data.to_csv(os.path.join(session_dir[f'ephys_dir_{data_type}'], f'{session}_drift_trial_table.csv'), index=False)
+        
 
 def update_unit_tbl_by_drift(session, data_type): 
     session_dir = session_dirs(session)
@@ -775,21 +918,20 @@ if __name__ == '__main__':
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
     session_list = session_assets['session_id'].values
     session_list = [session for session in session_list if isinstance(session, str)]
-    session = 'behavior_717121_2024-06-15_10-00-58'
+    session = 'behavior_716325_2024-05-31_10-31-14'
     # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
     def process(session):
         session_dir = session_dirs(session)
         if session_dir['curated_dir_curated'] is not None and os.path.exists(session_dir['nwb_beh']):
             # try:
             print(session)
-            # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
-            generate_session_opto_drift_trial_table(session, 'curated', opto_only=True, save=True)
+            plot_session_opto_drift(session, 'curated', update_csv=True, plot=True, update_cut=True)
+            # generate_session_opto_drift_trial_table(session, 'curated', opto_only=True, save=True)
             print(f'{session} done')
             # except:
             #     print(f'{session} error')
-
-
-    Parallel(n_jobs=2)(delayed(process)(session) for session in session_list[17:])
+ 
+    Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[:-3])
     # process(session)
     # for session in session_list:
         # process(session)
