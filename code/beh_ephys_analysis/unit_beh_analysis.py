@@ -1,7 +1,17 @@
 # %%
 import sys
 import os
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+
+curr_path = os.path.dirname(os.path.abspath(__file__))
+
+# Add repoA to sys.path at the beginning
+if curr_path not in sys.path:
+    sys.path.insert(0, curr_path)
+else:
+    # move it to the front if it's already there
+    sys.path.remove(curr_path)
+    sys.path.insert(0, curr_path)
+
 from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
 from open_ephys.analysis import Session
 import datetime
@@ -460,31 +470,31 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     plt.close('all')
 
 
-if __name__ == '__main__': 
+# if __name__ == '__main__': 
 
-    df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
-    session_ids = df['session_id'].values
-    session_ids = [session_id for session_id in session_ids if isinstance(session_id, str)]  # filter only behavior sessions
-    model_name = 'stan_qLearning_5params'
-    data_type = 'curated'
-    curate_time = True
-    align_name = 'response'
-    formula = 'spikes ~ 1 + outcome + choice + Qchosen'
-    for session in ['behavior_751769_2025-01-18_10-15-25']:
-        print(session)
-        session_dir = session_dirs(session)
-        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-            if session_dir['curated_dir_curated'] is not None:
-                # if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_curated'],f'{session}_unit_beh_{align_name}.pdf')):
-                plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, 
-                            model_name = model_name, formula=formula,
-                            pre_event=-1.5, post_event=3, binSize=0.2, stepSize=0.05,
-                            units=None)
-                # else:
-                #     print(f'Already plotted {session} for curated data')
-            else:
-                print(f'No curated data for {session}')
-            # elif session_dir['curated_dir_raw'] is not None:
+    # df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    # session_ids = df['session_id'].values
+    # session_ids = [session_id for session_id in session_ids if isinstance(session_id, str)]  # filter only behavior sessions
+    # model_name = 'stan_qLearning_5params'
+    # data_type = 'curated'
+    # curate_time = True
+    # align_name = 'response'
+    # formula = 'spikes ~ 1 + outcome + choice + Qchosen'
+    # for session in ['behavior_751769_2025-01-18_10-15-25']:
+    #     print(session)
+    #     session_dir = session_dirs(session)
+    #     if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+    #         if session_dir['curated_dir_curated'] is not None:
+    #             # if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_curated'],f'{session}_unit_beh_{align_name}.pdf')):
+    #             plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, 
+    #                         model_name = model_name, formula=formula,
+    #                         pre_event=-1.5, post_event=3, binSize=0.2, stepSize=0.05,
+    #                         units=None)
+    #             # else:
+    #             #     print(f'Already plotted {session} for curated data')
+    #         else:
+    #             print(f'No curated data for {session}')
+    #         # elif session_dir['curated_dir_raw'] is not None:
             #     if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
             #         plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
             #                         model_name = model_name, formula=formula,
