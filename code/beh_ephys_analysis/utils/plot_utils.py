@@ -47,7 +47,7 @@ def interpolate_waveform(waveform):
     interpolated_waveform = np.zeros(np.shape(waveform))
     for col_ind in range(waveform.shape[1]):
         nan_ind = np.isnan(waveform[:, col_ind])
-        if np.sum(nan_ind) > 0:
+        if np.sum(nan_ind) > 0 and np.sum(nan_ind)<len(waveform[:, col_ind]):
             # Interpolate the waveform for each column
             temp = np.interp(np.arange(waveform.shape[0]), np.arange(waveform.shape[0])[~nan_ind], waveform[~nan_ind, col_ind])
             interpolated_waveform[:, col_ind] = temp
@@ -57,9 +57,17 @@ def interpolate_waveform(waveform):
     
 def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-30, 60], y_neighbors_to_keep = 3, orginal_loc = False, peak_ind = None):
     if peak_ind is None:
-        peak_ind = np.argmax(np.max(template, axis=0) - np.min(template, axis=0))
+        if template[45, :][np.argmax(np.abs(template[45, :]))]<0:
+            peak_ind = np.argmin(np.min(template, axis=0))
+            peak_sign = -1
+        else:
+            peak_sign = 1
+            peak_ind = np.argmax(np.max(template, axis=0))
     peak_channel = all_channels_int[peak_ind]
-    peak_sample = np.argmax(np.abs(template[:, peak_ind]))  
+    if peak_sign>0:
+        peak_sample = np.argmax(template[:, peak_ind])
+    else:
+        peak_sample = np.argmin(template[:, peak_ind])
     peak_group = np.arange(peak_channel - 2*y_neighbors_to_keep, peak_channel + 2*y_neighbors_to_keep + 1, 2)
     if right_left[peak_ind]: # peak is on the right
         sub_peak_channel = peak_channel - 1 
@@ -69,15 +77,43 @@ def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-
 
     # get the reordered template: major column on left, minor column on right
     reordered_template = np.full((2*y_neighbors_to_keep + 1, 2*(sample_to_keep[1] - sample_to_keep[0])), np.nan)
-    if peak_sample+sample_to_keep[1] > template.shape[0] or peak_sample+sample_to_keep[0] < 0:
+    # correct if sample is too off 
+    if peak_sample+0.5*(sample_to_keep[1]) > template.shape[0] or peak_sample+0.5*sample_to_keep[0] < 0:
         peak_sample = np.round(1/3 * template.shape[0]).astype(int)
+    # for channel_int, channel_curr in enumerate(peak_group):
+    #     if channel_curr in all_channels_int:
+    #         reordered_template[channel_int, :(sample_to_keep[1] - sample_to_keep[0])] = template[(peak_sample+sample_to_keep[0]):(peak_sample+sample_to_keep[1]), np.argwhere(all_channels_int == channel_curr)[0][0]].T
+    # First half: peak_group
     for channel_int, channel_curr in enumerate(peak_group):
         if channel_curr in all_channels_int:
-            reordered_template[channel_int, :(sample_to_keep[1] - sample_to_keep[0])] = template[(peak_sample+sample_to_keep[0]):(peak_sample+sample_to_keep[1]), np.argwhere(all_channels_int == channel_curr)[0][0]].T
+            col_idx = np.argwhere(all_channels_int == channel_curr)[0][0]
+            
+            # Compute safe bounds
+            start = max(peak_sample + sample_to_keep[0], 0)
+            end = min(peak_sample + sample_to_keep[1], np.shape(template)[0])
+            slice_len = end - start
+            
+            # Corresponding start index in output
+            out_start = max(0, - (peak_sample + sample_to_keep[0]))
+            
+            # Fill values
+            reordered_template[channel_int, out_start:out_start + slice_len] = template[start:end, col_idx]
 
+    # for channel_int, channel_curr in enumerate(sub_group):
+    #     if channel_curr in all_channels_int:
+    #         reordered_template[channel_int, (sample_to_keep[1] - sample_to_keep[0]):2*(sample_to_keep[1] - sample_to_keep[0])] = template[(peak_sample+sample_to_keep[0]):(peak_sample+sample_to_keep[1]), np.argwhere(all_channels_int == channel_curr)[0][0]].T
     for channel_int, channel_curr in enumerate(sub_group):
         if channel_curr in all_channels_int:
-            reordered_template[channel_int, (sample_to_keep[1] - sample_to_keep[0]):2*(sample_to_keep[1] - sample_to_keep[0])] = template[(peak_sample+sample_to_keep[0]):(peak_sample+sample_to_keep[1]), np.argwhere(all_channels_int == channel_curr)[0][0]].T
+            col_idx = np.argwhere(all_channels_int == channel_curr)[0][0]
+            
+            start = max(peak_sample + sample_to_keep[0], 0)
+            end = min(peak_sample + sample_to_keep[1], np.shape(template)[0])
+            slice_len = end - start
+            
+            out_start = max(0, - (peak_sample + sample_to_keep[0]))
+            offset = sample_to_keep[1] - sample_to_keep[0]
+            reordered_template[channel_int, 
+                            offset + out_start:offset + out_start + slice_len] = template[start:end, col_idx]
 
     # whether switch back to original location
     if orginal_loc:

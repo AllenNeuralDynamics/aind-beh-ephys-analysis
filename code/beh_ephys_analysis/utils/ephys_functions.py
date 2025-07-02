@@ -290,7 +290,7 @@ def plot_raster_rate(
     color_list = [colormap(i / (n_colors - 1)) for i in range(n_colors)]
     """ get spike matrix"""
     # get spike matrix
-    currArray, slide_times = get_spike_matrix(spike_times_curr, align_events, 
+    currArray, slide_times = get_spike_matrix(spike_times, align_events, 
                                             pre_event=tb, post_event=tf, 
                                             binSize=time_bin, stepSize=0.5*time_bin)
 

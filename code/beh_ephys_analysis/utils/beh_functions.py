@@ -742,7 +742,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'session_curation_file': session_curation_file,
                 'nwb_beh': beh_nwb_dir,
                 'sorted_dir_curated': sorted_dir,
-                'sorted_dir_curated': sorted_raw_dir,
+                'sorted_dir_raw': sorted_raw_dir,
                 'opto_csvs': opto_csvs,}
 
     # make directories

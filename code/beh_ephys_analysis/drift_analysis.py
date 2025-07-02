@@ -922,7 +922,7 @@ if __name__ == '__main__':
     # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
     def process(session):
         session_dir = session_dirs(session)
-        if session_dir['curated_dir_curated'] is not None and os.path.exists(session_dir['nwb_beh']):
+        if session_dir['curated_dir_curated'] is not None:
             # try:
             print(session)
             plot_session_opto_drift(session, 'curated', update_csv=True, plot=True, update_cut=True)
@@ -931,7 +931,7 @@ if __name__ == '__main__':
             # except:
             #     print(f'{session} error')
  
-    Parallel(n_jobs=8)(delayed(process)(session) for session in session_list[:-3])
+    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[:17])
     # process(session)
     # for session in session_list:
         # process(session)

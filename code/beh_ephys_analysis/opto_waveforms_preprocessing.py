@@ -13,7 +13,7 @@ from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import re
-from utils.beh_functions import parseSessionID, session_dirs
+from utils.beh_functions import parseSessionID, session_dirs, get_session_tbl
 from utils.plot_utils import shiftedColorMap, template_reorder
 from utils.ephys_functions import load_drift
 from open_ephys.analysis import Session##
@@ -824,6 +824,19 @@ def re_filter_opto_waveforms(session, data_type, opto_only = True, load_sorting_
     if opto_only:
         selected_unit_ids = unit_tbl.query('opto_pass == True')['unit_id'].values
     
+    # load opto info
+    data_type = 'curated'
+    target  = 'soma'
+    opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_{target}.csv'), index_col=0)
+    laser_onset_samples = opto_df['laser_onset_samples'].values
+    session_period_ind = np.argmax(np.diff(laser_onset_samples))
+    session_start_sample = laser_onset_samples[session_period_ind] + 30000*10 # added 10 second to remove the whole laser train and artifact
+    session_end_sample = laser_onset_samples[session_period_ind + 1]
+    session_length = session_end_sample - session_start_sample
+    laser_onset_times = opto_df['time'].values
+    session_start_time = laser_onset_times[session_period_ind]
+    session_end_time = laser_onset_times[session_period_ind + 1]
+    print(str(session_length/(30000*60)) + ' min')
     # initialize columns 
     unit_tbl['mat_wf_raw'] = None
     unit_tbl['mat_wf_raw_aligned'] = None
@@ -869,14 +882,23 @@ def re_filter_opto_waveforms(session, data_type, opto_only = True, load_sorting_
             spike_samples = sorting_opto.get_unit_spike_train(unit_id)
             spike_times = unit_tbl.query('unit_id == @unit_id')['spike_times'].values[0]
             unit_drift = load_drift(session, unit_id, data_type=data_type)
-            unit_start = ephys_start
-            unit_end = ephys_end
+            unit_start = session_start_time
+            unit_end = session_end_time
             if unit_drift is not None:
                 if unit_drift['ephys_cut'] is not None:
                     if unit_drift['ephys_cut'][0] is not None:
-                        unit_start = max(ephys_start, unit_drift['ephys_cut'][0])
+                        unit_start = max(ephys_start, unit_drift['ephys_cut'][0], session_start_time)
                     if unit_drift['ephys_cut'][1] is not None:
-                        unit_end = min(ephys_end, unit_drift['ephys_cut'][1])
+                        unit_end = min(ephys_end, unit_drift['ephys_cut'][1], session_end_time)
+            if unit_end - unit_start<10*60:
+                unit_start = ephys_start
+                unit_end = ephys_end
+                if unit_drift is not None:
+                    if unit_drift['ephys_cut'] is not None:
+                        if unit_drift['ephys_cut'][0] is not None:
+                            unit_start = max(ephys_start, unit_drift['ephys_cut'][0])
+                        if unit_drift['ephys_cut'][1] is not None:
+                            unit_end = min(ephys_end, unit_drift['ephys_cut'][1])                
             bin = 10*60
             if (unit_end-bin) >= unit_start:
                 temp_bins = np.arange(unit_start, unit_end-bin, 5*60) # 5 minutes steps   
@@ -895,7 +917,7 @@ def re_filter_opto_waveforms(session, data_type, opto_only = True, load_sorting_
                 sample_ind = np.where((spike_times >= unit_start_cut) & (spike_times < unit_end_cut))[0]
                 samples_to_keep = spike_samples[sample_ind]
             else:
-                samples_to_keep = spike_samples
+                samples_to_keep = spike_samples[(spike_times >= unit_start) & (spike_times < unit_end)]
             # select only part of the session
             keep_inds = (spike_vector['unit_index'] == unit_index) & np.isin(spike_vector['sample_index'], samples_to_keep)
             spike_vector_peaks.append(spike_vector[keep_inds])
@@ -917,7 +939,7 @@ def re_filter_opto_waveforms(session, data_type, opto_only = True, load_sorting_
         recording_raw = recording_raw.select_channels(good_channels)
         # raw fake
         recording_ps = spre.phase_shift(recording, margin_ms=100.0)
-        recording_raw_fake = spre.bandpass_filter(recording_ps, freq_min=5, freq_max=8000)
+        recording_raw_fake = spre.bandpass_filter(recording_ps, freq_min=50, freq_max=8000)
         recording_raw_fake = spre.common_reference(recording_raw_fake)
         recording_raw_fake = recording_raw_fake.select_channels(good_channels)
         
@@ -973,9 +995,6 @@ def re_filter_opto_waveforms(session, data_type, opto_only = True, load_sorting_
             analyzer_raw = si.load(os.path.join(session_dir[f'ephys_dir_{data_type}'], 'raw.zarr'), load_extensions=True)
             analyzer_raw_fake = si.load(os.path.join(session_dir[f'ephys_dir_{data_type}'], 'raw_fake.zarr'), load_extensions=True)
             print(f'Session {session} loaded raw analyzers.')
-    
-    
-
     
     # info from analyzer
     samples_to_keep = [-30, 60]
@@ -1082,16 +1101,506 @@ def re_filter_opto_waveforms(session, data_type, opto_only = True, load_sorting_
     plt.tight_layout()
     fig.savefig(fname=f'{session_dir[f"ephys_dir_{data_type}"]}/waveforms_re_filtered.pdf')
 
-    with open(unit_tbl_file, 'wb') as f:
-        pickle.dump(unit_tbl, f)
+def go_cue_waveforms(session, data_type, opto_only = True, load_sorting_analyzer = True):
+    session_dir = session_dirs(session)
+    unit_tbl = get_unit_tbl(session, data_type, summary=True)
+    selected_unit_ids = unit_tbl['unit_id'].values
+    if opto_only:
+        selected_unit_ids = unit_tbl.query('opto_pass == True')['unit_id'].values
+    
+    # load opto info
+    data_type = 'curated'
+    target  = 'soma'
+    opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_{target}.csv'), index_col=0)
+    laser_onset_samples = opto_df['laser_onset_samples'].values
+    session_period_ind = np.argmax(np.diff(laser_onset_samples))
+    session_start_sample = laser_onset_samples[session_period_ind] + 30000*10 # added 10 second to remove the whole laser train and artifact
+    session_end_sample = laser_onset_samples[session_period_ind + 1]
+    session_length = session_end_sample - session_start_sample
+    laser_onset_times = opto_df['time'].values
+    session_start_time = laser_onset_times[session_period_ind]
+    session_end_time = laser_onset_times[session_period_ind + 1]
+    print(str(session_length/(30000*60)) + ' min')
+    if session_dir['nwb_beh'] is None:
+        print(f'No behavior data for session {session}.')
+        return
+    else:
+        session_df = get_session_tbl(session)
+    
+    # initialize columns 
+    unit_tbl['mat_wf_bp'] = None
+    unit_tbl['mat_wf_bp_aligned'] = None
+    unit_tbl['peak_waveform_bp'] = None
+    unit_tbl['peak_waveform_bp_aligned'] = None
+    unit_tbl['amplitude_bp'] = None
+    unit_tbl['peak_bp'] = None
 
-            
+
+    unit_tbl['mat_wf_raw_fake'] = None
+    unit_tbl['mat_wf_raw_fake_aligned'] = None
+    unit_tbl['peak_waveform_raw_fake'] = None
+    unit_tbl['peak_waveform_raw_fake_aligned'] = None
+    unit_tbl['amplitude_raw_fake'] = None
+    unit_tbl['peak_raw_fake'] = None
+
+    unit_tbl_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
+    selected_unit_ids = [int(unit_id) for unit_id in selected_unit_ids]
+    if len(selected_unit_ids) == 0:
+        print(f'No units to process for session {session}.')
+        with open(unit_tbl_file, 'wb') as f:
+            pickle.dump(unit_tbl, f)
+        return
+
+    if not load_sorting_analyzer:
+        analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
+        sorting = si.load(session_dir[f'curated_dir_{data_type}'], load_extensions=False)
+        sorting_opto = sorting.select_units(selected_unit_ids)
+        analyzer_opto = analyzer.select_units(selected_unit_ids)
+        spike_vector = sorting_opto.to_spike_vector()
+
+        qm_json = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
+        with open(qm_json) as f:
+            qm = json.load(f)
+        ephys_start = qm['ephys_cut'][0]
+        ephys_end = qm['ephys_cut'][1]
+        align_time = session_df['goCue_start_time'].values
+        spike_vector_go_cue = []
+        for unit_id in selected_unit_ids:
+            unit_index = np.where(sorting_opto.unit_ids==unit_id)[0][0]
+            spike_samples = sorting_opto.get_unit_spike_train(unit_id)
+            spike_times = unit_tbl.query('unit_id == @unit_id')['spike_times'].values[0]
+            unit_drift = load_drift(session, unit_id, data_type=data_type)
+            unit_start = session_start_time
+            unit_end = session_end_time
+            session_df_curr = session_df.copy()
+            if unit_drift is not None:
+                if unit_drift['ephys_cut'] is not None:
+                    if unit_drift['ephys_cut'][0] is not None:
+                        unit_start = max(ephys_start, unit_drift['ephys_cut'][0], session_start_time)
+                        session_df_curr = session_df_curr.query('goCue_start_time >= @unit_start')
+                    if unit_drift['ephys_cut'][1] is not None:
+                        unit_end = min(ephys_end, unit_drift['ephys_cut'][1], session_end_time)
+                        session_df_curr = session_df_curr.query('goCue_start_time < @unit_end')
+            if len(session_df_curr)>5:
+                go_cue_samples = []
+                for event_ind in range(align_time.shape[0]):
+                    align_time_curr = align_time[event_ind]
+                    # find spike sample inds in [0, 50ms] around go cue
+                    start = np.searchsorted(spike_times, align_time_curr)
+                    end = np.searchsorted(spike_times, align_time_curr + 0.05)
+                    if start < end:
+                        go_cue_samples.extend(spike_samples[start:end])
+                
+                # select only part of the session
+                keep_inds = (spike_vector['unit_index'] == unit_index) & np.isin(spike_vector['sample_index'], go_cue_samples)
+                spike_vector_go_cue.append(spike_vector[keep_inds]) # for each neuron
+
+        spike_vector_go_cue = np.concatenate(spike_vector_go_cue)
+        spike_vector_go_cue = spike_vector_go_cue[
+                np.lexsort((spike_vector_go_cue["sample_index"], spike_vector_go_cue["segment_index"]))
+            ]
+        sorting_peaks = si.NumpySorting(spike_vector_go_cue, 
+                                        unit_ids=selected_unit_ids,
+                                        sampling_frequency=30000)
+        # two versions of filters
+        compressed_folder = session_dir['session_dir_raw']
+        stream_name = 'ProbeA'
+        recording_zarr = [os.path.join(compressed_folder, f) for f in os.listdir(compressed_folder) if stream_name in f and 'LFP' not in f][0]
+        recording = si.read_zarr(recording_zarr)
+        good_channels = recording.channel_ids[np.isin(recording.channel_ids, analyzer_opto.channel_ids)]
+        
+        recording_raw = spre.common_reference(recording, reference='global', operator='median')
+        recording_raw = recording_raw.select_channels(good_channels)
+        # raw fake
+        recording_ps = spre.phase_shift(recording, margin_ms=100.0)
+        recording_raw_fake = spre.bandpass_filter(recording_ps, freq_min=50, freq_max=8000)
+        recording_raw_fake = spre.common_reference(recording_raw_fake)
+        recording_raw_fake = recording_raw_fake.select_channels(good_channels)
+        # bp
+        recording_bp = spre.bandpass_filter(recording_ps, freq_min=300, freq_max=6000)
+        recording_bp = spre.common_reference(recording_bp)
+        recording_bp = recording_bp.select_channels(good_channels)
+        
+        # # sparsity
+        # sparsity_mask_all = np.tile(analyzer.sparsity.mask, (len(edges)-1, 1))
+        # sparsity_all = si.ChannelSparsity(
+        #     sparsity_mask_all,
+        #     unit_ids=sorting_binned_selected.unit_ids,
+        #     channel_ids=recording_processed_good.channel_ids
+        # )
 
 
 
+        analyzer_raw_fake = si.create_sorting_analyzer(
+            sorting_peaks,
+            recording_raw_fake,
+            sparsity=analyzer_opto.sparsity
+        )
 
-            
-            
+        analyzer_bp = si.create_sorting_analyzer(
+            sorting_peaks,
+            recording_bp,
+            sparsity=analyzer_opto.sparsity
+        )
+
+        si.set_global_job_kwargs(n_jobs=-1, progress_bar=True)
+        _ = analyzer_bp.compute("random_spikes", method="all", max_spikes_per_unit=1000)
+        _ = analyzer_bp.compute("waveforms", ms_before=5, ms_after=10)
+        _ = analyzer_bp.compute("templates", ms_before=5, ms_after=10)
+
+        save_loc = os.path.join(session_dir[f'ephys_dir_{data_type}'], 'gocue_bp.zarr')
+        if os.path.exists(save_loc):
+            print(f'Warning: {save_loc} already exists and will be overwritten.')
+            shutil.rmtree(save_loc)
+        analyzer_bp.save_as(format='zarr', folder=save_loc)
+        print(f'Saved raw waveforms to {save_loc}')
+
+        _ = analyzer_raw_fake.compute("random_spikes", method="all", max_spikes_per_unit=1000)
+        _ = analyzer_raw_fake.compute("waveforms", ms_before=5, ms_after=10)
+        _ = analyzer_raw_fake.compute("templates", ms_before=5, ms_after=10)
+
+        save_loc = os.path.join(session_dir[f'ephys_dir_{data_type}'], 'gocue_raw_fake.zarr')
+        if os.path.exists(save_loc):
+            print(f'Warning: {save_loc} already exists and will be overwritten.')
+            shutil.rmtree(save_loc)
+        analyzer_raw_fake.save_as(format='zarr', folder=save_loc)
+        print(f'Saved raw waveforms to {save_loc}')
+    else:
+        if not os.path.exists(os.path.join(session_dir[f'ephys_dir_{data_type}'], 'gocue_raw_fake.zarr')) or not os.path.exists(os.path.join(session_dir[f'ephys_dir_{data_type}'], 'gocue_bp.zarr')):
+            print("Analyzer doesn't exist, compute first.")
+            load_sorting_analyzer = False
+            go_cue_waveforms(session, data_type, opto_only=opto_only, load_sorting_analyzer=load_sorting_analyzer)
+            return
+        else:
+            analyzer_bp = si.load(os.path.join(session_dir[f'ephys_dir_{data_type}'],  'gocue_bp.zarr'), load_extensions=True)
+            analyzer_raw_fake = si.load(os.path.join(session_dir[f'ephys_dir_{data_type}'], 'gocue_raw_fake.zarr'), load_extensions=True)
+            print(f'Session {session} loaded raw analyzers.')
+    
+
+def short_isi_waveforms(session, data_type, opto_only = True, load_sorting_analyzer = True):
+    session_dir = session_dirs(session)
+    unit_tbl = get_unit_tbl(session, data_type, summary=True)
+    selected_unit_ids = unit_tbl['unit_id'].values
+    if opto_only:
+        selected_unit_ids = unit_tbl.query('opto_pass == True')['unit_id'].values
+    
+    # load opto info
+    data_type = 'curated'
+    target  = 'soma'
+    opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_{target}.csv'), index_col=0)
+    laser_onset_samples = opto_df['laser_onset_samples'].values
+    session_period_ind = np.argmax(np.diff(laser_onset_samples))
+    session_start_sample = laser_onset_samples[session_period_ind] + 30000*10 # added 10 second to remove the whole laser train and artifact
+    session_end_sample = laser_onset_samples[session_period_ind + 1]
+    session_length = session_end_sample - session_start_sample
+    laser_onset_times = opto_df['time'].values
+    session_start_time = laser_onset_times[session_period_ind]
+    session_end_time = laser_onset_times[session_period_ind + 1]
+    print(str(session_length/(30000*60)) + ' min')
+    if session_dir['nwb_beh'] is None:
+        print(f'No behavior data for session {session}.')
+        return
+    else:
+        session_df = get_session_tbl(session)
+    
+    # initialize columns 
+    unit_tbl['mat_wf_bp'] = None
+    unit_tbl['mat_wf_bp_aligned'] = None
+    unit_tbl['peak_waveform_bp'] = None
+    unit_tbl['peak_waveform_bp_aligned'] = None
+    unit_tbl['amplitude_bp'] = None
+    unit_tbl['peak_bp'] = None
+
+
+    unit_tbl['mat_wf_raw_fake'] = None
+    unit_tbl['mat_wf_raw_fake_aligned'] = None
+    unit_tbl['peak_waveform_raw_fake'] = None
+    unit_tbl['peak_waveform_raw_fake_aligned'] = None
+    unit_tbl['amplitude_raw_fake'] = None
+    unit_tbl['peak_raw_fake'] = None
+
+    unit_tbl_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
+    selected_unit_ids = [int(unit_id) for unit_id in selected_unit_ids]
+    if len(selected_unit_ids) == 0:
+        print(f'No units to process for session {session}.')
+        with open(unit_tbl_file, 'wb') as f:
+            pickle.dump(unit_tbl, f)
+        return
+
+    if not load_sorting_analyzer:
+        analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
+        sorting = si.load(session_dir[f'curated_dir_{data_type}'], load_extensions=False)
+        sorting_opto = sorting.select_units(selected_unit_ids)
+        analyzer_opto = analyzer.select_units(selected_unit_ids)
+        spike_vector = sorting_opto.to_spike_vector()
+
+        qm_json = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
+        with open(qm_json) as f:
+            qm = json.load(f)
+        ephys_start = qm['ephys_cut'][0]
+        ephys_end = qm['ephys_cut'][1]
+        align_time = session_df['goCue_start_time'].values
+        spike_vector_go_cue = []
+        for unit_id in selected_unit_ids:
+            unit_index = np.where(sorting_opto.unit_ids==unit_id)[0][0]
+            spike_samples = sorting_opto.get_unit_spike_train(unit_id)
+            spike_times = unit_tbl.query('unit_id == @unit_id')['spike_times'].values[0]
+            unit_drift = load_drift(session, unit_id, data_type=data_type)
+            unit_start = session_start_time
+            unit_end = session_end_time
+            session_df_curr = session_df.copy()
+            if unit_drift is not None:
+                if unit_drift['ephys_cut'] is not None:
+                    if unit_drift['ephys_cut'][0] is not None:
+                        unit_start = max(ephys_start, unit_drift['ephys_cut'][0], session_start_time)
+                        session_df_curr = session_df_curr.query('goCue_start_time >= @unit_start')
+                        spike_samples = spike_samples[spike_times >= unit_start]
+                        spike_times = spike_times[spike_times >= unit_start]
+                    if unit_drift['ephys_cut'][1] is not None:
+                        unit_end = min(ephys_end, unit_drift['ephys_cut'][1], session_end_time)
+                        session_df_curr = session_df_curr.query('goCue_start_time < @unit_end')
+                        spike_samples = spike_samples[spike_times < unit_end]
+                        spike_times = spike_times[spike_times < unit_end]
+                        
+
+                isi_samples = np.where(np.diff(spike_times)<= 0.005)[0]+1
+                isi_samples = spike_samples[isi_samples]
+                # select only part of the session
+                keep_inds = (spike_vector['unit_index'] == unit_index) & np.isin(spike_vector['sample_index'], isi_samples)
+                spike_vector_go_cue.append(spike_vector[keep_inds]) # for each neuron
+
+        spike_vector_go_cue = np.concatenate(spike_vector_go_cue)
+        spike_vector_go_cue = spike_vector_go_cue[
+                np.lexsort((spike_vector_go_cue["sample_index"], spike_vector_go_cue["segment_index"]))
+            ]
+        sorting_peaks = si.NumpySorting(spike_vector_go_cue, 
+                                        unit_ids=selected_unit_ids,
+                                        sampling_frequency=30000)
+        # two versions of filters
+        compressed_folder = session_dir['session_dir_raw']
+        stream_name = 'ProbeA'
+        recording_zarr = [os.path.join(compressed_folder, f) for f in os.listdir(compressed_folder) if stream_name in f and 'LFP' not in f][0]
+        recording = si.read_zarr(recording_zarr)
+        good_channels = recording.channel_ids[np.isin(recording.channel_ids, analyzer_opto.channel_ids)]
+        
+        recording_raw = spre.common_reference(recording, reference='global', operator='median')
+        recording_raw = recording_raw.select_channels(good_channels)
+        # raw fake
+        recording_ps = spre.phase_shift(recording, margin_ms=100.0)
+        recording_raw_fake = spre.bandpass_filter(recording_ps, freq_min=50, freq_max=8000)
+        recording_raw_fake = spre.common_reference(recording_raw_fake)
+        recording_raw_fake = recording_raw_fake.select_channels(good_channels)
+        # bp
+        recording_bp = spre.bandpass_filter(recording_ps, freq_min=300, freq_max=6000)
+        recording_bp = spre.common_reference(recording_bp)
+        recording_bp = recording_bp.select_channels(good_channels)
+        
+        # # sparsity
+        # sparsity_mask_all = np.tile(analyzer.sparsity.mask, (len(edges)-1, 1))
+        # sparsity_all = si.ChannelSparsity(
+        #     sparsity_mask_all,
+        #     unit_ids=sorting_binned_selected.unit_ids,
+        #     channel_ids=recording_processed_good.channel_ids
+        # )
+
+
+
+        analyzer_raw_fake = si.create_sorting_analyzer(
+            sorting_peaks,
+            recording_raw_fake,
+            sparsity=analyzer_opto.sparsity
+        )
+
+        analyzer_bp = si.create_sorting_analyzer(
+            sorting_peaks,
+            recording_bp,
+            sparsity=analyzer_opto.sparsity
+        )
+
+        si.set_global_job_kwargs(n_jobs=-1, progress_bar=True)
+        _ = analyzer_bp.compute("random_spikes", method="all", max_spikes_per_unit=500)
+        _ = analyzer_bp.compute("waveforms", ms_before=10, ms_after=5)
+        _ = analyzer_bp.compute("templates", ms_before=10, ms_after=5)
+
+        save_loc = os.path.join(session_dir[f'ephys_dir_{data_type}'], 'isishort_bp.zarr')
+        if os.path.exists(save_loc):
+            print(f'Warning: {save_loc} already exists and will be overwritten.')
+            shutil.rmtree(save_loc)
+        analyzer_bp.save_as(format='zarr', folder=save_loc)
+        print(f'Saved raw waveforms to {save_loc}')
+
+        _ = analyzer_raw_fake.compute("random_spikes", method="all", max_spikes_per_unit=500)
+        _ = analyzer_raw_fake.compute("waveforms", ms_before=10, ms_after=5)
+        _ = analyzer_raw_fake.compute("templates", ms_before=10, ms_after=5)
+
+        save_loc = os.path.join(session_dir[f'ephys_dir_{data_type}'], 'isishort_raw_fake.zarr')
+        if os.path.exists(save_loc):
+            print(f'Warning: {save_loc} already exists and will be overwritten.')
+            shutil.rmtree(save_loc)
+        analyzer_raw_fake.save_as(format='zarr', folder=save_loc)
+        print(f'Saved raw waveforms to {save_loc}')
+    else:
+        if not os.path.exists(os.path.join(session_dir[f'ephys_dir_{data_type}'], 'isishort_raw_fake.zarr')) or not os.path.exists(os.path.join(session_dir[f'ephys_dir_{data_type}'], 'isishort_bp.zarr')):
+            print("Analyzer doesn't exist, compute first.")
+            load_sorting_analyzer = False
+            short_isi_waveforms(session, data_type, opto_only=opto_only, load_sorting_analyzer=load_sorting_analyzer)
+            return
+        else:
+            analyzer_bp = si.load(os.path.join(session_dir[f'ephys_dir_{data_type}'],  'isishort_bp.zarr'), load_extensions=True)
+            analyzer_raw_fake = si.load(os.path.join(session_dir[f'ephys_dir_{data_type}'], 'isishort_raw_fake.zarr'), load_extensions=True)
+            print(f'Session {session} loaded raw analyzers.')
+    
+    
+
+    
+    # # info from analyzer
+    # samples_to_keep = [-45, 75]
+    # y_neighbors_to_keep = 3
+    # temp_ext_raw = analyzer_raw.get_extension("templates")
+    # temp_ext_raw_fake = analyzer_raw_fake.get_extension("templates")
+    # channel_locations = analyzer_raw.get_channel_locations()
+    # all_channels = analyzer_raw.sparsity.channel_ids
+    # if all_channels[0].startswith('AP'):
+    #     all_channels_int = np.array([int(channel.split('AP')[-1]) for channel in all_channels])
+    # else:
+    #     all_channels_int = np.array([int(channel.split('CH')[-1]) for channel in all_channels])
+    # right_left = channel_locations[:, 0]<20 
+
+    # # loop through opto units
+    # for unit_ind, unit_id in enumerate(selected_unit_ids):
+    #     if unit_id not in analyzer_raw.sorting.unit_ids:
+    #         print(f'Unit {unit_id} not in raw sorting, skip.')
+    #         continue
+    #     # raw_fake_wf
+    #     template_raw_fake = temp_ext_raw_fake.get_unit_template(unit_id, operator='average')
+    #     peak_channel = np.argmax(np.ptp(template_raw_fake, axis=0))
+    #     peak_wf_raw_fake = template_raw_fake[:, peak_channel]
+    #     if peak_wf_raw_fake[45]<0:
+    #         peak_sign  = -1
+    #         peak_ind = np.argmin(peak_wf_raw_fake)
+    #         if np.abs(peak_ind - 45)>10:
+    #             peak_ind = 45
+    #     else:
+    #         peak_sign = 1
+    #         peak_ind = np.argmax(peak_wf_raw_fake)
+    #         if np.abs(peak_ind - 45)>10:
+    #             peak_ind = 45
+    #     peak_wf_raw_fake_aligned = np.concatenate((
+    #         np.full(max(30 - peak_ind, 0), np.nan),
+    #         peak_wf_raw_fake[max(peak_ind - 30, 0) : min(peak_ind + 60, peak_wf_raw_fake.shape[0])],
+    #         np.full(max((peak_ind + 60) - peak_wf_raw_fake.shape[0], 0), np.nan)
+    #     ))
+    #     mat_wf_raw_fake = template_reorder(template_raw_fake, right_left, all_channels_int, 
+    #                                 sample_to_keep = samples_to_keep, y_neighbors_to_keep = y_neighbors_to_keep, orginal_loc = False, 
+    #                                 peak_ind=None)
+
+    #     mat_wf_raw_fake_aligned = mat_wf_raw_fake
+    #     peak_raw_fake = peak_wf_raw_fake_aligned[30]
+    #     amp_raw_fake = np.ptp(peak_wf_raw_fake)
+
+    #     # raw_wf
+    #     template_raw = temp_ext_raw.get_unit_template(unit_id, operator='average')
+    #     peak_channel = np.argmax(np.ptp(template_raw, axis=0))
+    #     peak_wf_raw = template_raw[:, peak_channel]
+    #     if peak_sign<0:
+    #         peak_ind = np.argmin(peak_wf_raw)
+    #         if np.abs(peak_ind - 45)>5:
+    #             peak_ind = 45
+    #     else:
+    #         peak_ind = np.argmax(peak_wf_raw)
+    #         if np.abs(peak_ind - 45)>5:
+    #             peak_ind = 45
+    #     peak_wf_raw_aligned = np.concatenate((
+    #         np.full(max(30 - peak_ind, 0), np.nan),
+    #         peak_wf_raw[max(peak_ind - 30, 0) : min(peak_ind + 60, peak_wf_raw.shape[0])],
+    #         np.full(max((peak_ind + 60) - peak_wf_raw.shape[0], 0), np.nan)
+    #     ))
+    #     mat_wf_raw = template_reorder(template_raw-np.nanmean(template_raw[0, :]), right_left, all_channels_int, 
+    #                                 sample_to_keep = samples_to_keep, y_neighbors_to_keep = y_neighbors_to_keep, orginal_loc = False, 
+    #                                 peak_ind=None)
+    #     mat_wf_raw_aligned = mat_wf_raw
+    #     peak_raw = peak_wf_raw_aligned[30]
+    #     amp_raw = np.ptp(peak_wf_raw)
+
+        
+
+    #     # plot and save
+
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'mat_wf_raw'] = mat_wf_raw
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'mat_wf_raw_aligned'] = mat_wf_raw_aligned
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'peak_waveform_raw'] = peak_wf_raw
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'peak_waveform_raw_aligned'] = peak_wf_raw_aligned
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'amplitude_raw'] = amp_raw
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'peak_raw'] = peak_raw
+
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'mat_wf_raw_fake'] = mat_wf_raw_fake
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'mat_wf_raw_fake_aligned'] = mat_wf_raw_fake_aligned
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'peak_waveform_raw_fake'] = peak_wf_raw_fake
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'peak_waveform_raw_fake_aligned'] = peak_wf_raw_fake_aligned
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'amplitude_raw_fake'] = amp_raw_fake
+    #     unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'peak_raw_fake'] = peak_raw_fake
+
+    # nrows = int(np.ceil(len(selected_unit_ids)/5))
+    # fig = plt.figure(figsize=(15, 3*nrows))
+    # gs = gridspec.GridSpec(nrows, 5, figure=fig)
+    # time = np.arange(-30, 60)/30
+    # for plot_ind, plot_unit_id in enumerate(selected_unit_ids):
+    #     wave_raw = unit_tbl.query('unit_id == @plot_unit_id')['peak_waveform_raw_aligned'].values[0]
+    #     wave_raw_fake = unit_tbl.query('unit_id == @plot_unit_id')['peak_waveform_raw_fake_aligned'].values[0]
+
+    #     ax = fig.add_subplot(gs[plot_ind//5, plot_ind%5])
+    #     if wave_raw is not None:
+    #         ax.plot(time, wave_raw, color='blue', label='raw')
+    #     if wave_raw_fake is not None:
+    #         ax.plot(time, wave_raw_fake, color='orange', label='raw_fake')
+    #     ax.set_title(f'Unit {plot_unit_id}')
+    #     ax.axvline(0, color='black', linestyle='--', linewidth=0.5)
+    #     ax.axhline(0, color='black', linestyle='--', linewidth=0.5)
+    #     if plot_ind == 0:
+    #         ax.legend()
+    #     # set all box invisible
+    #     ax.spines['top'].set_visible(False)
+    #     ax.spines['right'].set_visible(False)
+    #     ax.spines['left'].set_visible(False)
+    #     ax.spines['bottom'].set_visible(False)
+    #     ax.set_xlim(time[0], time[-1])
+    #     # remove ticks
+    #     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    # plt.suptitle(f'Session {session} - Re-filtered waveforms')
+    # plt.tight_layout()
+    # fig.savefig(fname=f'{session_dir[f"ephys_dir_{data_type}"]}/waveforms_re_filtered.pdf')
+    # # plot 2D waveforms with raw_fake
+    # nrows = int(np.ceil(len(selected_unit_ids)/5))
+    # fig = plt.figure(figsize=(15, 3*nrows))
+    # gs = gridspec.GridSpec(nrows, 5, figure=fig)
+    # time = np.arange(samples_to_keep[0], samples_to_keep[1])/30
+    # for plot_ind, plot_unit_id in enumerate(selected_unit_ids):
+    #     wave_raw_fake = unit_tbl.query('unit_id == @plot_unit_id')['mat_wf_raw_fake_aligned'].values[0]
+
+    #     ax = fig.add_subplot(gs[plot_ind//5, plot_ind%5])
+    #     if wave_raw_fake is not None:
+    #         im = ax.imshow(wave_raw_fake, aspect='auto', cmap='bwr', vmin=-np.nanmax(np.abs(wave_raw_fake)), vmax=np.nanmax(np.abs(wave_raw_fake)), interpolation='nearest')
+    #         plt.colorbar(im, ax=ax, orientation='vertical')
+
+    #     ax.set_title(f'Unit {plot_unit_id}')
+    #     ax.axvline(0, color='black', linestyle='--', linewidth=0.5)
+    #     ax.axhline(0, color='black', linestyle='--', linewidth=0.5)
+    #     if plot_ind == 0:
+    #         ax.legend()
+    #     # set all box invisible
+    #     ax.spines['top'].set_visible(False)
+    #     ax.spines['right'].set_visible(False)
+    #     ax.spines['left'].set_visible(False)
+    #     # ax.spines['bottom'].set_visible(False) 
+    #     # ax.set_xlim(time[0], time[-1])
+    #     # remove ticks
+    #     ax.tick_params(left=False, bottom=True, labelleft=False, labelbottom=False)
+    # plt.suptitle(f'Session {session} - Re-filtered 2D waveforms')
+    # plt.tight_layout()
+    # fig.savefig(fname=f'{session_dir[f"ephys_dir_{data_type}"]}/2D_waveforms_re_filtered.pdf')    
+    # with open(unit_tbl_file, 'wb') as f:
+    #     pickle.dump(unit_tbl, f)
+
 
 
     
@@ -1104,7 +1613,7 @@ if __name__ == "__main__":
     data_type = 'curated'
     target = 'soma'
     load_sorting_analyzer = True
-    session = 'behavior_751181_2025-02-27_11-24-47'
+    session = 'behavior_751766_2025-02-11_11-53-38'
     # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
  
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -1126,12 +1635,14 @@ if __name__ == "__main__":
             re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
             # elif session_dir['nwb_dir_raw'] is not None:
             #     data_type = 'raw' 
-            #     opto_wf_p reprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+            #     opto_wf_p reprocessing(session, data_type, target, load_sorting_analyzer = load_sortin g_analyzer)
     
-    # Parallel(n_jobs=-1)(delayed(process)(session) for session in session_list[:-3]) 
-    for session in session_list[46:-3]:
-        process(session) 
-    # process('behavior_751004_2024-12-20_13-26-11') 
+    # Parallel(n_jobs=3)(delayed(process)(session) for session in session_list[:10]) 
+    # for session in session_list[:10]:
+    #     process(session)  
+    # process('behavior_751004_2024-12-19_11-50-37') 
     # re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
+    # short_isi_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
+    go_cue_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
 
 # %%
