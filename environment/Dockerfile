@@ -1,4 +1,4 @@
-# hash:sha256:8d5d3da8954239b6d5b596e398a691544b9471cecd013aadb57a59f47ce13dd2
+  # hash:sha256:8d5d3da8954239b6d5b596e398a691544b9471cecd013aadb57a59f47ce13dd2
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/cuda-miniconda-jupyterlab:latest
 
