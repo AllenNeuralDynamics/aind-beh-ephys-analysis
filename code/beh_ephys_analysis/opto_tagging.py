@@ -391,7 +391,7 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
         plt.tight_layout()
     return fig, opto_tagging_dict, opto_tagging_df
 #%%
-def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False, target_unit_ids=None, ephys_cut = False, save = False):
+def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False, target_unit_ids=None, ephys_cut = False, save = False, drift_cut = True):
     session_dir = session_dirs(session)
     session_qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
     with open(session_qm_file) as f:
@@ -498,7 +498,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     
     #     if pass_qc[unit_id]:   
         qc_dict = unit_qc.loc[unit_qc['ks_unit_id'] == unit_id].iloc[0].to_dict()
-        fig, opto_tagging_dict_curr, opto_tagging_df_curr = opto_plotting_unit(unit_id, spiketimes_curr, spike_amplitude_curr, 
+        fig, opto_tagging_dict_curr, opto_tagging_df_curr = opto_plotting_unit(unit_id, spiketimes_curr, spike_amplitude_curr, # -1 is for session behavior_782394_2025-04-22_10-53-28
                                                             waveforms[unit_id], opto_wf, qc_dict, crosscorr,
                                                             opto_responses['resp_p'][unit_id], opto_responses['resp_lat'][unit_id], 
                                                             opto_df_curr, opto_info, qm,
@@ -564,28 +564,30 @@ if __name__ == "__main__":
             # elif session_dir['curated_dir_raw'] is not None:
             #     data_type = 'raw'
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    session = 'behavior_751181_2025-02-27_11-24-47'
-    # opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids=[62], plot = True, ephys_cut = False, save=True)
+    # session = 'behavior_751181_2025-02-27_11-24-47'
+# /root/capsule/scratch/782394/behavior_782394_2025-04-24_12-07-34/ephys/opto/raw/figures    # opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids=[62], plot = True, ephys_cut = False, save=True)
      
     
     from joblib import Parallel, delayed
-    def process(session): 
+    data_type = 'curated'
+    def process(session, data_type): 
         print(f'Starting {session}')
         session_dir = session_dirs(session)
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
         print(session_dir[f'curated_dir_{data_type}'])
         if session_dir[f'curated_dir_{data_type}'] is not None:
-            opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
+            opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
             print(f'Finished {session}')
-        else:
-            print(f'No curated data found for {session}') 
-            # elif session_dir['curated_dir_raw'] is not None:
-            #     data_type = 'r aw' 
-            #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    # Parallel(n_jobs=11)(delayed(process)(session) for session in session_list[-14:-3])
-    # process('behavior_761038_2025-04-15_10-25-11')
-    for session in [session_list[-6]]:
-        process(session)
+        # else:
+        # #     print(f'No curated data found for {session}') 
+        # elif session_dir['curated_dir_raw'] is not None:
+        #     data_type = 'raw' 
+        #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
+    # Parallel(n_jobs=5)(delayed(process)(session, data_type) for session in session_list[-25:-10])
+    process('behavior_782394_2025-04-22_10-53-28', data_type)
+    # for session in [session_list[-13]]:
+    #     process(session)
+    # print(session_list[-13])
 
     
 

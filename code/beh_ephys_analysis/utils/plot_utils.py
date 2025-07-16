@@ -57,12 +57,9 @@ def interpolate_waveform(waveform):
     
 def template_reorder(template, right_left, all_channels_int, sample_to_keep = [-30, 60], y_neighbors_to_keep = 3, orginal_loc = False, peak_ind = None):
     if peak_ind is None:
-        if template[45, :][np.argmax(np.abs(template[45, :]))]<0:
-            peak_ind = np.argmin(np.min(template, axis=0))
-            peak_sign = -1
-        else:
-            peak_sign = 1
-            peak_ind = np.argmax(np.max(template, axis=0))
+        peak_ind = np.argmax(np.ptp(template, axis=0))
+    
+    peak_sign = np.sign(template[:, peak_ind][np.argmax(np.abs(template[:, peak_ind]))])
     peak_channel = all_channels_int[peak_ind]
     if peak_sign>0:
         peak_sample = np.argmax(template[:, peak_ind])
@@ -165,7 +162,7 @@ def combine_pdf_big(pdf_dir, output_pdf, add_title= 'default'):
     print(f'Processing {len(files)} files in {pdf_dir}')
 
     for i, file in enumerate(files):
-        if file.lower().endswith(".pdf"):
+        if file.lower().endswith(".pdf") and os.path.isfile(os.path.join(pdf_dir, file)):
             pdf_path = os.path.join(pdf_dir, file)
             images = convert_from_path(pdf_path, dpi=300)  # High-quality conversion
 
@@ -199,11 +196,14 @@ def combine_pdf_big(pdf_dir, output_pdf, add_title= 'default'):
                 draw.rectangle([text_position, (text_position[0] + bg_x2, text_position[1] + bg_y2)], fill="white")
                 
                 draw.text(text_position, title, fill=text_color, font=font)
-
                 # Save the modified image
                 img_path = os.path.join(output_images_dir, f"{file[:-4]}_page_{i+1}.png")
                 img.save(img_path, "PNG")
                 png_images.append(img_path)
+        elif file.lower().endswith(".png") and os.path.isfile(os.path.join(pdf_dir, file)): # If the file is already a PNG, just save it to the output directory
+            png_path = os.path.join(output_images_dir, file)
+            shutil.copy(os.path.join(pdf_dir, file), png_path)
+            png_images.append(png_path)
 
     # Combine all PNGs into a single PDF
     if png_images:

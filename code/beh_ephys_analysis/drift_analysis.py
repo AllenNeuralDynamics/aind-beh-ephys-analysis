@@ -931,8 +931,8 @@ if __name__ == '__main__':
             # except:
             #     print(f'{session} error')
  
-    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[:17])
-    # process(session)
+    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-25:-10])
+    # process('behavior_782394_2025-04-22_10-53-28')
     # for session in session_list:
         # process(session)
     # generate_session_opto_drift_trial_table('behavior_716325_2024-05-31_10-31-14', 'curated', opto_only=True, save=True)

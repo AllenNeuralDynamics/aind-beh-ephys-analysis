@@ -167,7 +167,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     log_file.close()
 
 if __name__ == "__main__":  
-    session = 'ecephys_713854_2024-03-08_17-15-58'
+    session = 'ecephys_763360_2025-04-16_13-29-55'
     ephys_cut = [0, 0]
     beh_and_time_alignment(session, ephys_cut=ephys_cut)
 

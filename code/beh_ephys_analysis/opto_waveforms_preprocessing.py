@@ -1071,6 +1071,10 @@ def re_filter_opto_waveforms(session, data_type, opto_only = True, load_sorting_
         unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'amplitude_raw_fake'] = amp_raw_fake
         unit_tbl.at[unit_tbl[unit_tbl['unit_id'] == unit_id].index[0], 'peak_raw_fake'] = peak_raw_fake
 
+    # save
+    with open(unit_tbl_file, 'wb') as f:
+        pickle.dump(unit_tbl, f)    
+
     nrows = int(np.ceil(len(selected_unit_ids)/5))
     fig = plt.figure(figsize=(15, 3*nrows))
     gs = gridspec.GridSpec(nrows, 5, figure=fig)
@@ -1637,12 +1641,12 @@ if __name__ == "__main__":
             #     data_type = 'raw' 
             #     opto_wf_p reprocessing(session, data_type, target, load_sorting_analyzer = load_sortin g_analyzer)
     
-    # Parallel(n_jobs=3)(delayed(process)(session) for session in session_list[:10]) 
-    # for session in session_list[:10]:
+    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-25:-10]) 
+    # for session in session_list[-25:-10]:
     #     process(session)  
-    # process('behavior_751004_2024-12-19_11-50-37') 
+    # process('behavior_782394_2025-04-22_10-53-28') 
     # re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
     # short_isi_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
-    go_cue_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
+    # go_cue_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
 
 # %%

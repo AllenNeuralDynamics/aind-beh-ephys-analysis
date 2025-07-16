@@ -37,7 +37,7 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
     if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):
         beh_nwb = load_nwb_from_filename(os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
     else:
-        beh_nwb == None
+        beh_nwb = None
     opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv'))
     sorting_analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     sorting = si.load(session_dir[f'curated_dir_{data_type}'])
@@ -66,7 +66,7 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
     pre_end = opto_df.loc[opto_df['pre_post']== 'pre']['laser_onset_samples'].max()
     post_start = opto_df.loc[opto_df['pre_post']== 'post']['laser_onset_samples'].min()
     if len(opto_df['pre_post'].unique()) == 1:
-        post_start =  opto_df.loc[opto_df['pre_post']== 'pre']['laser_onset_samples'].min()
+        post_start =  opto_df['laser_onset_samples'].min()
         pre_end = 1
     spike_indices_laser = (spike_indices <= pre_end) | (spike_indices >= post_start)
 
@@ -114,6 +114,7 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
     analyzer_dict = {"correlograms": {
                 "window_ms": window_ms,
                 "bin_ms": bin_ms}}
+    si.set_global_job_kwargs(n_jobs=-1, progress_bar=True)
     sorting_analyzer_laser.compute(analyzer_dict)
     sorting_analyzer_nolaser.compute(analyzer_dict)
     # save correlograms
@@ -318,7 +319,8 @@ def ephys_opto_preprocessing(session, data_type, target):
         opto_df.loc[laser_times > laser_cut, 'pre_post'] = 'post'
     else:
         opto_df['pre_post'] = 'post'
-    unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
+    # unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
+    unit_spikes = {unit_id:(unit_spike-1) for unit_id, unit_spike in zip(unit_ids, unit_spikes)} # for session behavior_782394_2025-04-22_10-53-28
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
         pickle.dump(unit_spikes, f)
 
@@ -545,10 +547,11 @@ if __name__ == "__main__":
             plt.close('all')
             ephys_opto_crosscorr(session, data_type)
             print(f'Finished {session}')
-    
-    # Parallel(n_jobs=3)(delayed(process)(session) for session in session_list[-14:-3])
-    # process('behavior_761038_2025-04-15_10-25-11')
-    for session in session_list[-14:-3]:
-        process(session)
+    # for session in session_list[-25:-10]:
+    #     process(session)
+    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-25:-10])
+    # process('behavior_782394_2025-04-22_10-53-28')
+    # for session in session_list[-14:-3]:
+    #     process(session)
 
 
