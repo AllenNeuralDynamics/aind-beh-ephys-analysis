@@ -26,8 +26,8 @@ def apply_qc(combined_tagged_units, constraints):
     # start with a mask of all True
     mask = pd.Series(True, index=combined_tagged_units.index)
     mask_no_opto = pd.Series(True, index=combined_tagged_units.index)
-    opto_list = ['p_max', 'eu', 'corr', 'tag_loc', 'lat_max_p', 'p_mean']
-    multi_condition_list = ['p_max', 'eu', 'corr', 'lat_max_p', 'p_mean']
+    opto_list = ['p_max', 'eu', 'corr', 'tag_loc', 'lat_max_p', 'p_mean', 'sig_counts']
+    multi_condition_list = ['p_max', 'eu', 'corr', 'lat_max_p', 'p_mean', 'sig_counts']
     for col, cfg in constraints.items():
         if col not in combined_tagged_units:
             print(f'Column {col} not found in combined_tagged_units, skipping...')
@@ -53,7 +53,7 @@ def apply_qc(combined_tagged_units, constraints):
     combined_tagged_units['selected_qc_only'] = mask
     # for each neuron, apply combined opto constraints
     opto_pass = np.full(len(combined_tagged_units), False)
-    opto_cond_list = ['all_p_max', 'all_p_mean', 'all_lat_max_p', 'all_corr', 'all_eu']
+    opto_cond_list = ['all_p_max', 'all_p_mean', 'all_lat_max_p', 'all_corr', 'all_eu', 'all_sig_counts']
     print(f'Applying opto conditions: {opto_list}')
     for ind, row in combined_tagged_units.iterrows():
         curr_opto_tbl = pd.DataFrame(row[opto_cond_list].to_dict())
@@ -79,6 +79,7 @@ def apply_qc(combined_tagged_units, constraints):
             combined_tagged_units.at[ind, 'lat_max_p'] = curr_opto_tbl['all_lat_max_p'].values[ind_max].astype(float)
             combined_tagged_units.at[ind, 'corr'] = curr_opto_tbl['all_corr'].values[ind_max].astype(float)
             combined_tagged_units.at[ind, 'eu'] = curr_opto_tbl['all_eu'].values[ind_max].astype(float)
+            combined_tagged_units.at[ind, 'count_max'] = curr_opto_tbl['all_sig_counts'].values[ind_max].astype(float)
 
     combined_tagged_units['selected_opto_only'] = opto_pass
     mask_all = mask & opto_pass
