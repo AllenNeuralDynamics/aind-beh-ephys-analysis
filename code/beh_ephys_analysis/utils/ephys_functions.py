@@ -436,6 +436,41 @@ def correlate_nan(x, y, lag='full'):
                 corrs[l] = np.corrcoef(x[:-l][valid_mask], y[l:][valid_mask])[0, 1]
     return corrs
 
+def correlate_nan_bi(x, y, lag='full'):
+    """
+    Calculate bidirectional cross-correlation between x and y while ignoring NaNs.
+    Returns an array of correlation values from -max_lag to +max_lag.
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    if lag == 'full':
+        lag = len(x) - 1
+
+    max_lag = lag
+
+    corrs = np.full((2 * max_lag + 1,), np.nan)
+    lags = np.arange(-max_lag, max_lag + 1)
+
+    for i, l in enumerate(lags):
+        if l < 0:
+            # Shift x forward, y backward
+            valid_mask = ~np.isnan(x[-l:]) & ~np.isnan(y[:l])
+            if np.any(valid_mask):
+                corrs[i] = np.corrcoef(x[-l:][valid_mask], y[:l][valid_mask])[0, 1]
+        elif l == 0:
+            valid_mask = ~np.isnan(x) & ~np.isnan(y)
+            if np.any(valid_mask):
+                corrs[i] = np.corrcoef(x[valid_mask], y[valid_mask])[0, 1]
+        else:  # l > 0
+            # Shift y forward, x backward
+            valid_mask = ~np.isnan(x[:-l]) & ~np.isnan(y[l:])
+            if np.any(valid_mask):
+                corrs[i] = np.corrcoef(x[:-l][valid_mask], y[l:][valid_mask])[0, 1]
+
+    return corrs, lags
+
+
 def autocorrelation(x, lag):
     n = len(x)
     x = x - np.nanmean(x)
@@ -501,6 +536,66 @@ def cross_corr_train(spike_times_x, spike_times_y, bin_size, window_length, rec_
     counts_x = counts_x - np.nanmean(counts_x)
     counts_y = counts_y - np.nanmean(counts_y)
     # result = np.correlate(x, x, mode='full')
-    result = correlate_nan(counts_x, counts_y, lag = lag)  # only valid correlations
-    lag_time = np.arange(0, lag + 1) * bin_size
+    result, lags = correlate_nan_bi(counts_x, counts_y, lag = lag)  # only valid correlations
+    lag_time = np.arange(-lag, lag+1) * bin_size
     return result, lag_time
+
+class load_auto_corr():
+    def __init__(self, session, data_type):
+        """Initialize the object with a DataFrame."""
+        session_dir = session_dirs(session)
+        auto_corr_tbl_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], f'{session}_{data_type}_auto_corr.pkl')
+        if not os.path.exists(auto_corr_tbl_dir):
+            auto_corr_data = None
+        else:
+            # read from pickle file
+            with open(auto_corr_tbl_dir, 'rb') as f:
+                auto_corr_data = pd.read_pickle(f)
+        self.auto_corr_data = auto_corr_data
+
+    def load_unit(self, unit_id):
+        """Load the autocorrelation data for a specific unit."""
+        if self.auto_corr_data is None:
+            return None
+        else: 
+            unit_auto_corr_data = self.auto_corr_data[self.auto_corr_data['unit'] == unit_id].copy()
+            if len(unit_auto_corr_data) == 0:
+                unit_auto_corr_data = None
+        return unit_auto_corr_data.to_dict(orient='records')[0] if unit_auto_corr_data is not None else None
+
+class load_cross_corr():
+    def __init__(self, session, data_type):
+        """Initialize the object with a DataFrame."""
+        session_dir = session_dirs(session)
+        cross_corr_tbl_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], f'{session}_{data_type}_cross_corr.pkl')
+        if not os.path.exists(cross_corr_tbl_dir):
+            cross_corr_data = None
+        else:
+            # read from pickle file
+            with open(cross_corr_tbl_dir, 'rb') as f:
+                cross_corr_data = pd.read_pickle(f)
+        self.cross_corr_data = cross_corr_data
+
+    def load_units(self, unit_1, unit_2):
+        """Load the autocorrelation data for a specific unit."""
+        if self.cross_corr_data is None:
+            return None
+        else: 
+            unit_cross_corr_data = self.cross_corr_data[((self.cross_corr_data['unit_1']==unit_1) & (self.cross_corr_data['unit_2']==unit_2))].copy()
+            if len(unit_cross_corr_data) == 0:
+                unit_cross_corr_data = self.cross_corr_data[((self.cross_corr_data['unit_2']==unit_1) & (self.cross_corr_data['unit_1']==unit_2))].copy()
+                if len(unit_cross_corr_data) == 0:
+                    unit_cross_corr_data = None
+                else:
+                    unit_cross_corr_data = unit_cross_corr_data.copy()
+                    unit_cross_corr_data['unit_1'] = unit_2
+                    unit_cross_corr_data['unit_2'] = unit_1
+                    unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long'] = np.array(np.flip(unit_cross_corr_data['cross_corr_long'].values[0], axis=0))
+                    unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short'] = np.array(np.flip(unit_cross_corr_data['cross_corr_short'].values[0], axis=0))
+            elif len(unit_cross_corr_data) == 1:
+                unit_cross_corr_data = unit_cross_corr_data.copy()
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long'] = np.array(unit_cross_corr_data['cross_corr_long'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short'] = np.array(unit_cross_corr_data['cross_corr_short'].values[0])
+            else:
+                raise ValueError(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
+        return unit_cross_corr_data.to_dict(orient='records')[0] if unit_cross_corr_data is not None else None
