@@ -420,3 +420,85 @@ class load_trial_drift:
                 raise ValueError(f"Category '{cat}' not found in drift data.")
             unit_drift_data = unit_drift_data[cat]
         return unit_drift_data
+
+def correlate_nan(x, y, lag='full'):
+    """Calculate correlation while ignoring NaNs."""
+    if lag == 'full':
+        lag = len(x) - 1
+    corrs = np.full((lag + 1,), np.nan)
+    for l in range(lag + 1):
+        if l==0:
+            valid_mask = ~np.isnan(x) & ~np.isnan(y)
+            corrs[l] = np.corrcoef(x[valid_mask], y[valid_mask])[0, 1]
+        else:
+            valid_mask = ~np.isnan(x[:-l]) & ~np.isnan(y[l:])
+            if np.any(valid_mask):
+                corrs[l] = np.corrcoef(x[:-l][valid_mask], y[l:][valid_mask])[0, 1]
+    return corrs
+
+def autocorrelation(x, lag):
+    n = len(x)
+    x = x - np.nanmean(x)
+    # result = np.correlate(x, x, mode='full')
+    result = correlate_nan(x, x, lag = lag)  # only valid correlations
+    # result = result[result.size // 2:]  # keep only second half
+    # return result[:lag + 1] / result[0]  # normalize
+    return result/result[0]  # normalize
+
+def auto_corr_train(spike_times, bin_size, window_length, rec_start, rec_end):
+    """
+    Calculate autocorrelation of spike times.
+    
+    Parameters:
+    spike_times : array-like
+        Spike times of the unit.
+    auto_inhi_bin : float
+        Bin size for autocorrelation.
+    window_length : float
+        Length of the window for autocorrelation.
+    rec_start : float
+        Start time of the recording.
+    rec_end : float
+        End time of the recording.
+        
+    Returns:
+    acf : array-like
+        Autocorrelation function values.
+    """
+    counts = np.histogram(spike_times, bins=np.arange(rec_start, rec_end, auto_inhi_bin))[0]
+    lag=int(window_length/auto_inhi_bin)
+    n = len(counts)
+    counts = counts - np.nanmean(counts)
+    # result = np.correlate(x, x, mode='full')
+    result = correlate_nan(counts, counts, lag = lag)  # only valid correlations
+    lag_time = np.arange(0, lag + 1) * auto_inhi_bin
+    return result/result[0], anto_inhi_bin
+
+def cross_corr_train(spike_times_x, spike_times_y, bin_size, window_length, rec_start, rec_end):
+    """
+    Calculate autocorrelation of spike times.
+    
+    Parameters:
+    spike_times : array-like
+        Spike times of the unit.
+    auto_inhi_bin : float
+        Bin size for autocorrelation.
+    window_length : float
+        Length of the window for autocorrelation.
+    rec_start : float
+        Start time of the recording.
+    rec_end : float
+        End time of the recording.
+        
+    Returns:
+    acf : array-like
+        Autocorrelation function values.
+    """
+    counts_x = np.histogram(spike_times_x, bins=np.arange(rec_start, rec_end, auto_inhi_bin))[0]
+    lag=int(window_length/auto_inhi_bin)
+    n = len(counts)
+    counts = counts - np.nanmean(counts)
+    # result = np.correlate(x, x, mode='full')
+    result = correlate_nan(counts, counts, lag = lag)  # only valid correlations
+    lag_time = np.arange(0, lag + 1) * auto_inhi_bin
+    return result/result[0], anto_inhi_bin

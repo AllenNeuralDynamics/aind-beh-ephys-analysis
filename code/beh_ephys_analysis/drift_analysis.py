@@ -922,17 +922,17 @@ if __name__ == '__main__':
     # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True)
     def process(session):
         session_dir = session_dirs(session)
-        if session_dir['curated_dir_curated'] is not None:
+        if session_dir['curated_dir_curated'] is not None :
             # try:
             print(session)
-            plot_session_opto_drift(session, 'curated', update_csv=True, plot=True, update_cut=True)
-            # generate_session_opto_drift_trial_table(session, 'curated', opto_only=True, save=True)
+            # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True, update_cut=False)
+            generate_session_opto_drift_trial_table(session, 'curated', opto_only=True, save=True)
             print(f'{session} done')
             # except:
             #     print(f'{session} error')
  
-    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-25:-10])
-    # process('behavior_782394_2025-04-22_10-53-28')
+    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-23:-10])
+    # process('behavior_782394_2025-04-23_10-51-17')
     # for session in session_list:
         # process(session)
     # generate_session_opto_drift_trial_table('behavior_716325_2024-05-31_10-31-14', 'curated', opto_only=True, save=True)
