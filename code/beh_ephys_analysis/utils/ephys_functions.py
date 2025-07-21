@@ -452,7 +452,7 @@ def auto_corr_train(spike_times, bin_size, window_length, rec_start, rec_end):
     Parameters:
     spike_times : array-like
         Spike times of the unit.
-    auto_inhi_bin : float
+    bin_size : float
         Bin size for autocorrelation.
     window_length : float
         Length of the window for autocorrelation.
@@ -465,14 +465,14 @@ def auto_corr_train(spike_times, bin_size, window_length, rec_start, rec_end):
     acf : array-like
         Autocorrelation function values.
     """
-    counts = np.histogram(spike_times, bins=np.arange(rec_start, rec_end, auto_inhi_bin))[0]
-    lag=int(window_length/auto_inhi_bin)
+    counts = np.histogram(spike_times, bins=np.arange(rec_start, rec_end, bin_size))[0]
+    lag=int(window_length/bin_size)
     n = len(counts)
     counts = counts - np.nanmean(counts)
     # result = np.correlate(x, x, mode='full')
     result = correlate_nan(counts, counts, lag = lag)  # only valid correlations
-    lag_time = np.arange(0, lag + 1) * auto_inhi_bin
-    return result/result[0], anto_inhi_bin
+    lag_time = np.arange(0, lag + 1) * bin_size
+    return result, lag_time
 
 def cross_corr_train(spike_times_x, spike_times_y, bin_size, window_length, rec_start, rec_end):
     """
@@ -481,7 +481,7 @@ def cross_corr_train(spike_times_x, spike_times_y, bin_size, window_length, rec_
     Parameters:
     spike_times : array-like
         Spike times of the unit.
-    auto_inhi_bin : float
+    bin_size : float
         Bin size for autocorrelation.
     window_length : float
         Length of the window for autocorrelation.
@@ -494,11 +494,13 @@ def cross_corr_train(spike_times_x, spike_times_y, bin_size, window_length, rec_
     acf : array-like
         Autocorrelation function values.
     """
-    counts_x = np.histogram(spike_times_x, bins=np.arange(rec_start, rec_end, auto_inhi_bin))[0]
-    lag=int(window_length/auto_inhi_bin)
-    n = len(counts)
-    counts = counts - np.nanmean(counts)
+    counts_x = np.histogram(spike_times_x, bins=np.arange(rec_start, rec_end, bin_size))[0]
+    counts_y = np.histogram(spike_times_y, bins=np.arange(rec_start, rec_end, bin_size))[0]
+    lag=int(np.round(window_length/bin_size))
+    n = len(counts_x)
+    counts_x = counts_x - np.nanmean(counts_x)
+    counts_y = counts_y - np.nanmean(counts_y)
     # result = np.correlate(x, x, mode='full')
-    result = correlate_nan(counts, counts, lag = lag)  # only valid correlations
-    lag_time = np.arange(0, lag + 1) * auto_inhi_bin
-    return result/result[0], anto_inhi_bin
+    result = correlate_nan(counts_x, counts_y, lag = lag)  # only valid correlations
+    lag_time = np.arange(0, lag + 1) * bin_size
+    return result, lag_time
