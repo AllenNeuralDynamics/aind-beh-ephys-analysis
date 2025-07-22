@@ -540,6 +540,94 @@ def cross_corr_train(spike_times_x, spike_times_y, bin_size, window_length, rec_
     lag_time = np.arange(-lag, lag+1) * bin_size
     return result, lag_time
 
+def cross_corr_train_nogo(spike_times_x, spike_times_y, bin_size, window_length, rec_start, rec_end, go_cue_times, go_cue_period):
+    """
+    Calculate autocorrelation of spike times.
+    
+    Parameters:
+    spike_times : array-like
+        Spike times of the unit.
+    bin_size : float
+        Bin size for autocorrelation.
+    window_length : float
+        Length of the window for autocorrelation.
+    rec_start : float
+        Start time of the recording.
+    rec_end : float
+        End time of the recording.
+        
+    Returns:
+    acf : array-like
+        Autocorrelation function values.
+    """
+    counts_x = np.histogram(spike_times_x, bins=np.arange(rec_start, rec_end, bin_size))[0]
+    counts_y = np.histogram(spike_times_y, bins=np.arange(rec_start, rec_end, bin_size))[0]
+    counts_x = counts_x.astype(float)
+    counts_y = counts_y.astype(float)
+    time_bins = np.arange(rec_start, rec_end, bin_size)
+    time_starts = time_bins[:-1]
+    time_ends = time_bins[1:]
+    for go_ind, go_time in enumerate(go_cue_times):
+        go_start = go_time
+        go_end = go_time + go_cue_period
+        # find the indices of the bins that overlaps with the go period
+        overlap_indices = np.where((time_starts <= go_end) & (time_ends >= go_start))[0]
+        if len(overlap_indices) > 0:
+            # set the counts in the overlapping bins to zero
+            counts_x[overlap_indices] = np.nan
+            counts_y[overlap_indices] = np.nan
+
+
+    lag=int(np.round(window_length/bin_size))
+    n = len(counts_x)
+    counts_x = counts_x - np.nanmean(counts_x)
+    counts_y = counts_y - np.nanmean(counts_y)
+    # result = np.correlate(x, x, mode='full')
+    result, lags = correlate_nan_bi(counts_x, counts_y, lag = lag)  # only valid correlations
+    lag_time = np.arange(-lag, lag+1) * bin_size
+    return result, lag_time
+
+def auto_corr_train_nogo(spike_times, bin_size, window_length, rec_start, rec_end, go_cue_times, go_cue_period):
+    """
+    Calculate autocorrelation of spike times.
+    
+    Parameters:
+    spike_times : array-like
+        Spike times of the unit.
+    bin_size : float
+        Bin size for autocorrelation.
+    window_length : float
+        Length of the window for autocorrelation.
+    rec_start : float
+        Start time of the recording.
+    rec_end : float
+        End time of the recording.
+        
+    Returns:
+    acf : array-like
+        Autocorrelation function values.
+    """
+    counts = np.histogram(spike_times, bins=np.arange(rec_start, rec_end, bin_size))[0]
+    counts = counts.astype(float)
+    time_bins = np.arange(rec_start, rec_end, bin_size)
+    time_starts = time_bins[:-1]
+    time_ends = time_bins[1:]
+    for go_ind, go_time in enumerate(go_cue_times):
+        go_start = go_time
+        go_end = go_time + go_cue_period
+        # find the indices of the bins that overlaps with the go period
+        overlap_indices =(time_starts <= go_end) & (time_ends >= go_start)
+        if np.sum(overlap_indices) > 0:
+            # set the counts in the overlapping bins to zero
+            counts[overlap_indices] = np.nan
+    lag=int(window_length/bin_size)
+    n = len(counts)
+    counts = counts - np.nanmean(counts)
+    # result = np.correlate(x, x, mode='full')
+    result = correlate_nan(counts, counts, lag = lag)  # only valid correlations
+    lag_time = np.arange(0, lag + 1) * bin_size
+    return result, lag_time
+
 class load_auto_corr():
     def __init__(self, session, data_type):
         """Initialize the object with a DataFrame."""
@@ -592,10 +680,14 @@ class load_cross_corr():
                     unit_cross_corr_data['unit_2'] = unit_1
                     unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long'] = np.array(np.flip(unit_cross_corr_data['cross_corr_long'].values[0], axis=0))
                     unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short'] = np.array(np.flip(unit_cross_corr_data['cross_corr_short'].values[0], axis=0))
+                    unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long_nogo'] = np.array(np.flip(unit_cross_corr_data['cross_corr_long_nogo'].values[0], axis=0))
+                    unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short_nogo'] = np.array(np.flip(unit_cross_corr_data['cross_corr_short_nogo'].values[0], axis=0))
             elif len(unit_cross_corr_data) == 1:
                 unit_cross_corr_data = unit_cross_corr_data.copy()
                 unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long'] = np.array(unit_cross_corr_data['cross_corr_long'].values[0])
                 unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short'] = np.array(unit_cross_corr_data['cross_corr_short'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long_nogo'] = np.array(unit_cross_corr_data['cross_corr_long_nogo'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short_nogo'] = np.array(unit_cross_corr_data['cross_corr_short_nogo'].values[0])
             else:
                 raise ValueError(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
         return unit_cross_corr_data.to_dict(orient='records')[0] if unit_cross_corr_data is not None else None
