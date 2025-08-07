@@ -60,7 +60,7 @@ def cross_auto_corr(session, data_type):
     for unit_ind_1, unit_1 in enumerate(unit_ids_focus):
         if session_tbl is not None:
             session_tbl_curr = session_tbl.copy()
-        print(f'Processing unit {unit_1}')
+        print(f'Processing unit {session} {unit_1}')
         spike_times_1 = unit_tbl[unit_tbl['unit_id'] == unit_1]['spike_times'].values[0]
         drift_1 = load_drift(session, unit_1, data_type)
         start_unit_1 = rec_start
@@ -245,23 +245,27 @@ if __name__ == '__main__':
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
         print(session_dir[f'curated_dir_{data_type}'])
         if session_dir[f'curated_dir_{data_type}'] is not None:
+            if os.path.exists(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], f'{session}_{data_type}_long_corr.png')):
+                print(f'Cross correlation already computed for {session}. Skipping.')
+                return None
+            else:
             # try:
             # plot_ephys_probe(session, data_type=data_type, probe=probe) 
-            cross_auto_corr(session, data_type)
-            plot_cross_auto_corr(session, data_type)
-            plt.close('all')
-            print(f'Finished {session}')
+                cross_auto_corr(session, data_type)
+                plot_cross_auto_corr(session, data_type)
+                plt.close('all')
+                print(f'Finished {session}')
         # except:
             # print(f'Error processing {session}')
-            plt.close('all')
+            # plt.close('all')
         else: 
             print(f'No curated data found for {session}') 
         # elif session\_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw' 
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    Parallel(n_jobs=-5)(
+    Parallel(n_jobs=10, backend='loky')(
         delayed(process)(session, data_type) 
-        for session in session_list[17:65]
+        for session in session_list[19:64]
     )
 
     # process('behavior_754897_2025-03-13_11-20-42', data_type)

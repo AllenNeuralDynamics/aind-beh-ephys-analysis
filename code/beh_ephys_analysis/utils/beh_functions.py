@@ -28,6 +28,8 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from scipy.stats import norm
 import statsmodels.api as sm
 
+import spikeinterface as si
+
 save_folder=R'/root/capsule/scratch/check_rwd_licks'
 
 logger = logging.getLogger(__name__)
@@ -598,41 +600,75 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     # nwb files
     nwb_dir_raw = None
     nwb_dir_curated = None
+    # load recordings and decide which one is longer
+    if os.path.exists(session_dir_raw):
+        # loop through experiments and segments to get the longest one
+        lengths = []
+        experiment_ids = []
+        segment_inds = []
+        stream_name = []
+
+        for experiment in os.listdir(session_dir_raw):
+            if 'ProbeA' in experiment: 
+                rec_path = os.path.join(session_dir_raw, experiment)
+                # print(rec_path)
+                exp_match = re.search(r'experiment(\d+)', experiment)
+                # experiment_inds.append(int(match.group(1)))
+                recording_curr = si.load(rec_path)
+                rec_num = recording_curr.get_num_segments()
+                # print(rec_num)
+                for rec_ind in range(rec_num):
+                    lengths.append(recording_curr.get_num_samples(segment_index = rec_ind))
+                    experiment_ids.append(int(exp_match.group(1)))
+                    segment_inds.append(rec_ind)
+                    stream_name.append(experiment.split('.zarr')[0])
+
+        max_len_ind = np.argmax(np.array(lengths))
+        experiment_id = experiment_ids[max_len_ind]
+        seg_id = segment_inds[max_len_ind]+1
+        print(f'Selected experiment{experiment_id} recording{seg_id}, length:{lengths[max_len_ind]/32000 :.2f}')
+        experiment_name = stream_name[max_len_ind]
+        stream_name = experiment_name + f'_recording{seg_id}'
+        all_rec_count = experiment_id-1 + seg_id-1
+        raw_recording_dir = os.path.join(session_dir_raw, experiment_name+'.zarr')
+    else:
+        print(f'No raw session directory found for {session_id}.')
+        stream_name = None
+        raw_recording_dir = None 
+        experiment_id = None
+        seg_id = None   
+        max_len_ind = None
+        all_rec_count = None
     # raw version
     nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
+    nwb_dir_raw = None
     if os.path.exists(nwb_dir_temp):
         nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
-        if len(nwbs) == 1:
-            nwb_dir_raw = os.path.join(nwb_dir_temp, nwbs[0])
-        elif len(nwbs)>1:
-            print('There are multiple recordings in the raw nwb directory. Please specify the recording you would like to use.')
+        nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb) and (f'recording{seg_id}' in nwb)]
+        if len(nwb) == 1:
+            nwb_dir_raw = os.path.join(nwb_dir_temp, nwb[0])
+        elif len(nwb) > 1:
+            print('There are multiple recordings in the raw nwb directory. Picked one with units.')
+            nwb_dir_raw = None
         else:
+            nwb_dir_raw = None
             print('There is no nwb file in the raw directory.')
     nwb_dir_curated = None
     # curated version
     if os.path.exists(sorted_dir):
         nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
-        if os.path.exists(nwb_dir_temp):
-            nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
-            if len(nwbs) == 1:
-                nwb_dir_curated = os.path.join(nwb_dir_temp, nwbs[0])
-            elif len(nwbs)>1:
-                print('There are multiple recordings in the curated nwb directory. Picked one with units.')
-                for nwb in nwbs:
-                    if 'units' in os.listdir(os.path.join(nwb_dir_temp, nwb)):
-                        nwb_dir_curated = os.path.join(nwb_dir_temp, nwb)
-                        break
-            else:
-                nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
-        else:
+        if not os.path.exists(nwb_dir_temp):
             nwb_dir_temp = [path for path in os.listdir(sorted_dir) if path.endswith('.nwb')]
-            if len(nwb_dir_temp) == 1:
-                nwb_dir_curated = os.path.join(sorted_dir, nwb_dir_temp[0])
-            else:
-                nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
-
+        nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
+        nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb) and (f'recording{seg_id}' in nwb)]
+        if len(nwb) == 1:
+            nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
+        elif len(nwb) > 1:
+            print('There are multiple recordings in the curated nwb directory. Picked one with units.')
+            nwb_dir_curated = None
+        else:
+            nwb_dir_curated = None
+            print('There is no nwb file in the curated directory.')
     # postprocessed dirs
     postprocessed_dir_raw = None
     postprocessed_dir_curated = None
@@ -641,14 +677,14 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
         if os.path.exists(postprocessed_dir_temp):
             postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
-            postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
+            postprocessed_sub_folder = [s for s in postprocessed_sub_folders if ('post' not in s) and (stream_name in s)]
             postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
 
     if os.path.exists(sorted_raw_dir):
         postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
         if os.path.exists(postprocessed_dir_temp):
             postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
-            postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s]
+            postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name in s]
             postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
 
     
@@ -660,12 +696,14 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         curated_dir_temp = os.path.join(sorted_dir, 'curated')
         if os.path.exists(curated_dir_temp):
             curated_sub_folders = os.listdir(curated_dir_temp)
+            curated_sub_folders = [s for s in curated_sub_folders if stream_name in s]
             curated_dir_curated = os.path.join(curated_dir_temp, curated_sub_folders[0])    
     
     if os.path.exists(sorted_raw_dir):
         curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
         if os.path.exists(curated_dir_temp):
             curated_sub_folders = os.listdir(curated_dir_temp)
+            curated_sub_folders = [s for s in curated_sub_folders if stream_name in s]
             curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
 
     # model dir
@@ -715,6 +753,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'raw_id': raw_id,
                 'datetime': date_obj,
                 'raw_dir': raw_dir,
+                'raw_rec': raw_recording_dir,
                 'session_dir': session_dir,
                 'session_dir_raw': session_dir_raw,
                 'processed_dir': processed_dir,
@@ -743,7 +782,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'nwb_beh': beh_nwb_dir,
                 'sorted_dir_curated': sorted_dir,
                 'sorted_dir_raw': sorted_raw_dir,
-                'opto_csvs': opto_csvs,}
+                'opto_csvs': opto_csvs,
+                'stream_name': stream_name,
+                'experiment_id': experiment_id,
+                'seg_id': seg_id,
+                'rec_id_all': all_rec_count}
 
     # make directories
     makedirs(dir_dict)
@@ -970,8 +1013,8 @@ def plot_session_in_time_all(nwb, bin_size = 10, in_time = True, ax_ori = None):
     else:
         return ax_ori
 
-def plot_session_glm(session, tMax = 10, cut = [0, np.nan]):
-    tbl = makeSessionDF(session, cut = cut)
+def plot_session_glm(session, tMax = 10, cut = [0, np.nan], model_name = None):
+    tbl = makeSessionDF(session, cut = cut, model_name=model_name)
     allChoices = 2 * (tbl['choice'].values - 0.5)
     allRewards = allChoices * tbl['outcome'].values
     allNoRewards = allChoices * (1 - tbl['outcome'].values)
@@ -1040,7 +1083,15 @@ def plot_session_glm(session, tMax = 10, cut = [0, np.nan]):
     intercept_info = f'R² = {rsq:.2f} | Int: {glm_result.params[0]:.2f}'
     plt.legend(loc='upper right')
 
-    return fig, session
+    coeffs_dict = {'coeff_reward': coef_vals.tolist(),
+                   'ci-bands_reward': ci_bands.tolist(),
+                   'coeff_no-reward': coef_vals_no_rwd.tolist(),
+                   'ci-bands_no-reward': ci_bands_no_rwd.tolist(),
+                   'rsq': rsq,
+                   'intercept': glm_result.params[0],
+                   }
+
+    return fig, session, coeffs_dict
 
 def get_session_tbl(session):
     session_dir = session_dirs(session)

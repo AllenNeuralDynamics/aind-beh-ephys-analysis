@@ -569,7 +569,7 @@ if __name__ == "__main__":
      
     
     from joblib import Parallel, delayed
-    data_type = 'curated'
+    data_type = 'raw'
     def process(session, data_type): 
         print(f'Starting {session}')
         session_dir = session_dirs(session)
@@ -583,8 +583,8 @@ if __name__ == "__main__":
         # elif session_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw' 
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    # Parallel(n_jobs=5)(delayed(process)(session, data_type) for session in session_list[-25:-10])
-    process('behavior_782394_2025-04-22_10-53-28', data_type)
+    Parallel(n_jobs=5)(delayed(process)(session, data_type) for session in session_list[-8:-6])
+    # process('behavior_782394_2025-04-22_10-53-28', data_type)
     # for session in [session_list[-13]]:
     #     process(session)
     # print(session_list[-13])

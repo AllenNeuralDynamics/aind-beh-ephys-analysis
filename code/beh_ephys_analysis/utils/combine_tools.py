@@ -54,35 +54,40 @@ def apply_qc(combined_tagged_units, constraints):
     # for each neuron, apply combined opto constraints
     opto_pass = np.full(len(combined_tagged_units), False)
     opto_cond_list = ['all_p_max', 'all_p_mean', 'all_lat_max_p', 'all_corr', 'all_eu', 'all_sig_counts']
-    print(f'Applying opto conditions: {opto_list}')
-    for ind, row in combined_tagged_units.iterrows():
-        curr_opto_tbl = pd.DataFrame(row[opto_cond_list].to_dict())
-        opto_pass_curr = np.full(len(curr_opto_tbl), True)
-        for col, cfg in constraints.items():
-            if col not in opto_list or col == 'tag_loc':
-                continue
-            else: 
-                if "bounds" in cfg:
-                    lb, ub = np.array(cfg["bounds"], dtype=float)
-                    if not np.isnan(lb):
-                        opto_pass_curr &= curr_opto_tbl[f'all_{col}'] > lb
-                    if not np.isnan(ub):
-                        opto_pass_curr &= curr_opto_tbl[f'all_{col}'] < ub
-                elif "items" in cfg:
-                    allowed = cfg["items"]
-                    opto_pass_curr &= curr_opto_tbl[f'all_{col}'].isin(allowed)
-        if opto_pass_curr.any():
-            opto_pass[ind] = True
-            ind_max = np.where(opto_pass_curr)[0][np.argmax(curr_opto_tbl[opto_pass_curr]['all_p_max'])]
-            combined_tagged_units.at[ind, 'p_max'] = curr_opto_tbl['all_p_max'].values[ind_max].astype(float)
-            combined_tagged_units.at[ind, 'p_mean'] = curr_opto_tbl['all_p_mean'].values[ind_max].astype(float)
-            combined_tagged_units.at[ind, 'lat_max_p'] = curr_opto_tbl['all_lat_max_p'].values[ind_max].astype(float)
-            combined_tagged_units.at[ind, 'corr'] = curr_opto_tbl['all_corr'].values[ind_max].astype(float)
-            combined_tagged_units.at[ind, 'eu'] = curr_opto_tbl['all_eu'].values[ind_max].astype(float)
-            combined_tagged_units.at[ind, 'count_max'] = curr_opto_tbl['all_sig_counts'].values[ind_max].astype(float)
+    
+    if len(set(opto_cond_list) & set(combined_tagged_units.columns)) > 0:
+        print(f'Applying opto conditions: {opto_list}')
 
-    combined_tagged_units['selected_opto_only'] = opto_pass
-    mask_all = mask & opto_pass
+        for ind, row in combined_tagged_units.iterrows():
+            curr_opto_tbl = pd.DataFrame(row[opto_cond_list].to_dict())
+            opto_pass_curr = np.full(len(curr_opto_tbl), True)
+            for col, cfg in constraints.items():
+                if col not in opto_list or col == 'tag_loc':
+                    continue
+                else: 
+                    if "bounds" in cfg:
+                        lb, ub = np.array(cfg["bounds"], dtype=float)
+                        if not np.isnan(lb):
+                            opto_pass_curr &= curr_opto_tbl[f'all_{col}'] > lb
+                        if not np.isnan(ub):
+                            opto_pass_curr &= curr_opto_tbl[f'all_{col}'] < ub
+                    elif "items" in cfg:
+                        allowed = cfg["items"]
+                        opto_pass_curr &= curr_opto_tbl[f'all_{col}'].isin(allowed)
+            if opto_pass_curr.any():
+                opto_pass[ind] = True
+                ind_max = np.where(opto_pass_curr)[0][np.argmax(curr_opto_tbl[opto_pass_curr]['all_p_max'])]
+                combined_tagged_units.at[ind, 'p_max'] = curr_opto_tbl['all_p_max'].values[ind_max].astype(float)
+                combined_tagged_units.at[ind, 'p_mean'] = curr_opto_tbl['all_p_mean'].values[ind_max].astype(float)
+                combined_tagged_units.at[ind, 'lat_max_p'] = curr_opto_tbl['all_lat_max_p'].values[ind_max].astype(float)
+                combined_tagged_units.at[ind, 'corr'] = curr_opto_tbl['all_corr'].values[ind_max].astype(float)
+                combined_tagged_units.at[ind, 'eu'] = curr_opto_tbl['all_eu'].values[ind_max].astype(float)
+                combined_tagged_units.at[ind, 'count_max'] = curr_opto_tbl['all_sig_counts'].values[ind_max].astype(float)
+
+        combined_tagged_units['selected_opto_only'] = opto_pass
+        mask_all = mask & opto_pass
+    else:
+        mask_all = mask
     # apply and get filtered DataFrame
     combined_tagged_units_filtered = combined_tagged_units[mask_all].reset_index(drop=True)
     combined_tagged_units['selected'] = mask_all
@@ -113,6 +118,7 @@ def apply_qc(combined_tagged_units, constraints):
             # bins[-1] = bins[-1]+0.0001
             # if col=='peak':
             #     bins = np.linspace(-500, 300, 50)
+            bins = np.linspace(np.nanmin(full_data), np.nanmax(full_data), 50)
             match col:
                 case 'isi_violations':
                     bins =  np.linspace(0, 1, 50)

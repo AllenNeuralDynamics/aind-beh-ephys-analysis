@@ -163,7 +163,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     # %%
     # load neuralpixel session
     session_rec = Session(session_dir['session_dir'])
-    recording = session_rec.recordnodes[0].recordings[0]
+    recording = session_rec.recordnodes[0].recordings[session_dir['rec_id_all']]
     timestamps = recording.continuous[0].timestamps
     fig = plt.Figure(figsize=(10,2))
     plt.subplot(1,2,1)
@@ -303,7 +303,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     # unit_spikes = nwb.units[:]['spike_times']
     # unit_ids = nwb.units[:]['ks_unit_id']
     if preprosess_qm['ephys_sync']:
-        print('Ephys synced, getting spike times from nwb')
+        print('Ephys synced, getting spike times from recording time')
     else:
         print('Ephys not synced, resync spike times and laser times')
         harp_sync_time = np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy'))
@@ -320,7 +320,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     else:
         opto_df['pre_post'] = 'post'
     # unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
-    unit_spikes = {unit_id:(unit_spike-1) for unit_id, unit_spike in zip(unit_ids, unit_spikes)} # for session behavior_782394_2025-04-22_10-53-28
+    unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)} # for session behavior_782394_2025-04-22_10-53-28
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
         pickle.dump(unit_spikes, f)
 
@@ -472,7 +472,7 @@ def ephys_opto_preprocessing(session, data_type, target):
         all_channels_int = np.array([int(channel.split('AP')[-1]) for channel in all_channels])
     else:
         all_channels_int = np.array([int(channel.split('CH')[-1]) for channel in all_channels])
-    unit_spartsiity = we.sparsity.unit_id_to_channel_ids
+    unit_spartsity = we.sparsity.unit_id_to_channel_ids
     channel_locations = we.get_channel_locations()
     unit_locations = we.get_extension("unit_locations").get_data(outputs="by_unit")
     del we
@@ -529,7 +529,7 @@ def ephys_opto_crosscorr(session, data_type):
 
 if __name__ == "__main__":
     # session = 'behavior_717121_2024-06-15_10-00-58'
-    data_type = 'curated'
+    data_type = 'raw'
     target = 'soma'
     # ephys_opto_preprocessing(session, data_type, target)
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -543,13 +543,13 @@ if __name__ == "__main__":
         session_dir = session_dirs(session)
         if session_dir[f'curated_dir_{data_type}'] is not None: 
             print(f'Processing {session}')
-            # ephys_opto_preprocessing(session, data_type, target)
+            ephys_opto_preprocessing(session, data_type, target)
             plt.close('all')
-            ephys_opto_crosscorr(session, data_type)
+            # ephys_opto_crosscorr(session, data_type)
             print(f'Finished {session}')
     # for session in session_list[-25:-10]:
     #     process(session)
-    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-25:-10])
+    Parallel(n_jobs=2)(delayed(process)(session) for session in session_list[-9:])
     # process('behavior_782394_2025-04-22_10-53-28')
     # for session in session_list[-14:-3]:
     #     process(session)

@@ -19,6 +19,7 @@ import datetime
 from aind_ephys_rig_qc.temporal_alignment import search_harp_line
 from matplotlib.gridspec import GridSpec
 import json
+import spikeinterface as si
 
 # %%
 def beh_and_time_alignment(session, ephys_cut = [0, 0]):
@@ -39,7 +40,6 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
 
     # %%
     print(session)
-    session_dir = session_dirs(session)
     aniID, date_time, string = parseSessionID(session)
     session_json_dir = os.path.join(session_dir['raw_dir'], 'behavior')
     session_json_files = []
@@ -74,7 +74,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
         fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_lick_analysis.pdf'))
         # display(fig)
 
-        fig, _ = plot_session_glm(session, tMax=5)
+        fig, _, _ = plot_session_glm(session, tMax=5)
         fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_glm.pdf'))
         # display(fig)
 
@@ -102,16 +102,25 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
 
         # %%
         session_rec = Session(session_dir['session_dir'])  
-        recording = session_rec.recordnodes[0].recordings[0]
+        recording = session_rec.recordnodes[0].recordings[session_dir['rec_id_all']]
+        
         harp_line, nidaq_stream_name, source_node_id, figure = search_harp_line(recording, session_dir['session_dir'])
         figure.savefig(os.path.join(session_dir['alignment_dir'], 'harp_line.png'))
         print(F'Harp line {harp_line} found in {session}')
 
         # %%
-        timestamps = recording.continuous[0].timestamps[::30000]
+        timestamps = recording.continuous[0].timestamps
         # example neurons
-        nwb = load_nwb_from_filename(session_dir['nwb_dir_raw'])
-        unit_spikes = nwb.units[::10]['spike_times']
+        # extract from nwb
+        # nwb = load_nwb_from_filename(session_dir['nwb_dir_raw'])
+        # unit_spikes = nwb.units[::10]['spike_times']
+        # mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
+        # mean_spike_times = np.mean(np.array(mean_spike_times))
+        # extract from sorting
+        sorting = si.load(session_dir['curated_dir_raw'])
+        # recording = si.read_zarr(session_dir['raw_rec'])
+        # sorting.register_recording(recording)
+        unit_spikes = [timestamps[sorting.get_unit_spike_train(unit_id = curr_unit)] for curr_unit in sorting.unit_ids[::10]]
         mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
         mean_spike_times = np.mean(np.array(mean_spike_times))
         figure, ax = plt.subplots(1, 1, figsize=(10, 5))
@@ -170,6 +179,7 @@ if __name__ == "__main__":
     session = 'ecephys_763360_2025-04-16_13-29-55'
     ephys_cut = [0, 0]
     beh_and_time_alignment(session, ephys_cut=ephys_cut)
+
 
 
 
