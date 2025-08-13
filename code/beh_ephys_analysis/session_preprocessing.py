@@ -22,7 +22,7 @@ import spikeinterface as si
 import spikeinterface.extractors as se
 import spikeinterface.postprocessing as spost
 import spikeinterface.widgets as sw
-from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_nwb
+from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_nwb  
 from aind_ephys_utils import align
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib import colormaps
@@ -33,9 +33,19 @@ import datetime
 def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = None):
     # loading info
     session_dir = session_dirs(session)
+<<<<<<< HEAD
     opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv'))
     sorting_analyzer = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
+=======
+    if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):
+        beh_nwb = load_nwb_from_filename(os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
+    else:
+        beh_nwb == None
+    opto_df = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv'))
+    sorting_analyzer = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
+    sorting = si.load(session_dir[f'curated_dir_{data_type}'])
+>>>>>>> origin/main
     unit_ids = sorting.get_unit_ids()
     spike_times = sorting.get_unit_spike_train(unit_id=unit_ids[0])
     spike_vector = sorting.to_spike_vector()
@@ -54,6 +64,10 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
     good_channel_ids = recording.channel_ids[
             np.in1d(recording.channel_ids, sorting_analyzer.channel_ids)
     ]
+<<<<<<< HEAD
+=======
+    del sorting_analyzer
+>>>>>>> origin/main
     recording = recording.select_channels(good_channel_ids)
 
     # find maximum spike sample number with 'pre'
@@ -225,18 +239,35 @@ def ephys_opto_preprocessing(session, data_type, target):
     laser_line = 2
     # load all laser times
     events = recording.events
+    del recording
     laser_events = events[
                     (events.stream_name == 'PXIe-6341')
                     & (events.line == laser_line)
                     & (events.state == 1)
                 ].sort_values(by='sample_number')
     laser_times = np.sort(laser_events['timestamp'].values)
+    qm['laser_sync'] = True
+    # in rare case where only recording is synced by events is not
+    # if laser_times[-1] < timestamps[0] or laser_times[0] > timestamps[-1]:
+    #     qm['laser_sync'] = False
+    #     print(f'{session} laser is not synced.')
+    #     np_event = events[
+    #         (events.stream_name == 'ProbeA')
+    #         & (events.state == 1)
+    #         & (events.line == 1)
+    #     ].sort_values(by='sample_number')
+    #     np_event_time = np.sort(np_event['timestamp'].values)
+    #     np_global_time = timestamps[np_event['sample_number'].values-recording.continuous[0].sample_numbers[0]]
+    #     laser_times = align_timestamps_to_anchor_points(laser_times, np_event_time, np_global_time)
+        # laser_times_ori = laser_times.copy()
+        # if session == 'behavior_717121_2024-06-15_10-00-58':
+        #     local_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/original_timestamps.npy')
+        #     harp_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/timestamps.npy')
+        # laser_times = align_timestamps_to_anchor_points(laser_times, local_times, harp_times)
 
     # load all laser conditions
     opto_dfs = [pd.read_csv(csv) for csv in session_dir['opto_csvs']]
     opto_df = pd.concat(opto_dfs)
-    opto_df.loc[laser_times < timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'pre'
-    opto_df.loc[laser_times >= timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'post'
     # load all laser times
     plt.plot(laser_times)
     plt.axhline(y = np.max(timestamps), color = 'r', linestyle = '--')
@@ -263,11 +294,15 @@ def ephys_opto_preprocessing(session, data_type, target):
     else:
         qm['laser_same_count'] = True
         print(f'{session} has equal number of laser triggers and opto_df')
+<<<<<<< HEAD
     # %%
     if data_type == 'curated':
         opto_df = opto_df[(laser_times >= qm['ephys_cut'][0]) & (laser_times < qm['ephys_cut'][1])].copy()
         laser_times = laser_times[(laser_times >= qm['ephys_cut'][0]) & (laser_times < qm['ephys_cut'][1])].copy() 
     laser_times_ori = laser_times.copy()
+=======
+    # %% 
+>>>>>>> origin/main
 
     # %%
     nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
@@ -291,9 +326,8 @@ def ephys_opto_preprocessing(session, data_type, target):
         # to be updated
         unit_spikes = [align_timestamps_to_anchor_points(spike_times, local_sync_time, harp_sync_time) for spike_times in unit_spikes]
         laser_times = align_timestamps_to_anchor_points(laser_times, local_sync_time, harp_sync_time)
-    # remove cut off period if data is curated version
-    if data_type == 'curated':
-        unit_spikes = [spikes[(spikes >= qm['ephys_cut'][0]) & (spikes < qm['ephys_cut'][1])] for spikes in unit_spikes]
+    opto_df.loc[laser_times < timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'pre'
+    opto_df.loc[laser_times >= timestamps[int(np.round(len(timestamps) * 0.5))], 'pre_post'] = 'post'
     unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
         pickle.dump(unit_spikes, f)
@@ -337,7 +371,11 @@ def ephys_opto_preprocessing(session, data_type, target):
     # Collect all target laser times and conditions
     # save all confirmed laser times
     opto_df['time'] = laser_times
+<<<<<<< HEAD
     laser_onset_samples = np.searchsorted(timestamps, laser_times_ori)
+=======
+    laser_onset_samples = np.searchsorted(timestamps, laser_times)
+>>>>>>> origin/main
     opto_df['laser_onset_samples'] = laser_onset_samples
     if 'emission_location' in opto_df.columns:
         opto_df = opto_df.drop(columns=['site'])
@@ -438,7 +476,7 @@ def ephys_opto_preprocessing(session, data_type, target):
 
     # %%
     # load waveforms info
-    we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
+    we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     print(f'Loaded session: {session}')
     unit_ids = we.sorting.get_unit_ids()
     all_templates = we.get_extension("templates").get_data(operator="average")
@@ -450,6 +488,10 @@ def ephys_opto_preprocessing(session, data_type, target):
     unit_spartsiity = we.sparsity.unit_id_to_channel_ids
     channel_locations = we.get_channel_locations()
     unit_locations = we.get_extension("unit_locations").get_data(outputs="by_unit")
+<<<<<<< HEAD
+=======
+    del we
+>>>>>>> origin/main
     right_left = channel_locations[:, 0]<20
 
     # re-organize templates so that left and right separate
@@ -498,16 +540,38 @@ def ephys_opto_preprocessing(session, data_type, target):
 def ephys_opto_crosscorr(session, data_type):
     session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
     session_crosscorr(session, data_type, window_ms=1000, bin_ms=10, post_fix = 'long')
+<<<<<<< HEAD
     print(f"Cross-correlation saved to {session_dir[f'opto_dir_{data_type}']}")
+=======
+    # print(f"Cross-correlation saved to {session_dir[f'opto_dir_{data_type}']}")
+>>>>>>> origin/main
 
 
 if __name__ == "__main__":
-    session = 'behavior_758017_2025-02-04_11-57-38'
-    data_type = 'raw'
+    # session = 'behavior_717121_2024-06-15_10-00-58'
+    data_type = 'curated'
     target = 'soma'
     # ephys_opto_preprocessing(session, data_type, target)
+<<<<<<< HEAD
     si.set_global_job_kwargs(n_jobs=-1)
     session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
     session_crosscorr(session, data_type, window_ms=2000, bin_ms=10, post_fix = 'long')
+=======
+    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_list = session_assets['session_id']
+    session_list = [session for session in session_list if isinstance(session, str)]
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+    for session in [session_list[-1]]:  
+        session_dir = session_dirs(session)
+        if session_dir['nwb_dir_curated'] is None:
+            continue
+        else: 
+            print(f'Processing {session}')
+            ephys_opto_preprocessing(session, data_type, target)
+            ephys_opto_crosscorr(session, data_type)
+            print(f'Finished {session}')
+>>>>>>> origin/main
 
 

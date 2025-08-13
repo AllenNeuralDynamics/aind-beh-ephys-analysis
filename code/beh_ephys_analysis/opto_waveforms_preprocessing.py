@@ -32,6 +32,7 @@ import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
 import spikeinterface.postprocessing as spost
 from tqdm import tqdm
+import shutil
 
 def load_and_preprocess_recording(session_folder, stream_name):
     ephys_path = os.path.dirname(session_folder)
@@ -80,7 +81,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
             load_sorting_analyzer = False
     if not load_sorting_analyzer:
         # recording info
-        sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
+        sorting = si.load(session_dir[f'curated_dir_{data_type}'])
         max_spikes_per_unit_spontaneous = 500
         spike_vector = sorting.to_spike_vector()
         unit_ids = sorting.unit_ids
@@ -119,7 +120,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
                                         )['laser_onset_samples'].values
                                     if len(onset_samples) == 0:
                                         continue
-                                    pulse_offset = 1/curr_freq * sorting.sampling_frequency
+                                    pulse_offset = 1/curr_freq
                                     pulse_offset_samples = int(pulse_offset * sorting.sampling_frequency)
                                     for pulse_ind in range(curr_num_pulses):
                                         for onset_sample in onset_samples:
@@ -196,7 +197,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
         # %%
         # filter good channels
         recording_processed = load_and_preprocess_recording(session_dir['session_dir'], 'ProbeA')
-        we = si.load_sorting_analyzer_or_waveforms(session_dir[f'postprocessed_dir_{data_type}'])
+        we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
         good_channel_ids = recording_processed.channel_ids[
             np.in1d(recording_processed.channel_ids, we.channel_ids)
         ]
@@ -207,6 +208,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
         # %%
         num_cases = len(sorting_all.unit_ids) // num_units - 2
         sparsity_mask_all = np.tile(we.sparsity.mask, (num_cases + 2, 1))
+        del we
         sparsity_all = si.ChannelSparsity(
             sparsity_mask_all,
             unit_ids=sorting_all.unit_ids,
@@ -241,12 +243,15 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
         _ = analyzer.compute("random_spikes", method="all")
         _ = analyzer.compute(["waveforms", "templates"])
         waveform_zarr_folder = f'{session_dir[f"opto_dir_{data_type}"]}/opto_waveforms.zarr'
+        if os.path.exists(waveform_zarr_folder):
+            print("Zarr folder already exists, deleting.")
+            shutil.rmtree(waveform_zarr_folder)
         analyzer_saved_zarr = analyzer.save_as(format='zarr', folder = waveform_zarr_folder)
         print(f'Saved analyzer to {waveform_zarr_folder}')
     else:
         waveform_zarr_folder = f'{session_dir[f"opto_dir_{data_type}"]}/opto_waveforms.zarr'
         if os.path.exists(waveform_zarr_folder):
-            analyzer = si.load_sorting_analyzer(waveform_zarr_folder)
+            analyzer = si.load(waveform_zarr_folder, load_extensions=False)
             print(f'Loaded analyzer from {waveform_zarr_folder}')
         else:
             print("Analyzer doesn't exist, please compute first.")
@@ -262,9 +267,8 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     extreme_channels = si.get_template_extremum_channel(analyzer) 
 
     for ind_id, unit_id in enumerate(analyzer.unit_ids):
-        print(unit_id)
         unit_id_name, case = unit_id.split(" ", 1)
-        # print(unit_id_name, case)
+        
         unit_template = template_ext.get_unit_template(unit_id)       
         peak_waveform = unit_template[:,extreme_channel_indices[unit_id]]
         # plt.figure()
@@ -316,7 +320,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
             peak_channel = row['peak_channel']
             unit_id = row['unit_id']
             pre_post = row['pre_post']
-
+            
             spont_unit = waveform_metrics.query("spont == 1 and unit_id == @unit_id and pre_post == @pre_post")
             if len(spont_unit) == 0:
                 template_spont = np.nan
@@ -336,12 +340,13 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
             correlation = np.corrcoef(peak_waveform_resp.reshape(-1), peak_waveform_spont.reshape(-1))[0, 1]
             waveform_metrics.at[index, 'correlation'] = correlation
             # euclidean distance
+            focus_ind = np.array(range(np.max(np.array([peak_samp_ind-10, 0])), np.min(np.array([peak_samp_ind+20, len(peak_waveform_spont)]))))
 
-            euc_dist = np.sqrt(np.linalg.norm(
-                peak_waveform_resp[np.max(np.array([peak_samp_ind-10, 0])): np.min(np.array([peak_samp_ind+20, len(peak_waveform_spont)]))]
-                - peak_waveform_spont[np.max(np.array([peak_samp_ind-10, 0])): np.min(np.array([peak_samp_ind+20, len(peak_waveform_spont)]))]))
+            euc_dist = np.linalg.norm(
+                peak_waveform_resp[focus_ind]
+                - peak_waveform_spont[focus_ind])
             # energy
-            energy = np.sqrt(np.sum(np.square(peak_waveform_spont[np.max(np.array([peak_samp_ind-10, 0])): np.min(np.array([peak_samp_ind+20, len(peak_waveform_spont)]))])))
+            energy = np.linalg.norm(peak_waveform_spont[focus_ind])
             euc_dist_norm = euc_dist / energy
             waveform_metrics.at[index, 'euclidean_norm'] = euc_dist_norm
 
@@ -352,8 +357,8 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
 
     # %%
     unit_ids = waveform_metrics['unit_id'].unique()
-    gs = gridspec.GridSpec(30, 5)
-    fig = plt.figure(figsize=(10, 40))
+    gs = gridspec.GridSpec(40, 10)
+    fig = plt.figure(figsize=(20, 50))
     count = 0
     for unit_id in unit_ids:
         spont_post = waveform_metrics.query('spont == 1 and unit_id == @unit_id and pre_post == "post"')
@@ -387,8 +392,25 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     log_file.close()
     
 if __name__ == "__main__":
-    session = 'behavior_751004_2024-12-23_14-20-03'
+    # session = 'behavior_751004_2024-12-20_13-26-11'
     data_type = 'raw'
     target = 'soma'
     load_sorting_analyzer = True
-    opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+    # session = 'behavior_754897_2025-03-14_11-28-53'
+    # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+
+    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_list = session_assets['session_id']
+    ind = [i for i, session in enumerate(session_list) if session == 'behavior_751769_2025-01-16_11-32-05']
+    ind = ind[0]
+
+    for session in session_list[-5:]: 
+        print(session)
+        session_dir = session_dirs(session)
+        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+            if session_dir['curated_dir_curated'] is not None:
+                data_type = 'curated'
+                opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+            # elif session_dir['nwb_dir_raw'] is not None:
+            #     data_type = 'raw'
+            #     opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)

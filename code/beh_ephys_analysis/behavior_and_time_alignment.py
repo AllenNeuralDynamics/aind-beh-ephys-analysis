@@ -44,20 +44,23 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     session_json_dir = os.path.join(session_dir['raw_dir'], 'behavior')
     session_json_files = []
     for dir, _, files in os.walk(session_json_dir):
+        print(dir)
         for file in files:
+            print(file)
             if file.endswith('.json') and aniID in file and 'model' not in file:
                 session_json_files.extend([os.path.join(dir, file)])
     print(f'{len(session_json_files)} session json files found.')
+    nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
     if len(session_json_files) == 1:
         session_json_file = session_json_files[0]
         if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):
             print('NWB file already exists.')
         else:
             print('Processing NWB:')
-            success, nwb_file = bonsai_to_nwb(session_json_file, os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
+            success, nwb = bonsai_to_nwb(session_json_file, os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
 
     # %%
-    nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
+
     if not os.path.exists(nwb_file):
         print('NWB file does not exist.')
     else:
@@ -71,7 +74,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
         fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_lick_analysis.pdf'))
         # display(fig)
 
-        fig, _ = plot_session_glm(nwb, tMax=5)
+        fig, _ = plot_session_glm(session, tMax=5)
         fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_glm.pdf'))
         # display(fig)
 
@@ -106,13 +109,20 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
 
     # %%
     timestamps = recording.continuous[0].timestamps[::30000]
+    # example neurons
+    nwb = load_nwb_from_filename(session_dir['nwb_dir_raw'])
+    unit_spikes = nwb.units[::10]['spike_times']
+    mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
+    mean_spike_times = np.mean(np.array(mean_spike_times))
     figure, ax = plt.subplots(1, 1, figsize=(10, 5))
     ax.hist(timestamps, bins=100, density=True, alpha=0.5, label='ephys')
     ax.hist(all_licks, bins=100, density=True, alpha=0.5, label='licks')
     ax.hist(df_trial['goCue_start_time'], bins=100, density=True, alpha=0.5, label='goCue')
+    for i, unit_spike in enumerate(unit_spikes):
+        ax.hist(unit_spike, bins=100, density=True, alpha=0.2, color='k')
     ax.legend()
     figure.savefig(os.path.join(session_dir['alignment_dir'], 'lick_goCue_ephys_time.pdf'))
-    if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]):
+    if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]) and np.abs(np.mean(timestamps) - mean_spike_times) < 0.2*(timestamps[-1]-timestamps[0]): 
         print(f'{session} ephys is synced.')
         qm_dict['ephys_sync'] = True
     else:
@@ -150,8 +160,13 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     # Close the file
     log_file.close()
 
+<<<<<<< HEAD
 if __name__ == "__main__":
     session = 'behavior_716325_2024-05-31_10-31-14'
+=======
+if __name__ == "__main__":  
+    session = 'behavior_754897_2025-03-15_11-32-18'
+>>>>>>> origin/main
     ephys_cut = [0, 0]
     beh_and_time_alignment(session, ephys_cut=ephys_cut)
 

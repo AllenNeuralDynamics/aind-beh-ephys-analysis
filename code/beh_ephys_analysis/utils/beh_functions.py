@@ -10,7 +10,7 @@ from scipy.stats import norm
 import ast
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_data
-
+from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from uuid import uuid4
 import json
 from datetime import datetime
@@ -20,9 +20,10 @@ from dateutil.tz import tzlocal
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
 from pynwb.file import Subject
 from scipy.io import loadmat
+import pickle
 
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 from scipy.stats import norm
 import statsmodels.api as sm
@@ -81,7 +82,7 @@ def _get_field(obj, field_list, reject_list=[None, np.nan,'',[]], index=None, de
     
 
 ######## load the Json/Mat file #######
-def bonsai_to_nwb(fname, save_file):
+def bonsai_to_nwb(fname, save_file=None):
     if fname.endswith('.mat'):
         Obj = loadmat(fname)
         for key in Obj.keys():
@@ -552,37 +553,17 @@ def bonsai_to_nwb(fname, save_file):
     # save NWB file
     base_filename = os.path.splitext(os.path.basename(fname))[0] + '.nwb'
     if len(nwbfile.trials) > 0:
-        NWBName = save_file
-        io = NWBHDF5IO(NWBName, mode="w")
-        io.write(nwbfile)
-        io.close()
-        logger.info(f'Successfully converted: {NWBName}')
-        print(f'NWB saved {NWBName}')
-        return 'success', nwbfile
+        if save_file is not None: 
+            NWBName = save_file
+            io = NWBHDF5IO(NWBName, mode="w")
+            io.write(nwbfile)
+            io.close()
+            logger.info(f'Successfully converted: {NWBName}')
+            print(f'NWB saved {NWBName}')
+            return 'success', nwbfile
     else:
         logger.warning(f"No trials found! Skipping {fname}")
         return 'empty_trials', nwbfile
-
-def load_nwb(filename):
-    """
-    Load NWB from file, checking for HDF5 or Zarr
-    if filename is not a string, then return the input, assuming its the NWB file already
-    """
-
-    if type(filename) is str:
-        if os.path.isdir(filename):
-            io = NWBZarrIO(filename, mode="r")
-            nwb = io.read()
-            return nwb
-        elif os.path.isfile(filename):
-            io = NWBHDF5IO(filename, mode="r")
-            nwb = io.read()
-            return nwb
-        else:
-            raise FileNotFoundError(filename)
-    else:
-        # Assuming its already an NWB
-        return filename
 
 def parseSessionID(file_name):
     if len(re.split('[_.]', file_name)[0]) == 6 & re.split('[_.]', file_name)[0].isdigit():
@@ -602,7 +583,7 @@ def parseSessionID(file_name):
     
     return aniID, dateObj, raw_id
 
-def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
+def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data/LC-NE_scratch_data_06-14-2025', scratch_dir = '/root/capsule/data/LC-NE_scratch_data_06-14-2025'):
     # parse session_id
     aniID, date_obj, raw_id = parseSessionID(session_id)
     # raw dirs
@@ -637,10 +618,6 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         else:
             nwb_dir = None
             print('There is no nwb file in the raw directory.')
-
-    # pro   
-    
-    beh_nwb_dir = None
 
     # postprocessed dirs
     postprocessed_dir_raw = None
@@ -678,11 +655,13 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
 
     # model dir
-    
+    models_dir = os.path.join(data_dir, f'{aniID}_model_stan')
     if model_name is not None:
         model_dir = os.path.join(models_dir, model_name)
-        model_file = os.path.join(model_dir, raw_id+'_session_model_dv.csv')
-        session_curation_file = os.path.join(model_dir, 'ani_session_data.csv')
+        model_file = os.path.join(model_dir, session_id+'_session_model_dv.csv')
+        if not os.path.exists(model_file):
+            model_file = os.path.join(model_dir, raw_id+'_session_model_dv.csv')
+        session_curation_file = os.path.join(models_dir, f'{aniID}_session_data.csv')
     else:
         model_dir = None
         model_file = None
@@ -714,6 +693,9 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     opto_dir_curated = os.path.join(opto_dir, 'curated')
     opto_dir_fig_raw = os.path.join(opto_dir, 'raw', 'figures')
     opto_dir_fig_curated = os.path.join(opto_dir, 'curated', 'figures')
+    # pro   
+    
+    beh_nwb_dir = os.path.join(processed_dir, 'behavior', f'{session_id}.nwb')
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
@@ -743,7 +725,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'model_dir': model_dir,
                 'model_file': model_file,
                 'session_curation_file': session_curation_file,
-                'beh_nwb_dir': beh_nwb_dir,
+                'nwb_beh': beh_nwb_dir,
                 'sorted_dir_curated': sorted_dir,
                 'sorted_dir_curated': sorted_raw_dir,
                 'opto_csvs': opto_csvs,}
@@ -757,11 +739,10 @@ def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scrat
     model_dirs = session_dirs(session_id, model_name, data_dir=data_dir, scratch_dir=scratch_dir)
     if model_dirs['model_file'] is not None:
         model_dv_temp = pd.read_csv(model_dirs['model_file'], index_col=0)
-        nwb = load_nwb(model_dirs['nwb_dir'])
-        trial_df = nwb.trials.to_dataframe()
+        # trial_df = get_session_tbl(session_id)
         # model_dv = pd.DataFrame(np.nan, index=range(len(trial_df)), columns=model_dv_temp.columns)
         session_curation = pd.read_csv(model_dirs['session_curation_file'])
-        session_cut = session_curation.loc[session_curation['session_id'] == model_dirs['raw_id'], 'session_cut'].values[0]
+        session_cut = session_curation.loc[session_curation['session_id'].str.contains(model_dirs['raw_id']), 'session_cut'].values[0]
         session_cut = ast.literal_eval(session_cut)
         # model_dv[curr_cut[0]:curr_cut[1]] = model_dv_temp
         model_dv = model_dv_temp.copy()
@@ -809,12 +790,17 @@ def delete_files_without_name(folder_path, name):
                 # Delete the file
                 os.remove(file_path)
 
-def makeSessionDF(nwb, cut = [0, np.nan]):
-    tblTrials = nwb.trials.to_dataframe()
+def makeSessionDF(session, cut = [0, np.nan], model_name = None):
+    tblTrials = get_session_tbl(session)
+
+    if model_name is not None:
+        model_dv, cut = load_model_dv(session, model_name)
+
     if np.isnan(cut[1]):
         tblTrials = tblTrials.iloc[cut[0]:].copy()
     else:
         tblTrials = tblTrials.iloc[cut[0]:cut[1]].copy()
+    
     # tblTrials.reset_index(inplace=True)
     trialStarts = tblTrials.loc[tblTrials['animal_response']!=2, 'goCue_start_time'].values
     responseTimes = tblTrials[tblTrials['animal_response']!=2]
@@ -849,6 +835,11 @@ def makeSessionDF(nwb, cut = [0, np.nan]):
     laser = tblTrials['laser_on_trial'] == 1
     laserPrev = np.concatenate((np.full((1), np.nan), laserChoice[:-1]))
     # trial_id = tblTrials.loc[tblTrials['animal_response']!=2, 'id']
+
+    # stay vs switch
+    svs = np.zeros(len(choices), dtype=bool)
+    svs[choices!=choicesPrev] = True
+
     trialData = pd.DataFrame({
         # 'trial_id': trial_id,
         'outcome': outcomes.values.astype(float), 
@@ -860,13 +851,33 @@ def makeSessionDF(nwb, cut = [0, np.nan]):
         'go_cue_time': go_cue_time.values,
         'choice_time': outcome_time.values,
         'outcome_time': outcome_time.values,
+        'svs': svs
         })
+    # combine all columns of trialData and tblTrials
+    choice_tbl = tblTrials.loc[tblTrials['animal_response']!=2].copy()
+    choice_tbl.reset_index(inplace=True)
+    trialData = pd.concat([trialData, choice_tbl], axis=1)
+
+    if model_name is not None:
+        session_df = pd.merge(trialData, model_dv, left_index=True, right_index=True, suffixes=('', '_model'))
+
+        for column in session_df.columns:
+            if '_model' in column:
+                session_df.drop(column, axis=1, inplace=True)
+        if 'Q_r' in session_df.columns:
+            Qchosen = session_df['Q_l'].values
+            Qchosen[np.where(session_df['choice']>0)] = session_df.loc[session_df['choice']>0, 'Q_r']
+            session_df['Qchosen'] = Qchosen
+        trialData = session_df.copy()
+
     return trialData
 
 def get_history_from_nwb(nwb, cut = [0, np.nan]):
     """Get choice and reward history from nwb file"""
-
-    df_trial = nwb.trials.to_dataframe()
+    if not isinstance(nwb, pd.DataFrame):       
+        df_trial = nwb.trials.to_dataframe()
+    else:
+        df_trial = nwb.copy()
     if np.isnan(cut[1]):
         df_trial = df_trial.iloc[cut[0]:].copy()
     else:
@@ -885,7 +896,7 @@ def get_history_from_nwb(nwb, cut = [0, np.nan]):
         df_trial.reward_random_number_right.values,
     ]
 
-    trial_time = df_trial['goCue_start_time'].values - df_trial['goCue_start_time'].values[0]
+    trial_time = df_trial['goCue_start_time'].values
     return (
         choice_history,
         reward_history,
@@ -895,11 +906,15 @@ def get_history_from_nwb(nwb, cut = [0, np.nan]):
         trial_time,
     )
 
-def plot_session_in_time_all(nwb, bin_size = 10, in_time = True):
-    fig = plt.Figure(figsize = (12, 6))
-    gs = GridSpec(3, 1, figure = fig, height_ratios=[6,1,1], hspace = 0.5)
+def plot_session_in_time_all(nwb, bin_size = 10, in_time = True, ax_ori = None):
+    if ax_ori is None:
+        fig, _ = plt.subplots(figsize=(12, 6))
+        fig = plt.Figure(figsize=(12, 6))
+        gs = GridSpec(3, 1, figure = fig, height_ratios=[6,1,1], hspace = 0.5)
+    else:
+        gs = GridSpecFromSubplotSpec(3, 1, height_ratios=[6,1,1], hspace = 0.5, subplot_spec = ax_ori.get_subplotspec())
     choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(nwb)
-    ax_choice_reward = fig.add_subplot(gs[0,0])
+    ax_choice_reward = fig.add_subplot(gs[0])
     if in_time:
         plot_foraging_session(  # noqa: C901
                             choice_history,
@@ -917,9 +932,12 @@ def plot_session_in_time_all(nwb, bin_size = 10, in_time = True):
                             autowater_offered = autowater_offered,
                             ax = ax_choice_reward,
                             )
+    # turn off x and y axis
+    ax_choice_reward.set_frame_on(False)
     # plot licks
-    data = load_data(nwb)    
-    ax = fig.add_subplot(gs[2])
+    data = load_data(nwb)   
+    ax = fig.add_subplot(gs[2]) 
+    # ax = plt.subplot(gs[2])
     bins = np.arange(np.min(data['all_licks']-data['tbl_trials']['goCue_start_time'][0]), np.max(data['all_licks']-data['tbl_trials']['goCue_start_time'][0]), bin_size)  
     ax.hist(data['left_licks']-data['tbl_trials']['goCue_start_time'][0], bins = bins, color = 'blue', alpha = 0.5, label = 'left licks', density = True)
     ax.set_xlim(0, -data['tbl_trials']['goCue_start_time'][0]+data['tbl_trials']['goCue_start_time'].values[-1])
@@ -932,10 +950,13 @@ def plot_session_in_time_all(nwb, bin_size = 10, in_time = True):
     ax.legend(loc = 'upper right')
     ax.set_frame_on(False)
     plt.tight_layout()
-    return fig
+    if ax_ori is None:
+        return fig
+    else:
+        return ax_ori
 
-def plot_session_glm(nwb, tMax = 10, cut = [0, np.nan]):
-    tbl = makeSessionDF(nwb, cut = cut)
+def plot_session_glm(session, tMax = 10, cut = [0, np.nan]):
+    tbl = makeSessionDF(session, cut = cut)
     allChoices = 2 * (tbl['choice'].values - 0.5)
     allRewards = allChoices * tbl['outcome'].values
     allNoRewards = allChoices * (1 - tbl['outcome'].values)
@@ -1004,4 +1025,20 @@ def plot_session_glm(nwb, tMax = 10, cut = [0, np.nan]):
     intercept_info = f'R² = {rsq:.2f} | Int: {glm_result.params[0]:.2f}'
     plt.legend(loc='upper right')
 
-    return fig, nwb.session_id
+    return fig, session
+
+def get_session_tbl(session):
+    session_dir = session_dirs(session)
+    nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
+    nwb = load_nwb_from_filename(nwb_file)
+    tbl = nwb.trials.to_dataframe()
+    return tbl
+
+def get_unit_tbl(session, data_type):
+    session_dir = session_dirs(session)
+    unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
+    with open(unit_tbl_dir, 'rb') as f:
+        unit_data = pickle.load(f)
+    unit_tbl = unit_data['opto_tagging_df']
+    return unit_tbl
+ 
