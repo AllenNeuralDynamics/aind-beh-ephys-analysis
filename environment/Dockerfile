@@ -36,8 +36,6 @@ RUN pip install -U --no-cache-dir \
     natsort \
     harp-python@git+https://github.com/jsiegle/harp-python@decode-clock \
     aind-dynamic-foraging-data-utils==0.1.4 \
-    codeocean==0.2.0 \
-    requests==2.32.3 \
     pdf2image \
     seaborn \
     trimesh

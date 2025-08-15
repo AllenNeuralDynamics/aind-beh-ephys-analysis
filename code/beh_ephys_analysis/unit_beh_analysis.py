@@ -706,6 +706,120 @@ def burst_analysis(session, data_type, units = None):
     combine_pdf_big(save_path, os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'{session}_bursting.pdf'))
     print(f'{session} Done!')
 
+
+
+
+def plot_alignments(session, data_type='curated', unit_ids=None):
+    bin_len = 0.01
+    time_constant = 50
+    time_window = [-1, 1.5]
+    session_dir = session_dirs(session)
+    unit_tbl = get_unit_tbl(session, data_type)
+    session_tbl = get_session_tbl(session)
+    if unit_ids is None:
+        unit_ids = unit_tbl[unit_tbl['opto_pass'] & unit_tbl['default_qc']]['unit_id'].tolist()
+    lick_lat = session_tbl['reward_outcome_time'].values - session_tbl['goCue_start_time'].values
+    lick_lat = lick_lat[session_tbl['animal_response']!=2]
+    lick_lat_sort = np.argsort(lick_lat)
+    outcomes = session_tbl['rewarded_historyL'] | session_tbl['rewarded_historyR']
+    outcomes = outcomes[session_tbl['animal_response']!=2].values
+    outcomes_sort = np.argsort(outcomes)
+    for unit_id in unit_ids:
+        spike_times = unit_tbl[unit_tbl['unit_id']==unit_id]['spike_times'].values[0]
+        align_time_go = session_tbl['goCue_start_time']
+        align_time = session_tbl[session_tbl['animal_response']!=2]['reward_outcome_time']
+        
+        filtered_rate_go_cue, timestamps_go = get_spike_matrix_filter(spike_times, session_tbl['goCue_start_time'], time_window[0], time_window[1], time_constant=time_constant, stepSize=bin_len)
+        filtered_response, timestamps_response = get_spike_matrix_filter(spike_times, session_tbl[session_tbl['animal_response']!=2]['reward_outcome_time'], time_window[0], time_window[1], time_constant=time_constant, stepSize=bin_len)
+
+        fig = plt.figure(figsize=(10, 10))
+        gs = gridspec.GridSpec(2, 4, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
+        colors = [[1, 1, 1], "red"]
+        custom_cmap_heatmap = LinearSegmentedColormap.from_list("custom_heatmap", colors)
+        colors = [[1, 0.8, 0.8], "red"]
+        custom_cmap = LinearSegmentedColormap.from_list("custom_map", colors)
+
+        ax = fig.add_subplot(gs[0, 0])
+        im = ax.imshow(filtered_response[lick_lat_sort], extent=[time_window[0], time_window[1], 0, filtered_response.shape[0]], aspect='auto', origin='lower', cmap=custom_cmap_heatmap, vmin=0, vmax=filtered_response.max())
+        plt.colorbar(im, label='Firing rate (Hz)', ax=ax)
+        ax.set_xlabel('Time from choice (s)')
+        numbins = 3
+
+        fig, ax = plot_rate(
+                            filtered_response,
+                            timestamps_response, 
+                            lick_lat,
+                            # np.quantile(lick_lat, np.linspace(0, 0.95, numbins+1)),
+                            np.linspace(np.min(lick_lat), np.quantile(lick_lat, 0.95), numbins+1),
+                            range(numbins),
+                            custom_cmap,
+                            fig,
+                            gs[1, 0],
+                        )
+        ax.set_xlabel('Time from choice (s)')
+
+        ax = fig.add_subplot(gs[0, 1])
+
+        im = ax.imshow(filtered_rate_go_cue[session_tbl['animal_response']!=2, :][lick_lat_sort], extent=[time_window[0], time_window[1], 0, filtered_rate_go_cue.shape[0]], aspect='auto', origin='lower', cmap=custom_cmap_heatmap, vmin=0, vmax=filtered_rate_go_cue.max())
+        plt.colorbar(im, label='Firing rate (Hz)', ax=ax)
+        numbins = 3
+        fig, ax = plot_rate(
+                            filtered_rate_go_cue[session_tbl['animal_response']!=2, :],
+                            timestamps_go, 
+                            lick_lat,
+                            np.linspace(np.min(lick_lat), np.quantile(lick_lat, 0.95), numbins+1),
+                            range(numbins),
+                            custom_cmap,
+                            fig,
+                            gs[1, 1],
+                        )
+        ax.set_xlabel('Time from go cue (s)')
+
+        ax = fig.add_subplot(gs[0, 2])
+        outcomes_lick = 100*outcomes + lick_lat
+        outcomes_lick_sort = np.argsort(outcomes_lick)
+        im = ax.imshow(filtered_response[outcomes_lick_sort], extent=[time_window[0], time_window[1], 0, filtered_response.shape[0]], aspect='auto', origin='lower', cmap=custom_cmap_heatmap, vmin=0, vmax=filtered_response.max())
+        plt.colorbar(im, label='Firing rate (Hz)', ax=ax)
+        ax.axhline(np.sum(outcomes==0), color='black', linestyle='--', linewidth=1)
+        ax.set_xlabel('Time from choice (s)')
+
+        fig, ax = plot_rate(
+                            filtered_response,
+                            timestamps_response, 
+                            outcomes,
+                            np.array([-1, 0.5, 1.5]),
+                            ['no rwd', 'rwd'],
+                            custom_cmap,
+                            fig,
+                            gs[1, 2],
+                        )
+        ax.set_xlabel('Time from choice (s)')
+
+        ax = fig.add_subplot(gs[0, 3])
+        im = ax.imshow(filtered_rate_go_cue[session_tbl['animal_response']!=2, :][outcomes_lick_sort], extent=[time_window[0], time_window[1], 0, filtered_response.shape[0]], aspect='auto', origin='lower', cmap=custom_cmap_heatmap, vmin=0, vmax=filtered_rate_go_cue.max())
+        plt.colorbar(im, label='Firing rate (Hz)', ax=ax)
+        ax.axhline(np.sum(outcomes==0), color='black', linestyle='--', linewidth=1)
+        ax.set_xlabel('Time from go cue (s)')
+
+        fig, ax = plot_rate(
+                            filtered_rate_go_cue[session_tbl['animal_response']!=2, :],
+                            timestamps_go, 
+                            outcomes,
+                            np.array([-1, 0.5, 1.5]),
+                            ['no rwd', 'rwd'],
+                            custom_cmap,
+                            fig,
+                            gs[1, 3],
+                        )
+        fig.tight_layout()
+        fig.suptitle(f'Session: {session}, Unit: {unit_id}', fontsize=16)
+        target_folder = os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], 'go_cue_vs_response')
+        os.makedirs(target_folder, exist_ok=True)
+        fig.savefig(os.path.join(target_folder, f'{unit_id}_alignments.pdf'))
+    if len(unit_ids) > 0:
+        combine_pdf_big(target_folder, os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'alignments_compare_combined.pdf'))
+    
+
 if __name__ == '__main__': 
 
     df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')

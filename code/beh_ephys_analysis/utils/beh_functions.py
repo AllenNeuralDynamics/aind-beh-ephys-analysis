@@ -659,16 +659,27 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         nwb_dir_temp = os.path.join(sorted_dir, 'nwb')
         if not os.path.exists(nwb_dir_temp):
             nwb_dir_temp = [path for path in os.listdir(sorted_dir) if path.endswith('.nwb')]
-        nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
-        nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb) and (f'recording{seg_id}' in nwb)]
-        if len(nwb) == 1:
-            nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
-        elif len(nwb) > 1:
-            print('There are multiple recordings in the curated nwb directory. Picked one with units.')
-            nwb_dir_curated = None
-        else:
-            nwb_dir_curated = None
-            print('There is no nwb file in the curated directory.')
+            if len(nwb_dir_temp) == 1:
+                nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
+            elif len(nwb_dir_temp) > 1:
+                nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
+                print('There are multiple nwb files in the curated directory. Picked first one.')
+            else:
+                nwb_dir_temp = None
+                nwb_dir_curated = None
+                print('There is no nwb file in the curated directory.')
+
+        if nwb_dir_temp is not None:
+            nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
+            nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb) and (f'recording{seg_id}' in nwb)]
+            if len(nwb) == 1:
+                nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
+            elif len(nwb) > 1:
+                print('There are multiple recordings in the curated nwb directory. Picked one with units.')
+                nwb_dir_curated = None
+            else:
+                nwb_dir_curated = None
+                print('There is no nwb file in the curated directory.')
     # postprocessed dirs
     postprocessed_dir_raw = None
     postprocessed_dir_curated = None

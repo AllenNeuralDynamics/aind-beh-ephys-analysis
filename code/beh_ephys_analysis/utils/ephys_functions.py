@@ -15,32 +15,29 @@ import ast
 import json
 
 
-def filter_spikes(spk_units_cond, n_points = 300, tau_ker = .15):
-    time = np.linspace(-t_min , t_max , n_points)
-    dt = (t_max + t_min)/n_points
-    filt_spk_cond= []
-    s=0
-    for spk_units in spk_units_cond:
-        if s%100==0:
-            print('Neuron', s)
-        s+=1
-        spikes_to_exp = []
-        for spikes_trials in spk_units:
-            convolve  = np.zeros(n_points)  
-            for time_spike in spikes_trials:
-                if time_spike < -t_min:
-                    continue
-                else:
-                    t = (time - time_spike)/tau_ker
-                    conv = np.exp(-t)
-                    conv[t<0] = 0
-                    conv = conv/sum(conv)
-                    convolve = convolve + conv
-            spikes_to_exp.append(convolve)
-        filt_spk_cond.append(spikes_to_exp)
-    filt_spk_cond = np.array(filt_spk_cond) * (1/dt)
-    return filt_spk_cond, time
-
+def filter_jc(x, time_constant = 20):
+    # return filtered firing rate given time from spike (in ms)
+    # time_constant: in ms 
+    return (1 - np.exp(-1000*x)) * (np.exp(-1000*x/time_constant))
+    
+def get_spike_matrix_filter(spike_times, align_time, pre_event, post_event, time_constant=20, stepSize=0.05):
+    bin_times = np.arange(pre_event, post_event, stepSize)
+    spike_matrix = np.zeros((len(align_time), len(bin_times)))
+    for time_ind, curr_time in enumerate(bin_times):
+        curr_spikes = [
+            spike_times[
+                (spike_times <= (curr_time + align_time_curr))
+                & (spike_times > (curr_time + align_time_curr - time_constant*10/1000))
+            ] - (curr_time + align_time_curr)
+            for align_time_curr in align_time
+        ]
+        curr_rates = [
+            np.mean(filter_jc(-curr_spikes_trial, time_constant=time_constant))
+            if len(curr_spikes_trial) > 0 else 0
+            for curr_spikes_trial in curr_spikes
+        ]
+        spike_matrix[:, time_ind] = curr_rates
+    return spike_matrix, bin_times
 def build_time_window_domain(bin_edges, offsets, callback=None):
     callback = (lambda x: x) if callback is None else callback
     domain = np.tile(bin_edges[None, :], (len(offsets), 1))
@@ -350,9 +347,13 @@ def plot_rate(
     colormap,
     fig,
     subplot_spec,
-    tb,
-    tf,
+    tb = None,
+    tf = None,
 ):
+    if tb is None:
+        tb = np.min(slide_times)
+    if tf is None:
+        tf = np.max(slide_times)
     n_colors = len(bins)-1
     color_list = [colormap(i / (n_colors - 1)) for i in range(n_colors)]
 
