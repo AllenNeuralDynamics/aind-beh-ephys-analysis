@@ -575,8 +575,8 @@ def parseSessionID(file_name):
         raw_id= session_id
     elif re.split('[_.]', file_name)[0] == 'behavior' or re.split('[_.]', file_name)[0] == 'ecephys':
         aniID = re.split('[_.]', file_name)[1]
-        date = re.split('[_.]', file_name)[2]
-        dateObj = datetime.strptime(date, "%Y-%m-%d")
+        date = re.split('[_.]', file_name)[2]+'_'+re.split('[_.]', file_name)[3]
+        dateObj = datetime.strptime(date, "%Y-%m-%d_%H-%M-%S")
         raw_id = '_'.join(re.split('[_.]', file_name)[1:])
     else:
         aniID = None
@@ -586,8 +586,11 @@ def parseSessionID(file_name):
     return aniID, dateObj, raw_id
 
 def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
-    # parse session_id
+    # parse session_id 
     aniID, date_obj, raw_id = parseSessionID(session_id)
+    if aniID.startswith('ZS'):
+        print('Old data, using hopkins formats')
+        return session_dirs_hopkins(session_id)
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
     session_dir = os.path.join(raw_dir, 'ecephys_clipped')
@@ -698,6 +701,203 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name in s]
             postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
 
+def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
+    # parse session_id 
+    aniID, date_obj, raw_id = parseSessionID(session_id)
+    # raw dirs
+    raw_dir = os.path.join(data_dir, session_id+'_raw_data')
+    session_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'session')
+    session_dir_raw = session_dir
+    if not os.path.exists(session_dir):
+        session_dir = None
+        session_dir_raw = None
+    sorted_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'sorted')
+    sorted_raw_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'sorted')
+    # nwb files
+    nwb_dir_raw = None
+    nwb_dir_curated = None
+    # find raw recording
+    if session_dir is not None:
+        raw_recording_dir = os.path.join(session_dir, 'raw_data.hdf5')
+        if not os.path.exists(raw_recording_dir):
+            print(f'No raw session directory found for {session_id}.')
+            stream_name = None
+            raw_recording_dir = None 
+            experiment_id = None
+            seg_id = None   
+            max_len_ind = None
+            all_rec_count = None
+    else:
+        stream_name = None
+        raw_recording_dir = None 
+        experiment_id = None
+        seg_id = None   
+        max_len_ind = None
+        all_rec_count = None       
+    # raw version
+    nwb_dir_temp = raw_dir
+    nwb_dir_raw = None
+    if os.path.exists(nwb_dir_temp):
+        nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb.zarr')]
+        nwb = nwbs
+        if len(nwb) == 1:
+            nwb_dir_raw = os.path.join(nwb_dir_temp, nwb[0])
+        elif len(nwb) > 1:
+            print('There are multiple recordings in the raw nwb directory. Picked one with units.')
+            nwb_dir_raw = None
+        else:
+            nwb_dir_raw = None
+            print('There is no nwb file in the raw directory.')
+    nwb_dir_curated = None
+    # curated version
+    if os.path.exists(raw_dir):
+        nwb_dir_temp = raw_dir
+        if not os.path.exists(nwb_dir_temp):
+            nwb_dir_temp = [path for path in os.listdir(sorted_dir) if path.endswith('.nwb.zarr')]
+            if len(nwb_dir_temp) == 1:
+                nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
+            elif len(nwb_dir_temp) > 1:
+                nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
+                print('There are multiple nwb files in the curated directory. Picked first one.')
+            else:
+                nwb_dir_temp = None
+                nwb_dir_curated = None
+                print('There is no nwb file in the curated directory.')
+
+        if nwb_dir_temp is not None:
+            nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb.zarr')]
+            nwb = nwbs
+            if len(nwb) == 1:
+                nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
+            elif len(nwb) > 1:
+                print('There are multiple recordings in the curated nwb directory. Picked one with units.')
+                nwb_dir_curated = None
+            else:
+                nwb_dir_curated = None
+                print('There is no nwb file in the curated directory.')
+    # postprocessed dirs
+    postprocessed_dir_raw = None
+    postprocessed_dir_curated = None
+
+    # if os.path.exists(sorted_dir):
+    #     postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
+    #     if os.path.exists(postprocessed_dir_temp):
+    #         postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
+    #         postprocessed_sub_folder = [s for s in postprocessed_sub_folders if ('post' not in s) and (stream_name in s)]
+    #         postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+
+    # if os.path.exists(sorted_raw_dir):
+    #     postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
+    #     if os.path.exists(postprocessed_dir_temp):
+    #         postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
+    #         postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name in s]
+    #         postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+
+    
+    # curated dirs
+    curated_dir_raw = None
+    curated_dir_curated = None
+    
+    # if os.path.exists(sorted_dir):
+    #     curated_dir_temp = os.path.join(sorted_dir, 'curated')
+    #     if os.path.exists(curated_dir_temp):
+    #         curated_sub_folders = os.listdir(curated_dir_temp)
+    #         curated_sub_folders = [s for s in curated_sub_folders if stream_name in s]
+    #         curated_dir_curated = os.path.join(curated_dir_temp, curated_sub_folders[0])    
+    
+    # if os.path.exists(sorted_raw_dir):
+    #     curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
+    #     if os.path.exists(curated_dir_temp):
+    #         curated_sub_folders = os.listdir(curated_dir_temp)
+    #         curated_sub_folders = [s for s in curated_sub_folders if stream_name in s]
+    #         curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
+
+    # model dir
+    models_dir = os.path.join(data_dir, f'{aniID}_model_stan')
+    if model_name is not None:
+        model_dir = os.path.join(models_dir, model_name)
+        model_file = os.path.join(model_dir, session_id+'_session_model_dv.csv')
+        if not os.path.exists(model_file):
+            model_file = os.path.join(model_dir, raw_id+'_session_model_dv.csv')
+        session_curation_file = os.path.join(models_dir, f'{aniID}_session_data.csv')
+    else:
+        model_dir = None
+        model_file = None
+        session_curation_file = None
+    
+    # opto dirs
+    opto_csv_dir = os.path.join(raw_dir, 'ecephys_clipped')
+    opto_csvs = None
+    # if not os.path.exists(opto_csv_dir):
+    #     opto_csv_dir = os.path.join(raw_dir, 'ecephys', 'ecephys_clipped')
+
+    # if os.path.exists(opto_csv_dir):
+    #     temp_files = os.listdir(opto_csv_dir)
+    #     opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
+
+    # processed dirs
+    processed_dir = os.path.join(scratch_dir, aniID, session_id)
+    alignment_dir = os.path.join(processed_dir, 'alignment')
+    beh_fig_dir = os.path.join(processed_dir, 'behavior')
+    ephys_dir = os.path.join(processed_dir, 'ephys')
+    ephys_dir_raw = os.path.join(processed_dir, 'ephys', 'raw')
+    ephys_processed_dir_raw = os.path.join(ephys_dir_raw, 'processed')
+    ephys_fig_dir_raw = os.path.join(ephys_dir_raw, 'figures')
+    ephys_dir_curated = os.path.join(processed_dir, 'ephys', 'curated')
+    ephys_processed_dir_curated = os.path.join(ephys_dir_curated, 'processed')
+    ephys_fig_dir_curated = os.path.join(ephys_dir_curated, 'figures')
+    opto_dir = os.path.join(ephys_dir, 'opto')
+    opto_dir_raw = os.path.join(opto_dir, 'raw')
+    opto_dir_curated = os.path.join(opto_dir, 'curated')
+    opto_dir_fig_raw = os.path.join(opto_dir, 'raw', 'figures')
+    opto_dir_fig_curated = os.path.join(opto_dir, 'curated', 'figures')
+    # pro   
+    
+    beh_nwb_dir = os.path.join(processed_dir, 'behavior', f'{session_id}.nwb')
+
+    dir_dict = {'aniID': aniID,
+                'raw_id': raw_id,
+                'datetime': date_obj,
+                'raw_dir': raw_dir,
+                'raw_rec': raw_recording_dir,
+                'session_dir': session_dir,
+                'session_dir_raw': session_dir_raw,
+                'processed_dir': processed_dir,
+                'alignment_dir': alignment_dir,
+                'beh_fig_dir': beh_fig_dir,
+                'ephys_dir_raw': ephys_dir_raw,
+                'ephys_processed_dir_raw': ephys_processed_dir_raw,
+                'ephys_fig_dir_raw': ephys_fig_dir_raw,
+                'ephys_dir_curated': ephys_dir_curated,
+                'ephys_processed_dir_curated': ephys_processed_dir_curated,
+                'ephys_fig_dir_curated': ephys_fig_dir_curated,
+                'opto_dir': opto_dir,
+                'opto_dir_raw': opto_dir_raw,
+                'opto_dir_curated': opto_dir_curated,
+                'opto_dir_fig_raw': opto_dir_fig_raw,
+                'opto_dir_fig_curated': opto_dir_fig_curated,
+                'nwb_dir_raw': nwb_dir_raw,
+                'nwb_dir_curated': nwb_dir_curated,
+                'postprocessed_dir_raw': postprocessed_dir_raw,
+                'postprocessed_dir_curated': postprocessed_dir_curated,
+                'curated_dir_raw': curated_dir_raw,
+                'curated_dir_curated': curated_dir_curated,
+                'model_dir': model_dir,
+                'model_file': model_file,
+                'session_curation_file': session_curation_file,
+                'nwb_beh': beh_nwb_dir,
+                'sorted_dir_curated': sorted_dir,
+                'sorted_dir_raw': sorted_raw_dir,
+                'opto_csvs': opto_csvs,
+                'stream_name': None,
+                'experiment_id': 1,
+                'seg_id': 1,
+                'rec_id_all': 0}
+
+    # make directories
+    makedirs(dir_dict)
+
+    return dir_dict
     
     # curated dirs
     curated_dir_raw = None
@@ -960,10 +1160,6 @@ def get_history_from_nwb(nwb, cut = [0, np.nan]):
         df_trial.reward_probabilityL.values,
         df_trial.reward_probabilityR.values,
     ]
-    random_number = [
-        df_trial.reward_random_number_left.values,
-        df_trial.reward_random_number_right.values,
-    ]
 
     trial_time = df_trial['goCue_start_time'].values
     return (
@@ -971,7 +1167,6 @@ def get_history_from_nwb(nwb, cut = [0, np.nan]):
         reward_history,
         p_reward,
         autowater_offered,
-        random_number,
         trial_time,
     )
 
@@ -982,7 +1177,7 @@ def plot_session_in_time_all(nwb, bin_size = 10, in_time = True, ax_ori = None):
         gs = GridSpec(3, 1, figure = fig, height_ratios=[6,1,1], hspace = 0.5)
     else:
         gs = GridSpecFromSubplotSpec(3, 1, height_ratios=[6,1,1], hspace = 0.5, subplot_spec = ax_ori.get_subplotspec())
-    choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(nwb)
+    choice_history, reward_history, p_reward, autowater_offered, trial_time = get_history_from_nwb(nwb)
     ax_choice_reward = fig.add_subplot(gs[0])
     if in_time:
         plot_foraging_session(  # noqa: C901
