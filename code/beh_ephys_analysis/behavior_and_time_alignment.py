@@ -20,9 +20,6 @@ from aind_ephys_rig_qc.temporal_alignment import search_harp_line
 from matplotlib.gridspec import GridSpec
 import json
 import spikeinterface as si
-from pynwb import NWBHDF5IO, NWBFile
-from hdmf_zarr import NWBZarrIO
-import shutil
 
 # %%
 def beh_and_time_alignment(session, ephys_cut = [0, 0]):
@@ -177,83 +174,6 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     sys.stdout = sys.__stdout__
     # Close the file
     log_file.close()
-
-def transfer_nwb(session_id):
-    session_dir = session_dirs(session_id)
-    src_path = session_dir['nwb_dir_raw']
-    with NWBZarrIO(src_path, mode="r") as io:
-        src_nwb = io.read()
-        
-    # Get the trials DynamicTable
-    trials_table = src_nwb.trials
-
-    # --- Create a new NWBFile ---
-    new_nwb = NWBFile(
-        session_description="CS_plus only copy",
-        identifier=src_nwb.identifier,
-        session_start_time=src_nwb.session_start_time
-    )
-    new_nwb.session_id = session_id
-
-    # Add all custom trial columns to new NWB with their original description
-    for col in trials_table.colnames:
-        if col not in ("start_time", "stop_time", "tags", "timeseries"):  # reserved
-            desc = trials_table[col].description if hasattr(trials_table[col], "description") else ""
-            new_nwb.add_trial_column(name=col, description=desc)
-    new_nwb.add_trial_column(name='ITI_duration', description='Fake values to hack some analysis')
-    new_nwb.add_trial_column(name='delay_max', description='Max no lick window')
-    new_nwb.add_trial_column(name='delay_min', description='Min no lick window')
-    
-    metadata = {
-        # Meta
-        'box': 'Hopkins 295F nlyx'}
-    df_metadata = pd.DataFrame(metadata, index=[0])
-    new_nwb.add_scratch(df_metadata, 
-                        name="metadata",
-                        description="Some important session-wise meta data")
-    # Add trials one by one
-    # Convert trials table to DataFrame
-    trials_df = trials_table.to_dataframe()
-    pre_row = None
-    for ind, row in trials_df.iterrows():
-        if row['trial_type'] == 'CSplus':
-            kwargs = row.to_dict()
-            kwargs['ITI_duration'] = 0.5
-            if ind>0 and pre_row is not None:
-                kwargs['start_time'] = pre_row['goCue_start_time'] + 3.1
-            else:
-                kwargs['start_time'] = row['goCue_start_time'] - 1.5
-            kwargs['stop_time'] = row['goCue_start_time'] + 3.1
-            kwargs['delay_max'] = kwargs['delay_duration']
-            kwargs['delay_min'] = kwargs['delay_duration']
-            new_nwb.add_trial(**kwargs)
-            pre_row = row
-    # add aquisition 
-    from pynwb import TimeSeries
-
-    for name, acq in src_nwb.acquisition.items():
-        if isinstance(acq, TimeSeries):
-            new_acq = TimeSeries(
-                name=acq.name,
-                data=acq.data,
-                unit=acq.unit,
-                rate=acq.rate,
-                timestamps=acq.timestamps,
-                description=acq.description
-            )
-            new_nwb.add_acquisition(new_acq)
-        else:
-            new_nwb.add_acquisition(acq)  # fallback
-
-
-    # for name, acq in src_nwb.acquisition.items():
-    #     new_nwb.add_acquisition(acq)
-
-    # --- Write the new NWB (Zarr) ---
-    out_path = session_dir['nwb_beh']
-    shutil.rmtree(out_path, ignore_errors=True)
-    with NWBZarrIO(out_path, mode="w") as out_io:
-        out_io.write(new_nwb)
 
 if __name__ == "__main__":  
     session = 'ecephys_763360_2025-04-16_13-29-55'

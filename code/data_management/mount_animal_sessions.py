@@ -11,9 +11,13 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 datalist_dir = os.path.join(script_dir, 'session_assets.csv')
 data_df = pd.read_csv(datalist_dir)
 # %%
-ani_id = '751004'
+ani_id = 'ZS059'
 col_to_attach = ['raw_data', 'sorted', 'processed', 'model_stan']
-
+if not any(data_df['session_id'].str.contains(ani_id, na=False)):
+    print(f'Animal ID {ani_id} not found in data list.')
+    datalist_dir = os.path.join(script_dir, 'hopkins_session_assets.csv')
+    data_df = pd.read_csv(datalist_dir)
+    col_to_attach = ['raw_data']
 # %%
 # Lists of strings for id and mount
 all_ids = []
