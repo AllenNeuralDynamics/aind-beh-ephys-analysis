@@ -709,13 +709,16 @@ def burst_analysis(session, data_type, units = None):
 
 
 
-def plot_alignments(session, data_type='curated', unit_ids=None):
+def plot_alignments(session, data_type='curated', unit_ids=None, win_len = 0.5):
     bin_len = 0.01
-    time_constant = 50
+    time_constant = 100
     time_window = [-1, 1.5]
     session_dir = session_dirs(session)
     unit_tbl = get_unit_tbl(session, data_type)
-    session_tbl = get_session_tbl(session)
+    model_name = 'stan_qLearning_5params'
+    session_tbl_all = get_session_tbl(session)
+    unit_tbl = get_unit_tbl(session, data_type=data_type)
+    session_tbl = makeSessionDF(session, model_name = model_name)
     if unit_ids is None:
         unit_ids = unit_tbl[unit_tbl['opto_pass'] & unit_tbl['default_qc']]['unit_id'].tolist()
     lick_lat = session_tbl['reward_outcome_time'].values - session_tbl['goCue_start_time'].values
@@ -723,17 +726,32 @@ def plot_alignments(session, data_type='curated', unit_ids=None):
     lick_lat_sort = np.argsort(lick_lat)
     outcomes = session_tbl['rewarded_historyL'] | session_tbl['rewarded_historyR']
     outcomes = outcomes[session_tbl['animal_response']!=2].values
-    outcomes_sort = np.argsort(outcomes)
     for unit_id in unit_ids:
         spike_times = unit_tbl[unit_tbl['unit_id']==unit_id]['spike_times'].values[0]
+        session_tbl_curr = session_tbl.copy()
+        session_tbl_all_curr = session_tbl_all.copy()
+        spike_times_curr = spike_times.copy()
+        unit_drift = load_drift(session, unit_id, data_type=data_type)
+        if unit_drift is not None:
+            if unit_drift['ephys_cut'][0] is not None:
+                spike_times_curr = spike_times_curr[spike_times_curr >= unit_drift['ephys_cut'][0]]
+                session_tbl_curr = session_tbl_curr[session_tbl_curr['go_cue_time'] >= unit_drift['ephys_cut'][0]]
+                session_tbl_all_curr = session_tbl_all_curr[session_tbl_all_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
+                # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
+            if unit_drift['ephys_cut'][1] is not None:
+                spike_times_curr = spike_times_curr[spike_times_curr <= unit_drift['ephys_cut'][1]]
+                session_tbl_curr = session_tbl_curr[session_tbl_curr['go_cue_time'] <= unit_drift['ephys_cut'][1]]
+                session_tbl_all_curr = session_tbl_all_curr[session_tbl_all_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
+                # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
         align_time_go = session_tbl['goCue_start_time']
         align_time = session_tbl[session_tbl['animal_response']!=2]['reward_outcome_time']
         
         filtered_rate_go_cue, timestamps_go = get_spike_matrix_filter(spike_times, session_tbl['goCue_start_time'], time_window[0], time_window[1], time_constant=time_constant, stepSize=bin_len)
         filtered_response, timestamps_response = get_spike_matrix_filter(spike_times, session_tbl[session_tbl['animal_response']!=2]['reward_outcome_time'], time_window[0], time_window[1], time_constant=time_constant, stepSize=bin_len)
 
-        fig = plt.figure(figsize=(10, 10))
-        gs = gridspec.GridSpec(2, 4, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
+        fig = plt.figure(figsize=(15, 10))
+        gs = gridspec.GridSpec(2, 5, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
+        gs_model = gridspec.GridSpec(3, 5, height_ratios=[1, 1, 1], wspace=0.3, hspace=0.3)
         colors = [[1, 1, 1], "red"]
         custom_cmap_heatmap = LinearSegmentedColormap.from_list("custom_heatmap", colors)
         colors = [[1, 0.8, 0.8], "red"]
@@ -811,13 +829,139 @@ def plot_alignments(session, data_type='curated', unit_ids=None):
                             fig,
                             gs[1, 3],
                         )
+
+        # regresssion model
+        outcome_time = session_tbl_curr[session_tbl_curr['animal_response']!=2]['reward_outcome_time'].values
+        rewarded_ind = session_tbl_curr[session_tbl_curr['animal_response']!=2]['rewarded_historyL'].values | session_tbl_curr[session_tbl_curr['animal_response']!=2]['rewarded_historyR'].values
+        # rewarded_ind = np.full(len(outcome_time), True, dtype=bool)
+        reward_time = outcome_time[rewarded_ind] + 0.2
+        if len(reward_time) > 2:
+            # acf
+            # compute how past activity contribute to future activity, 
+            bin_len = 0.05
+            lag_length = 2
+            bin_num = int(np.ceil(lag_length / bin_len))
+
+            session_start = session_tbl_curr['goCue_start_time'].values[0]-10
+            session_end = session_tbl_curr['goCue_start_time'].values[-1]+20
+
+            counts = np.histogram(spike_times_curr, bins=np.arange(session_start, session_end, bin_len))[0]
+            starts = np.arange(session_start, session_end, bin_len)[:-1]
+            ends = np.arange(session_start, session_end, bin_len)[1:]
+
+            pre_time = 0
+            post_time = 2
+            # remove periods within session
+            counts_bl = counts.copy().astype(float)
+            if len(session_tbl_all_curr) > 0:
+                for ind, row in session_tbl_all_curr.iterrows():
+                    start_time = row['goCue_start_time'] - pre_time
+                    end_time = row['goCue_start_time'] + post_time
+                    # set counts in this period to np.nan
+                    mask = (ends >= start_time) & (starts <= end_time)
+                    if np.sum(mask) > 0:
+                        counts_bl[mask] = np.nan
+
+            # compute the lagged activity
+            lagged_matrix = np.zeros((len(counts_bl), bin_num))
+            for i in range(bin_num):
+                lagged_matrix[:, i] = np.roll(counts_bl, i + 1)
+                lagged_matrix[:i + 1, i] = np.nan  # set the first i+1 elements to np.nan
+
+            lagged_matrix = sm.add_constant(data=lagged_matrix)
+
+            model_bl = sm.OLS(counts_bl, lagged_matrix, missing='drop').fit()
+            ci = model_bl.conf_int(alpha=0.05)  # 95% CI
+            yerr = np.vstack([
+                model_bl.params[1:] - ci[1:, 0],  # lower error
+                ci[1:, 1] - model_bl.params[1:]   # upper error
+            ])
+            
+            spikes_df = align.to_events(spike_times_curr, reward_time, (0, win_len), return_df=True)
+            spike_counts = spikes_df.groupby('event_index').size()
+            spike_counts = np.array([spike_counts[i] if i in spike_counts.index else 0 for i in range(len(reward_time))])
+            spike_matrix, timestamps = get_spike_matrix(spike_times_curr, reward_time, -lag_length, win_len+bin_len, bin_len, bin_len)
+            predicted_counts = np.full((spike_matrix.shape[0], spike_matrix.shape[1]-bin_num+1), np.nan)
+            predicted_times = timestamps[bin_num-1:]  # Adjusted to match the predicted counts
+            pre_cue_counts = np.sum(predicted_times < 0)  # Count how many predicted times are before the cue
+            for i in range(spike_matrix.shape[1]-bin_num+1):
+                if i <= pre_cue_counts:
+                    X = sm.add_constant(spike_matrix[:, i:i+bin_num].copy())
+                    predicted_counts[:, i] = model_bl.predict(X)
+                else:
+                    mix_spikes = np.concatenate((spike_matrix[:, i:np.sum(timestamps<0)].copy(), predicted_counts[:, :i-1]), axis=1)
+                    X = sm.add_constant(mix_spikes)
+                    predicted_counts[:, i] = model_bl.predict(X)
+            predicted_inds = (predicted_times>=0.5* bin_len) & (predicted_times<=win_len-0.5* bin_len)
+            predicted_sum_win = predicted_counts[:, predicted_inds].sum(axis=1)
+            spike_counts_residual = spike_counts - predicted_sum_win
+
+            # compare 2 models
+            # fit regression, use Qchosen in session_df_curr to predict residuals vs spike counts
+            X = session_tbl_curr[['Qchosen']].values[session_tbl_curr['animal_response']!=2].reshape(-1, 1)  # reshape for single feature
+            X = X[rewarded_ind]
+            X = sm.add_constant(X)  # add intercept term
+            model_res = sm.OLS(spike_counts_residual, X).fit()  # fit model to residuals
+            ci_res = model_res.conf_int(alpha=0.05)  # 90% CI for residuals model
+            model_whole = sm.OLS(spike_counts, X).fit()  # fit model to spike counts
+            ci_whole = model_whole.conf_int(alpha=0.05)  # 90% CI for whole model
+
+            # plot model results
+            ax = fig.add_subplot(gs_model[0, 4])
+            ci = model_bl.conf_int(alpha=0.05)  # 95% CI
+            yerr = np.vstack([
+                model_bl.params[1:] - ci[1:, 0],  # lower error
+                ci[1:, 1] - model_bl.params[1:]   # upper error
+            ])
+            ax.errorbar(bin_len*np.arange(1, bin_num+1), model_bl.params[1:], yerr=yerr, fmt='-o', label='Model Coefficients with 90% CI',
+                        color='blue', capsize=5)
+            ax.axhline(0, color='black', linestyle='--', linewidth=1)
+            ax.set_xlabel('Lag (s)')
+
+            ax = fig.add_subplot(gs_model[1, 4])
+            yerr = np.vstack([
+                model_res.params[1:] - ci_res[1:, 0],  # lower error
+                ci_res[1:, 1] - model_res.params[1:]   # upper error
+            ])
+
+            ax.errorbar(range(1, 2), model_res.params[1:], yerr=yerr, fmt='o', label='Model Coefficients with 90% CI',
+                        color='blue', capsize=5)
+            yerr_whole = np.vstack([
+                model_whole.params[1:] - ci_whole[1:, 0],  # lower error
+                ci_whole[1:, 1] - model_whole.params[1:]   # upper error
+            ])
+            ax.errorbar(range(1), model_whole.params[1:], yerr=yerr_whole, fmt='o', label='Whole Model Coefficients with 90% CI',
+                        color='red', capsize=5)
+            ax.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+            ax.set_xlabel("Whole Outcome Qchosen ---- Res Outcome Qchosen")
+            ax.set_ylabel("Coefficient value")
+            ax.set_title("Linear Regression Coefficients with 95% CI")
+
+            ax = fig.add_subplot(gs_model[2, 4])
+            t_res = model_res.tvalues[1:]       
+            t_whole = model_whole.tvalues[1:]
+
+            # Plot bars for each model
+            ax.bar(range(1, 2), t_res, 0.3, label='Res Model', color='blue')
+            ax.bar(range(1), t_whole, 0.3, label='Whole Model', color='red')
+
+            # Reference line at 0
+            ax.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+
+            # Labels
+            ax.set_xlabel("Whole Outcome Qchosen ---- Res Outcome Qchosen")
+            ax.set_ylabel("t-statistic")
+            ax.set_title("Linear Regression t-Statistics")
+            ax.legend()
+
         fig.tight_layout()
         fig.suptitle(f'Session: {session}, Unit: {unit_id}', fontsize=16)
         target_folder = os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], 'go_cue_vs_response')
         os.makedirs(target_folder, exist_ok=True)
         fig.savefig(os.path.join(target_folder, f'{unit_id}_alignments.pdf'))
-    if len(unit_ids) > 0:
-        combine_pdf_big(target_folder, os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'alignments_compare_combined.pdf'))
+
+    # if len(unit_ids) > 0:
+    #     combine_pdf_big(target_folder, os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], f'alignments_compare_combined.pdf'))
     
 
 if __name__ == '__main__': 
