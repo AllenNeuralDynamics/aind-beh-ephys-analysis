@@ -21,6 +21,7 @@ from matplotlib.gridspec import GridSpec
 import json
 import spikeinterface as si
 from utils.hdf5_extractor import HDF5Recording
+from utils.hdf5_extractor import HDF5Recording
 
 # %%
 def beh_and_time_alignment(session, ephys_cut = [0, 0]):
