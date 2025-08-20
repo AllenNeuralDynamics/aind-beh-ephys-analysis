@@ -133,7 +133,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
             gs = gridspec.GridSpec(2, 7, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
             # plot session
             ax = fig.add_subplot(gs[0, 0]) 
-            choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(session_df_curr)
+            choice_history, reward_history, p_reward, autowater_offered, trial_time = get_history_from_nwb(session_df_curr)
             _, axes = plot_foraging_session(  # noqa: C901
                                             choice_history,
                                             reward_history,

@@ -10,9 +10,11 @@ from matplotlib.colors import LinearSegmentedColormap
 sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
 from beh_functions import session_dirs
 from matplotlib import gridspec
+from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from aind_ephys_utils import align 
 import ast
 import json
+import pickle
 
 
 def filter_jc(x, time_constant = 20):
@@ -692,3 +694,49 @@ class load_cross_corr():
             else:
                 raise ValueError(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
         return unit_cross_corr_data.to_dict(orient='records')[0] if unit_cross_corr_data is not None else None
+
+def make_summary_unit_tbl(session):
+    session_dir = session_dirs(session)
+    nwb = load_nwb_from_filename(session_dir['nwb_dir_raw'])
+    if nwb.units is None:
+        print(f"No units found in NWB file for session {session}.")
+        return None
+    nwb_units = load_nwb_from_filename(session_dir['nwb_dir_raw']).units[:] 
+    here = os.path.dirname(__file__)
+    tbl_columns_file = os.path.join(here, 'summary_col_list.json')
+    with open(tbl_columns_file, 'r') as f:
+        example_tbl_cols = json.load(open("summary_col_list.json"))
+    unit_summary = pd.DataFrame(columns= example_tbl_cols)
+    for row_ind, row in nwb_units.iterrows():
+        for col in example_tbl_cols:
+            if col in row.index:
+                unit_summary.at[row_ind, col] = row[col]
+            else:
+                unit_summary.at[row_ind, col] = np.nan
+        unit_summary.loc[row_ind, 'peak'] = -row['peak'] if 'peak' in row.index else np.nan
+        # convert array columns to single values
+        array_to_row = ['bl_max_p', 'p_max', 'p_mean', 'lat_max_p', 'euc_max_p', 'pass_count']
+        for col in array_to_row:
+            if col in row.index:
+                unit_summary.at[row_ind, col] = row[col][0] if isinstance(row[col], np.ndarray) else row[col]
+            else:
+                unit_summary.at[row_ind, col] = np.nan
+        # find corresponding columns in summary and nwb units
+        pairs_sum = ['amp', 'ks_unit_id', 'isi_violations_ratio', 'waveform_mean']
+        pairs_nwb = ['amplitude', 'unit_id', 'isi_violation_ratio', 'mat_wf_opt']
+        for col_sum, col_nwb in zip(pairs_sum, pairs_nwb):
+            if col_nwb in row.index:
+                unit_summary.at[row_ind, col_sum] = row[col_nwb]
+            else:
+                unit_summary.at[row_ind, col_sum] = np.nan
+        # change units
+        change_units = ['LC_range_top', 'LC_range_bottom', 'y_loc']
+        for col in change_units:
+            if col in row.index:
+                unit_summary.at[row_ind, col] = row[col] * 1e3 if isinstance(row[col], float) else row[col]
+            else:
+                unit_summary.at[row_ind, col] = np.nan
+    # save into pikle
+    summary_path = os.path.join(session_dir['opto_dir_curated'], f'{session}_curated_soma_opto_tagging_summary.pkl')
+    with open(summary_path, 'wb') as f:
+        unit_summary.to_pickle(f)

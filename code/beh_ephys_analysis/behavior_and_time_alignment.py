@@ -20,6 +20,7 @@ from aind_ephys_rig_qc.temporal_alignment import search_harp_line
 from matplotlib.gridspec import GridSpec
 import json
 import spikeinterface as si
+from utils.hdf5_extractor import HDF5Recording
 
 # %%
 def beh_and_time_alignment(session, ephys_cut = [0, 0]):
@@ -165,6 +166,122 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
         qm_dict['ephys_sync'] = True
         qm_dict['ephys_cut'] = ephys_cut
         qm_dict['soundcard_sync'] = True
+
+    # %%
+    qm_file = os.path.join(session_dir['processed_dir'], f"{session}_qm.json")
+    with open(qm_file, 'w') as f:
+        json.dump(qm_dict, f, indent=4)
+    print(f"Output saved to {output_file}")
+    sys.stdout = sys.__stdout__
+    # Close the file
+    log_file.close()
+
+def beh_and_time_alignment_hopkins(session, ephys_cut = [0, 0]):
+    session_dir = session_dirs(session)
+    print(session)
+    qm_dict = {'soundcard_sync': True, 'ephys_sync': None}
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_file = os.path.join(session_dir['processed_dir'], f"{session}_process_record.txt")
+
+    # Redirect stdout to the file
+    if not os.path.exists(output_file):
+        log_file = open(output_file, "w") 
+    else: 
+        log_file = open(output_file, "a")
+    sys.stdout = log_file
+    print(f"Session: {session} processed at {timestamp}")
+
+
+    # %%
+    print(session)
+    aniID, date_time, string = parseSessionID(session)
+
+    # %%
+    nwb_file = session_dir['nwb_beh']
+    if not os.path.exists(nwb_file):
+        print('NWB file does not exist.')
+    else:
+        print('Plotting session.')
+        nwb = load_nwb_from_filename(nwb_file)
+        fig = plot_session_in_time_all(nwb)
+        fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_choice_reward.pdf'))
+        # display(fig)
+        
+        fig, _ = plot_lick_analysis(nwb)
+        fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_lick_analysis.pdf'))
+        # display(fig)
+
+        fig, _, _ = plot_session_glm(session, tMax=5)
+        fig.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_glm.pdf'))
+        # display(fig)
+
+        # plt.close('all')
+    if os.path.exists(nwb_file):
+        # %%
+        left_licks = nwb.acquisition["left_lick_time"].timestamps[:]
+        right_licks = nwb.acquisition["right_lick_time"].timestamps[:]
+        all_licks = np.sort(np.concatenate((right_licks, left_licks)))
+        df_trial = nwb.trials.to_dataframe()
+        plt.figure()
+        plt.hist(all_licks, alpha=0.5, label='licks', density=True)
+        plt.hist(df_trial['goCue_start_time'], alpha=0.5, label='goCue', density=True)
+        plt.legend()
+        plt.savefig(os.path.join(session_dir['beh_fig_dir'], session + '_licks_vs_goCue.pdf'))
+        if np.abs(np.mean(all_licks) - np.mean(df_trial['goCue_start_time'])) > 0.2*(df_trial['goCue_start_time'].max() - df_trial['goCue_start_time'].min()):
+            print(f'{session} sound card is not synced.')
+            qm_dict['soundcard_sync'] = False
+        else:
+            print(f'{session} sound card is synced.')
+            qm_dict['soundcard_sync'] = True
+
+        # %% [markdown]
+        # ### Check ephys alignment
+
+        # example neurons
+        # extract from nwb
+        # nwb = load_nwb_from_filename(session_dir['nwb_dir_raw'])
+        # unit_spikes = nwb.units[::10]['spike_times']
+        # mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
+        # mean_spike_times = np.mean(np.array(mean_spike_times))
+        # extract from sorting
+        # recording = si.read_zarr(session_dir['raw_rec'])
+        # sorting.register_recording(recording)
+        # if recording exists, then check if ephys is synced with sound card
+        if os.path.exists(session_dir['raw_rec']):
+            recording = HDF5Recording(session_dir['raw_rec'])
+            timestamps = recording.get_times()
+            if load_nwb_from_filename(session_dir['nwb_dir_raw']).units is not None:
+                unit_spikes = load_nwb_from_filename(session_dir['nwb_dir_raw']).units[:]['spike_times']
+                mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
+                mean_spike_times = np.mean(np.array(mean_spike_times))
+            else:
+                mean_spike_times = np.mean(timestamps)
+            figure, ax = plt.subplots(1, 1, figsize=(10, 5))
+            ax.hist(timestamps, bins=100, density=True, alpha=0.5, label='ephys')
+            ax.hist(all_licks, bins=100, density=True, alpha=0.5, label='licks')
+            ax.hist(df_trial['goCue_start_time'], bins=100, density=True, alpha=0.5, label='goCue')
+            if load_nwb_from_filename(session_dir['nwb_dir_raw']).units is not None:
+                for i, unit_spike in enumerate(unit_spikes):
+                    ax.hist(unit_spike, bins=100, density=True, alpha=0.2, color='k')
+                ax.legend()
+            figure.savefig(os.path.join(session_dir['alignment_dir'], 'lick_goCue_ephys_time.pdf'))
+            if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]) and np.abs(np.mean(timestamps) - mean_spike_times) < 0.2*(timestamps[-1]-timestamps[0]): 
+                print(f'{session} ephys is synced.')
+                qm_dict['ephys_sync'] = True
+            else:
+                print(f'{session} ephys is not synced.')
+                qm_dict['ephys_sync'] = False
+            # %% find a stable time period
+            ephys_cut_new = [timestamps[0]+ephys_cut[0], timestamps[-1]-ephys_cut[1]]
+            qm_dict['ephys_cut'] = ephys_cut_new
+        else:
+            print(f'{session} ephys recording does not exist.')
+            qm_dict['ephys_sync'] = None
+            qm_dict['ephys_cut'] = None
+    else: 
+        qm_dict['ephys_sync'] = None
+        qm_dict['ephys_cut'] = None
+        qm_dict['soundcard_sync'] = None
 
     # %%
     qm_file = os.path.join(session_dir['processed_dir'], f"{session}_qm.json")

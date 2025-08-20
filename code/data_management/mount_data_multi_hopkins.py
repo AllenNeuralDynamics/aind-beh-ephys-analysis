@@ -17,7 +17,7 @@ data_df = data_df[data_df['session_id'].notna() & (data_df['session_id'] != "")]
   
 
 # %%
-col_to_attach = ['raw_data']
+col_to_attach = ['raw_data', 'model_stan']
 
 # %%
 # Lists of strings for id and mount
