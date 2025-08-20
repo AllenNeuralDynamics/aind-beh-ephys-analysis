@@ -209,50 +209,51 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
             # rpe
             target_var = 'pe'
             bin_counts = 4
-            bins = np.quantile(session_df_curr[target_var].values, np.linspace(0, 1, bin_counts+1))
-            # bins = [-1.0001, -0.5, 0, 0.5, 1.0001]
-            bins[0] = bins[0] - 0.0001
-            bins[-1] = bins[-1] + 0.0001
-            labels = ['1', '2', '3', '4']
-            
-            fig, ax1, ax2 = plot_raster_rate(spike_times_curr,
-                                            align_time,  
-                                            session_df_curr[target_var].values, # sorted by certain value
-                                            bins,
-                                            labels,
-                                            custom_cmap,
-                                            fig,
-                                            gs[0, 4],
-                                            tb=pre_event,
-                                            tf=post_event,
-                                            time_bin=stepSize,
-                                            )
-            # ax.set_yticks([])
-            # ax.set_ylabel(label, fontsize = fs)
-            ax1.set_title(target_var, fontsize = fs+2)
+            if target_var in session_df_curr.columns.to_list():
+                bins = np.quantile(session_df_curr[target_var].values, np.linspace(0, 1, bin_counts+1))
+                # bins = [-1.0001, -0.5, 0, 0.5, 1.0001]
+                bins[0] = bins[0] - 0.0001
+                bins[-1] = bins[-1] + 0.0001
+                labels = ['1', '2', '3', '4']
+                
+                fig, ax1, ax2 = plot_raster_rate(spike_times_curr,
+                                                align_time,  
+                                                session_df_curr[target_var].values, # sorted by certain value
+                                                bins,
+                                                labels,
+                                                custom_cmap,
+                                                fig,
+                                                gs[0, 4],
+                                                tb=pre_event,
+                                                tf=post_event,
+                                                time_bin=stepSize,
+                                                )
+                # ax.set_yticks([])
+                # ax.set_ylabel(label, fontsize = fs)
+                ax1.set_title(target_var, fontsize = fs+2)
 
 
-            # Qchosen
-            target_var = 'Qchosen'
-            bin_counts = 4
-            bins = np.quantile(session_df_curr[target_var].values, np.linspace(0, 1, bin_counts+1))
-            # bins = [-1.0001, -0.5, 0, 0.5, 1.0001]
-            bins[0] = bins[0] - 0.0001
-            bins[-1] = bins[-1] + 0.0001
-            labels = ['1', '2', '3', '4']
-            fig, ax1, ax2 = plot_raster_rate(spike_times_curr,
-                                            align_time, 
-                                            session_df_curr[target_var].values, # sorted by certain value
-                                            bins,
-                                            labels,
-                                            custom_cmap,
-                                            fig,
-                                            gs[0, 5],
-                                            tb=pre_event,
-                                            tf=post_event,
-                                            time_bin=stepSize,
-                                            )
-            ax1.set_title(target_var, fontsize = fs+2)
+                # Qchosen
+                target_var = 'Qchosen'
+                bin_counts = 4
+                bins = np.quantile(session_df_curr[target_var].values, np.linspace(0, 1, bin_counts+1))
+                # bins = [-1.0001, -0.5, 0, 0.5, 1.0001]
+                bins[0] = bins[0] - 0.0001
+                bins[-1] = bins[-1] + 0.0001
+                labels = ['1', '2', '3', '4']
+                fig, ax1, ax2 = plot_raster_rate(spike_times_curr,
+                                                align_time, 
+                                                session_df_curr[target_var].values, # sorted by certain value
+                                                bins,
+                                                labels,
+                                                custom_cmap,
+                                                fig,
+                                                gs[0, 5],
+                                                tb=pre_event,
+                                                tf=post_event,
+                                                time_bin=stepSize,
+                                                )
+                ax1.set_title(target_var, fontsize = fs+2)
 
             # stay vs switch
             target_var = 'svs'
@@ -438,7 +439,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     def process(unit_id):
         fig = plot_unit(unit_id) 
         if fig is not None: 
-            fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'unit_{unit_id}_goCue.pdf')) 
+            fig.savefig(fname=os.path.join(session_dir[f'ephys_fig_dir_{data_type}'], align_name, f'unit_{unit_id}_{align_name}.pdf')) 
         plt.close(fig)
         time.sleep(1)
 
