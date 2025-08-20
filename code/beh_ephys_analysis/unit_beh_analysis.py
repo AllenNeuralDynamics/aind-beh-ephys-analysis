@@ -133,7 +133,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
             gs = gridspec.GridSpec(2, 7, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
             # plot session
             ax = fig.add_subplot(gs[0, 0]) 
-            choice_history, reward_history, p_reward, autowater_offered, random_number, trial_time = get_history_from_nwb(session_df_curr)
+            choice_history, reward_history, p_reward, autowater_offered, trial_time = get_history_from_nwb(session_df_curr)
             _, axes = plot_foraging_session(  # noqa: C901
                                             choice_history,
                                             reward_history,
@@ -898,13 +898,14 @@ def plot_alignments(session, data_type='curated', unit_ids=None, win_len = 0.5):
 
             # compare 2 models
             # fit regression, use Qchosen in session_df_curr to predict residuals vs spike counts
-            X = session_tbl_curr[['Qchosen']].values[session_tbl_curr['animal_response']!=2].reshape(-1, 1)  # reshape for single feature
-            X = X[rewarded_ind]
-            X = sm.add_constant(X)  # add intercept term
-            model_res = sm.OLS(spike_counts_residual, X).fit()  # fit model to residuals
-            ci_res = model_res.conf_int(alpha=0.05)  # 90% CI for residuals model
-            model_whole = sm.OLS(spike_counts, X).fit()  # fit model to spike counts
-            ci_whole = model_whole.conf_int(alpha=0.05)  # 90% CI for whole model
+            if 'Qchosen' in session_tbl_curr.columns.to_list():
+                X = session_tbl_curr[['Qchosen']].values[session_tbl_curr['animal_response']!=2].reshape(-1, 1)  # reshape for single feature
+                X = X[rewarded_ind]
+                X = sm.add_constant(X)  # add intercept term
+                model_res = sm.OLS(spike_counts_residual, X).fit()  # fit model to residuals
+                ci_res = model_res.conf_int(alpha=0.05)  # 90% CI for residuals model
+                model_whole = sm.OLS(spike_counts, X).fit()  # fit model to spike counts
+                ci_whole = model_whole.conf_int(alpha=0.05)  # 90% CI for whole model
 
             # plot model results
             ax = fig.add_subplot(gs_model[0, 4])
@@ -917,42 +918,42 @@ def plot_alignments(session, data_type='curated', unit_ids=None, win_len = 0.5):
                         color='blue', capsize=5)
             ax.axhline(0, color='black', linestyle='--', linewidth=1)
             ax.set_xlabel('Lag (s)')
+            if 'Qchosen' in session_tbl_curr.columns.to_list():
+                ax = fig.add_subplot(gs_model[1, 4])
+                yerr = np.vstack([
+                    model_res.params[1:] - ci_res[1:, 0],  # lower error
+                    ci_res[1:, 1] - model_res.params[1:]   # upper error
+                ])
+            
+                ax.errorbar(range(1, 2), model_res.params[1:], yerr=yerr, fmt='o', label='Model Coefficients with 90% CI',
+                            color='blue', capsize=5)
+                yerr_whole = np.vstack([
+                    model_whole.params[1:] - ci_whole[1:, 0],  # lower error
+                    ci_whole[1:, 1] - model_whole.params[1:]   # upper error
+                ])
+                ax.errorbar(range(1), model_whole.params[1:], yerr=yerr_whole, fmt='o', label='Whole Model Coefficients with 90% CI',
+                            color='red', capsize=5)
+                ax.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+                ax.set_xlabel("Whole Outcome Qchosen ---- Res Outcome Qchosen")
+                ax.set_ylabel("Coefficient value")
+                ax.set_title("Linear Regression Coefficients with 95% CI")
 
-            ax = fig.add_subplot(gs_model[1, 4])
-            yerr = np.vstack([
-                model_res.params[1:] - ci_res[1:, 0],  # lower error
-                ci_res[1:, 1] - model_res.params[1:]   # upper error
-            ])
+                ax = fig.add_subplot(gs_model[2, 4])
+                t_res = model_res.tvalues[1:]       
+                t_whole = model_whole.tvalues[1:]
 
-            ax.errorbar(range(1, 2), model_res.params[1:], yerr=yerr, fmt='o', label='Model Coefficients with 90% CI',
-                        color='blue', capsize=5)
-            yerr_whole = np.vstack([
-                model_whole.params[1:] - ci_whole[1:, 0],  # lower error
-                ci_whole[1:, 1] - model_whole.params[1:]   # upper error
-            ])
-            ax.errorbar(range(1), model_whole.params[1:], yerr=yerr_whole, fmt='o', label='Whole Model Coefficients with 90% CI',
-                        color='red', capsize=5)
-            ax.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-            ax.set_xlabel("Whole Outcome Qchosen ---- Res Outcome Qchosen")
-            ax.set_ylabel("Coefficient value")
-            ax.set_title("Linear Regression Coefficients with 95% CI")
+                # Plot bars for each model
+                ax.bar(range(1, 2), t_res, 0.3, label='Res Model', color='blue')
+                ax.bar(range(1), t_whole, 0.3, label='Whole Model', color='red')
 
-            ax = fig.add_subplot(gs_model[2, 4])
-            t_res = model_res.tvalues[1:]       
-            t_whole = model_whole.tvalues[1:]
+                # Reference line at 0
+                ax.axhline(0, color='gray', linestyle='--', linewidth=0.8)
 
-            # Plot bars for each model
-            ax.bar(range(1, 2), t_res, 0.3, label='Res Model', color='blue')
-            ax.bar(range(1), t_whole, 0.3, label='Whole Model', color='red')
-
-            # Reference line at 0
-            ax.axhline(0, color='gray', linestyle='--', linewidth=0.8)
-
-            # Labels
-            ax.set_xlabel("Whole Outcome Qchosen ---- Res Outcome Qchosen")
-            ax.set_ylabel("t-statistic")
-            ax.set_title("Linear Regression t-Statistics")
-            ax.legend()
+                # Labels
+                ax.set_xlabel("Whole Outcome Qchosen ---- Res Outcome Qchosen")
+                ax.set_ylabel("t-statistic")
+                ax.set_title("Linear Regression t-Statistics")
+                ax.legend()
 
         fig.tight_layout()
         fig.suptitle(f'Session: {session}, Unit: {unit_id}', fontsize=16)
