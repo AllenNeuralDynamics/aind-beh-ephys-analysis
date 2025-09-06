@@ -400,16 +400,20 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
     we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     spike_amplitude = we.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
-    del we
     unit_ids = sorting.get_unit_ids()
 
     # load quality metrics from nwb
     if os.path.exists(session_dir[f'nwb_dir_{data_type}']):
         nwb = load_nwb(session_dir[f'nwb_dir_{data_type}'])
-        unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label', 'depth', 'snr']]
+        if 'depth' in nwb.units.colnames:
+            unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label', 'depth', 'snr']]
+        else:
+            locations = we.get_extension('unit_locations').get_data()[:, 1]
+            unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label', 'snr']]
+            unit_qc['depth'] = locations
     else:
         print('No nwb file found.') 
-    
+    del we
     # change all strings in unit_qc to float 
     unit_qc = unit_qc.replace("<NA>", pd.NA)
     unit_qc['waveform_mean'] = nwb.units[:]['waveform_mean']

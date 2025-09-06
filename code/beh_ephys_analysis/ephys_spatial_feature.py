@@ -579,7 +579,7 @@ def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False
 
 # %%
 def plot_ephys_corr_band(session, 
-                    data_type='curated', 
+                    data_tpye='curated', 
                     probe = '2'):
     session_dir = session_dirs(session)
     stream_name = 'ProbeA'
@@ -696,11 +696,11 @@ if __name__ == '__main__':
         session_dir = session_dirs(session)
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
         print(session_dir[f'curated_dir_{data_type}'])
-        if session_dir[f'curated_dir_{data_type}'] is not None:
+        if session_dir[f'curated_dir_{data_type}'] is None and session_dir['curated_dir_raw'] is None:
             try:
                 # plot_ephys_probe(session, data_type=data_type, probe=probe) 
                 plot_ephys_corr_band(session, 
-                        data_type='curated', 
+                        data_type=data_type, 
                         probe = probe)
                 plt.close('all')
                 print(f'Finished {session}')

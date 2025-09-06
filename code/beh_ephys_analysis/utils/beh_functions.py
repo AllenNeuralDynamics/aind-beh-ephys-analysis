@@ -25,6 +25,7 @@ from hdmf_zarr import NWBZarrIO
 from scipy.io import loadmat
 import pickle
 import shutil
+from open_ephys.analysis import Session
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
@@ -589,6 +590,57 @@ def parseSessionID(file_name):
     
     return aniID, dateObj, raw_id
 
+def get_stream_info(directory):
+    """
+    Get information about the streams in an Open Ephys data directory
+
+    Parameters
+    ----------
+    directory : str
+        The path to the Open Ephys data directory
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame with information about the streams
+
+    """
+
+    session = Session(directory)
+
+    stream_info = {
+        "Record Node": [],
+        "Rec Idx": [],
+        "Exp Idx": [],
+        "Stream": [],
+        "Duration (s)": [],
+        "Channels": [],
+    }
+
+    for recordnode in session.recordnodes:
+        current_record_node = os.path.basename(recordnode.directory).split(
+            "Record Node "
+        )[1]
+
+        for recording in recordnode.recordings:
+            current_experiment_index = recording.experiment_index
+            current_recording_index = recording.recording_index
+
+            for stream in recording.continuous:
+                sample_rate = stream.metadata["sample_rate"]
+                data_shape = stream.samples.shape
+                channel_count = data_shape[1]
+                duration = data_shape[0] / sample_rate
+
+                stream_info["Record Node"].append(current_record_node)
+                stream_info["Rec Idx"].append(current_recording_index)
+                stream_info["Exp Idx"].append(current_experiment_index)
+                stream_info["Stream"].append(stream.metadata["stream_name"])
+                stream_info["Duration (s)"].append(duration)
+                stream_info["Channels"].append(channel_count)
+
+    return pd.DataFrame(data=stream_info)
+
 def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
     # parse session_id 
     aniID, date_obj, raw_id = parseSessionID(session_id)
@@ -608,44 +660,58 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     nwb_dir_raw = None
     nwb_dir_curated = None
     # load recordings and decide which one is longer
-    if os.path.exists(session_dir_raw):
-        # loop through experiments and segments to get the longest one
-        lengths = []
-        experiment_ids = []
-        segment_inds = []
-        stream_name = []
+    stream_name = None
+    raw_recording_dir = None 
+    experiment_id = None
+    seg_id = None   
+    max_len_ind = None
+    all_rec_count = None
+    if os.path.exists(session_dir):
+        stream_info = get_stream_info(session_dir)
+        stream_info = stream_info[(stream_info['Stream'].str.contains('ProbeA')) & (~stream_info['Stream'].str.contains('LFP'))]
+        if len(stream_info)==1:
+            # if there is only one recording, use it
+            experiment = [f for f in os.listdir(session_dir_raw) if 'ProbeA' in f and 'LFP' not in f][0]
+            rec_path = os.path.join(session_dir_raw, experiment)
+            experiment_id = 1
+            seg_id = 1
+            print(f'Single experiment found: experiment{experiment_id}, recording{seg_id}')
+            stream_name = experiment.split('.zarr')[0]
+            all_rec_count = experiment_id-1 + seg_id-1
+            raw_recording_dir = os.path.join(session_dir_raw, experiment)
+        else:
+            # loop through experiments and segments to get the longest one
+            lengths = []
+            experiment_ids = []
+            segment_inds = []
+            stream_name = []
 
-        for experiment in os.listdir(session_dir_raw):
-            if 'ProbeA' in experiment: 
-                rec_path = os.path.join(session_dir_raw, experiment)
-                # print(rec_path)
-                exp_match = re.search(r'experiment(\d+)', experiment)
-                # experiment_inds.append(int(match.group(1)))
-                recording_curr = si.load(rec_path)
-                rec_num = recording_curr.get_num_segments()
-                # print(rec_num)
-                for rec_ind in range(rec_num):
-                    lengths.append(recording_curr.get_num_samples(segment_index = rec_ind))
-                    experiment_ids.append(int(exp_match.group(1)))
-                    segment_inds.append(rec_ind)
-                    stream_name.append(experiment.split('.zarr')[0])
+            for experiment in os.listdir(session_dir_raw):
+                if 'ProbeA' in experiment: 
+                    rec_path = os.path.join(session_dir_raw, experiment)
+                    # print(rec_path)
+                    exp_match = re.search(r'experiment(\d+)', experiment)
+                    # experiment_inds.append(int(match.group(1)))
+                    recording_curr = si.load(rec_path)
+                    rec_num = recording_curr.get_num_segments()
+                    # print(rec_num)
+                    for rec_ind in range(rec_num):
+                        lengths.append(recording_curr.get_num_samples(segment_index = rec_ind))
+                        experiment_ids.append(int(exp_match.group(1)))
+                        segment_inds.append(rec_ind)
+                        stream_name.append(experiment.split('.zarr')[0])
 
-        max_len_ind = np.argmax(np.array(lengths))
-        experiment_id = experiment_ids[max_len_ind]
-        seg_id = segment_inds[max_len_ind]+1
-        print(f'Selected experiment{experiment_id} recording{seg_id}, length:{lengths[max_len_ind]/32000 :.2f}')
-        experiment_name = stream_name[max_len_ind]
-        stream_name = experiment_name + f'_recording{seg_id}'
-        all_rec_count = experiment_id-1 + seg_id-1
-        raw_recording_dir = os.path.join(session_dir_raw, experiment_name+'.zarr')
+            max_len_ind = np.argmax(np.array(lengths))
+            experiment_id = experiment_ids[max_len_ind]
+            seg_id = segment_inds[max_len_ind]+1
+            print(f'Selected experiment{experiment_id} recording{seg_id}, length:{lengths[max_len_ind]/32000 :.2f}')
+            experiment_name = stream_name[max_len_ind]
+            stream_name = experiment_name + f'_recording{seg_id}'
+            all_rec_count = experiment_id-1 + seg_id-1
+            raw_recording_dir = os.path.join(session_dir_raw, experiment_name+'.zarr')
     else:
         print(f'No raw session directory found for {session_id}.')
-        stream_name = None
-        raw_recording_dir = None 
-        experiment_id = None
-        seg_id = None   
-        max_len_ind = None
-        all_rec_count = None
+
     # raw version
     nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
     nwb_dir_raw = None
