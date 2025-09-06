@@ -8,10 +8,10 @@ import os
 import sys
 from matplotlib.colors import LinearSegmentedColormap
 sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
-from beh_functions import session_dirs
+# from beh_functions import session_dirs
 from matplotlib import gridspec
-from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
-from aind_ephys_utils import align 
+# from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
+# from aind_ephys_utils import align 
 import ast
 import json
 import pickle
