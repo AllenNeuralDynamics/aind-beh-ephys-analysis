@@ -27,7 +27,7 @@ from utils.hdf5_extractor import HDF5Recording
 def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     session_dir = session_dirs(session)
     print(session)
-    qm_dict = {'soundcard_sync': None, 'ephys_sync': None}
+    qm_dict = {'soundcard_sync': True, 'ephys_sync': True}
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_file = os.path.join(session_dir['processed_dir'], f"{session}_process_record.txt")
 
@@ -119,43 +119,47 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
         # mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
         # mean_spike_times = np.mean(np.array(mean_spike_times))
         # extract from sorting
-        sorting = si.load(session_dir['curated_dir_raw'])
-        # recording = si.read_zarr(session_dir['raw_rec'])
-        # sorting.register_recording(recording)
-        unit_spikes = [timestamps[sorting.get_unit_spike_train(unit_id = curr_unit)] for curr_unit in sorting.unit_ids[::10]]
-        mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
-        mean_spike_times = np.mean(np.array(mean_spike_times))
-        figure, ax = plt.subplots(1, 1, figsize=(10, 5))
-        ax.hist(timestamps, bins=100, density=True, alpha=0.5, label='ephys')
-        ax.hist(all_licks, bins=100, density=True, alpha=0.5, label='licks')
-        ax.hist(df_trial['goCue_start_time'], bins=100, density=True, alpha=0.5, label='goCue')
-        for i, unit_spike in enumerate(unit_spikes):
-            ax.hist(unit_spike, bins=100, density=True, alpha=0.2, color='k')
-        ax.legend()
-        figure.savefig(os.path.join(session_dir['alignment_dir'], 'lick_goCue_ephys_time.pdf'))
-        if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]) and np.abs(np.mean(timestamps) - mean_spike_times) < 0.2*(timestamps[-1]-timestamps[0]): 
-            print(f'{session} ephys is synced.')
-            qm_dict['ephys_sync'] = True
-        else:
-            print(f'{session} ephys is not synced.')
-            qm_dict['ephys_sync'] = False
-            events = recording.events
-            harp_events = events[
-                (events.stream_name == nidaq_stream_name)
-                & (events.processor_id == source_node_id)
-                & (events.line == harp_line[0])
-            ]
+        if session_dir['curated_dir_raw'] is not None:
+            sorting = si.load(session_dir['curated_dir_raw'])
+            # recording = si.read_zarr(session_dir['raw_rec'])
+            # sorting.register_recording(recording)
+            unit_spikes = [timestamps[sorting.get_unit_spike_train(unit_id = curr_unit)] for curr_unit in sorting.unit_ids[::10]]
+            mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
+            mean_spike_times = np.mean(np.array(mean_spike_times))
+            figure, ax = plt.subplots(1, 1, figsize=(10, 5))
+            ax.hist(timestamps, bins=100, density=True, alpha=0.5, label='ephys')
+            ax.hist(all_licks, bins=100, density=True, alpha=0.5, label='licks')
+            ax.hist(df_trial['goCue_start_time'], bins=100, density=True, alpha=0.5, label='goCue')
+            for i, unit_spike in enumerate(unit_spikes):
+                ax.hist(unit_spike, bins=100, density=True, alpha=0.2, color='k')
+            ax.legend()
+            figure.savefig(os.path.join(session_dir['alignment_dir'], 'lick_goCue_ephys_time.pdf'))
+            if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]) and np.abs(np.mean(timestamps) - mean_spike_times) < 0.2*(timestamps[-1]-timestamps[0]): 
+                print(f'{session} ephys is synced.')
+                qm_dict['ephys_sync'] = True
+            else:
+                print(f'{session} ephys is not synced.')
+                qm_dict['ephys_sync'] = False
+                events = recording.events
+                if len(harp_line) == 0:
+                    print('No harp line found.')
+                    qm_dict['ephys_sync'] = True
+                else:
+                    harp_events = events[
+                        (events.stream_name == nidaq_stream_name)
+                        & (events.processor_id == source_node_id)
+                        & (events.line == harp_line[0])
+                    ]
+                    harp_states = harp_events.state.values
+                    harp_timestamps_local = harp_events.timestamp.values
+                    local_times, harp_times = decode_harp_clock(
+                        harp_timestamps_local, harp_states
+                    )
+                    np.save(os.path.join(session_dir['alignment_dir'], 'harp_times.npy'), harp_times)
+                    np.save(os.path.join(session_dir['alignment_dir'], 'local_times.npy'), local_times)
 
-            harp_states = harp_events.state.values
-            harp_timestamps_local = harp_events.timestamp.values
-            local_times, harp_times = decode_harp_clock(
-                harp_timestamps_local, harp_states
-            )
-            np.save(os.path.join(session_dir['alignment_dir'], 'harp_times.npy'), harp_times)
-            np.save(os.path.join(session_dir['alignment_dir'], 'local_times.npy'), local_times)
-
-            print('Harp times saved to: {}'.format(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
-            print('Local times saved to: {}'.format(os.path.join(session_dir['alignment_dir'], 'local_times.npy')))
+                    print('Harp times saved to: {}'.format(os.path.join(session_dir['alignment_dir'], 'harp_times.npy')))
+                    print('Local times saved to: {}'.format(os.path.join(session_dir['alignment_dir'], 'local_times.npy')))
         # %% find a stable time period
         ephys_cut_new = [recording.continuous[0].timestamps[0]+ephys_cut[0], recording.continuous[0].timestamps[-1]-ephys_cut[1]]
         if not qm_dict['ephys_sync']:

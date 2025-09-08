@@ -287,14 +287,15 @@ def ephys_opto_preprocessing(session, data_type, target):
     # %% 
 
     # %%
-    sorting = si.load(session_dir[f'curated_dir_{data_type}'])
-    unit_ids = sorting.get_unit_ids()
-    unit_spikes  = [timestamps[sorting.get_unit_spike_train(unit_id=unit_id)] for unit_id in unit_ids]
-    nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
-    unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label']]
+    if session_dir[f'curated_dir_{data_type}'] is not None:
+        sorting = si.load(session_dir[f'curated_dir_{data_type}'])
+        unit_ids = sorting.get_unit_ids()
+        unit_spikes  = [timestamps[sorting.get_unit_spike_train(unit_id=unit_id)] for unit_id in unit_ids]
+        nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
+        unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label']]
 
     # %%
-    # load spike times depending on if epyhs is synced
+    # load spike times depending on if ephys is synced
     preprosess_qm = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
     if not os.path.exists(preprosess_qm):
         print('No preprocessed quality metrics found. Run behavior_and_time_alignment.py frist.')
@@ -309,7 +310,8 @@ def ephys_opto_preprocessing(session, data_type, target):
         harp_sync_time = np.load(os.path.join(session_dir['alignment_dir'], 'harp_times.npy'))
         local_sync_time = np.load(os.path.join(session_dir['alignment_dir'], 'local_times.npy'))
         # to be updated
-        unit_spikes = [align_timestamps_to_anchor_points(spike_times, local_sync_time, harp_sync_time) for spike_times in unit_spikes]
+        if session_dir[f'curated_dir_{data_type}'] is not None:
+            unit_spikes = [align_timestamps_to_anchor_points(spike_times, local_sync_time, harp_sync_time) for spike_times in unit_spikes]
         laser_times = align_timestamps_to_anchor_points(laser_times, local_sync_time, harp_sync_time)
     if len(np.where(np.diff(laser_times) > 20*60)[0]) > 0:
         # find max time difference
@@ -320,9 +322,10 @@ def ephys_opto_preprocessing(session, data_type, target):
     else:
         opto_df['pre_post'] = 'post'
     # unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)}
-    unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)} # for session behavior_782394_2025-04-22_10-53-28
-    with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
-        pickle.dump(unit_spikes, f)
+    if session_dir[f'curated_dir_{data_type}'] is not None:
+        unit_spikes = {unit_id:unit_spike for unit_id, unit_spike in zip(unit_ids, unit_spikes)} # -1 for session behavior_782394_2025-04-22_10-53-28
+        with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'wb') as f:
+            pickle.dump(unit_spikes, f)
 
     # %%
     # gather all laser information and save
@@ -416,41 +419,42 @@ def ephys_opto_preprocessing(session, data_type, target):
     
     resp_p = {}
     resp_lat = {}
-    for curr_id in unit_ids:
-        spike_times = unit_spikes[curr_id]
-        curr_resp_p = np.empty(tuple(dim_len), dtype=object)
-        curr_resp_lat = np.empty(tuple(dim_len), dtype=object)
-        for power_ind, curr_power in enumerate(np.sort(opto_df_target['power'].unique())):
-            for site_ind, curr_site in enumerate(opto_df_target['site'].unique()):                                                             
-                for duration_ind, curr_duration in enumerate(np.sort(opto_df_target['duration'].unique())):
-                    for freq_ind, curr_freq in enumerate(np.sort(opto_df_target['freq'].unique())):
-                        for stim_time_ind, curr_stim_time in enumerate(opto_df_target['pre_post'].unique()):
-                            for num_pulse_ind, curr_num_pulses in enumerate(np.sort(opto_df_target['num_pulses'].unique())):
-                                laser_times_curr = opto_df_target.query('site == @curr_site and power == @curr_power and duration == @curr_duration and freq == @curr_freq and num_pulses == @curr_num_pulses and pre_post ==@curr_stim_time')['time'].values
-                                if len(laser_times_curr) == 0:
-                                    curr_resp_p[power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind] = np.full(curr_num_pulses, np.nan).tolist()
-                                    curr_resp_lat[power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind] = np.full(curr_num_pulses, np.nan).tolist()
-                                else:
-                                    resp_temp = []
-                                    resp_lat_temp = []
-                                    for curr_pulse in range(curr_num_pulses):
-                                        laser_times_curr_pulse = laser_times_curr + curr_pulse * 1/curr_freq
-                                        df = align.to_events(spike_times, laser_times_curr_pulse, (0, resp_win), return_df=True)
-                                        resp_temp.append(len(df['event_index'].unique())/len(laser_times_curr_pulse))
-                                        if len(df) > 0:
-                                            resp_lat_temp.append(np.nanmean(df.groupby('event_index')['time'].min().values))
-                                        else:
-                                            resp_lat_temp.append(np.nan)
-                                    
-                                    curr_resp_lat[power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind] = resp_lat_temp
-                                    curr_resp_p[power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind] = resp_temp
-        resp_p[curr_id] = curr_resp_p
-        resp_lat[curr_id] = curr_resp_lat
-        # save to unit_opto_tag
-        # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'unit_opto_tag_p_{target}_{curr_id}.npy'), curr_resp_p)  
-        # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'unit_opto_tag_lat_{target}_{curr_id}.npy'), curr_resp_lat)  
-        # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'spiketimes_{curr_id}.npy'), spike_times)    
-        # print(f'Unit {curr_id} done')
+    if session_dir[f'curated_dir_{data_type}'] is not None:
+        for curr_id in unit_ids:
+            spike_times = unit_spikes[curr_id]
+            curr_resp_p = np.empty(tuple(dim_len), dtype=object)
+            curr_resp_lat = np.empty(tuple(dim_len), dtype=object)
+            for power_ind, curr_power in enumerate(np.sort(opto_df_target['power'].unique())):
+                for site_ind, curr_site in enumerate(opto_df_target['site'].unique()):                                                             
+                    for duration_ind, curr_duration in enumerate(np.sort(opto_df_target['duration'].unique())):
+                        for freq_ind, curr_freq in enumerate(np.sort(opto_df_target['freq'].unique())):
+                            for stim_time_ind, curr_stim_time in enumerate(opto_df_target['pre_post'].unique()):
+                                for num_pulse_ind, curr_num_pulses in enumerate(np.sort(opto_df_target['num_pulses'].unique())):
+                                    laser_times_curr = opto_df_target.query('site == @curr_site and power == @curr_power and duration == @curr_duration and freq == @curr_freq and num_pulses == @curr_num_pulses and pre_post ==@curr_stim_time')['time'].values
+                                    if len(laser_times_curr) == 0:
+                                        curr_resp_p[power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind] = np.full(curr_num_pulses, np.nan).tolist()
+                                        curr_resp_lat[power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind] = np.full(curr_num_pulses, np.nan).tolist()
+                                    else:
+                                        resp_temp = []
+                                        resp_lat_temp = []
+                                        for curr_pulse in range(curr_num_pulses):
+                                            laser_times_curr_pulse = laser_times_curr + curr_pulse * 1/curr_freq
+                                            df = align.to_events(spike_times, laser_times_curr_pulse, (0, resp_win), return_df=True)
+                                            resp_temp.append(len(df['event_index'].unique())/len(laser_times_curr_pulse))
+                                            if len(df) > 0:
+                                                resp_lat_temp.append(np.nanmean(df.groupby('event_index')['time'].min().values))
+                                            else:
+                                                resp_lat_temp.append(np.nan)
+                                        
+                                        curr_resp_lat[power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind] = resp_lat_temp
+                                        curr_resp_p[power_ind, site_ind, num_pulse_ind, duration_ind, freq_ind, stim_time_ind] = resp_temp
+            resp_p[curr_id] = curr_resp_p
+            resp_lat[curr_id] = curr_resp_lat
+            # save to unit_opto_tag
+            # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'unit_opto_tag_p_{target}_{curr_id}.npy'), curr_resp_p)  
+            # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'unit_opto_tag_lat_{target}_{curr_id}.npy'), curr_resp_lat)  
+            # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'spiketimes_{curr_id}.npy'), spike_times)    
+            # print(f'Unit {curr_id} done')
 
     opto_response = {'resp_p': resp_p, 'resp_lat': resp_lat}
 
@@ -463,53 +467,56 @@ def ephys_opto_preprocessing(session, data_type, target):
 
     # %%
     # load waveforms info
-    we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     print(f'Loaded session: {session}')
-    unit_ids = we.sorting.get_unit_ids()
-    all_templates = we.get_extension("templates").get_data(operator="average")
-    all_channels = we.sparsity.channel_ids
-    if all_channels[0].startswith('AP'):
-        all_channels_int = np.array([int(channel.split('AP')[-1]) for channel in all_channels])
-    else:
-        all_channels_int = np.array([int(channel.split('CH')[-1]) for channel in all_channels])
-    unit_spartsity = we.sparsity.unit_id_to_channel_ids
-    channel_locations = we.get_channel_locations()
-    unit_locations = we.get_extension("unit_locations").get_data(outputs="by_unit")
-    del we
-    right_left = channel_locations[:, 0]<20
-
-    # re-organize templates so that left and right separate
-    colors = ["blue", "white", "red"]
-    b_w_r_cmap = LinearSegmentedColormap.from_list("b_w_r", colors)
-
-    y_neighbors_to_keep = 3
-    samples_to_keep = [-30, 60]
-    orginal_loc = False
-    waveform_params = {'samples_to_keep': samples_to_keep, 'y_neighbors_to_keep': y_neighbors_to_keep, 'orginal_loc': orginal_loc}
-    with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveform_params.json'), 'w') as f:
-        json.dump(waveform_params, f)
-
-    channel_loc_dict = {channel: channel_loc for channel, channel_loc in zip(all_channels_int, channel_locations)}
-
-    # save all re-ordered templates
-    print(f'Saving templates: {session}')
     opto_waveforms = {}
-    for unit_ind, unit_id in enumerate(unit_ids):
-        curr_template = all_templates[unit_ind]
-        reordered_template = template_reorder(curr_template, right_left, all_channels_int, sample_to_keep = samples_to_keep, y_neighbors_to_keep = y_neighbors_to_keep, orginal_loc = orginal_loc)
-        # shifted_cmap = shiftedColorMap(custom_cmap, np.nanmin(reordered_template), np.nanmax(reordered_template), 'shifted_b_w_r')
-        # plt.imshow(reordered_template, extent = [-30, -30+2*(30+60), 2*3+1, 0], cmap=shifted_cmap, aspect='auto');
-        # plt.axvline(0, color='black', linestyle='--', linewidth=0.5)
-        # plt.axvline(30+60, color='black', linestyle='--', linewidth=0.5)
-        # plt.title(f'Unit_id: {unit_id} depth: {unit_locations[unit_id][1]:.2f}')
-        # plt.box(False)
-        # plt.colorbar();
-        # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'unit_waveform_{unit_id}.npy'), reordered_template)
-        opto_waveforms[unit_id] = reordered_template
+    if session_dir[f'curated_dir_{data_type}'] is not None:
+        we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
+        unit_ids = we.sorting.get_unit_ids()
+        all_templates = we.get_extension("templates").get_data(operator="average")
+        all_channels = we.sparsity.channel_ids
+        if all_channels[0].startswith('AP'):
+            all_channels_int = np.array([int(channel.split('AP')[-1]) for channel in all_channels])
+        else:
+            all_channels_int = np.array([int(channel.split('CH')[-1]) for channel in all_channels])
+        unit_spartsity = we.sparsity.unit_id_to_channel_ids
+        channel_locations = we.get_channel_locations()
+        unit_locations = we.get_extension("unit_locations").get_data(outputs="by_unit")
+        del we
+        right_left = channel_locations[:, 0]<20
 
-    with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveforms_{target}.pkl'), 'wb') as f:
-        pickle.dump(opto_waveforms, f)
-    print(f'Saved templates: {session}')
+        # re-organize templates so that left and right separate
+        colors = ["blue", "white", "red"]
+        b_w_r_cmap = LinearSegmentedColormap.from_list("b_w_r", colors)
+
+        y_neighbors_to_keep = 3
+        samples_to_keep = [-30, 60]
+        orginal_loc = False
+        waveform_params = {'samples_to_keep': samples_to_keep, 'y_neighbors_to_keep': y_neighbors_to_keep, 'orginal_loc': orginal_loc}
+        with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveform_params.json'), 'w') as f:
+            json.dump(waveform_params, f)
+
+        channel_loc_dict = {channel: channel_loc for channel, channel_loc in zip(all_channels_int, channel_locations)}
+
+        # save all re-ordered templates
+        print(f'Saving templates: {session}')
+        for unit_ind, unit_id in enumerate(unit_ids):
+            curr_template = all_templates[unit_ind]
+            reordered_template = template_reorder(curr_template, right_left, all_channels_int, sample_to_keep = samples_to_keep, y_neighbors_to_keep = y_neighbors_to_keep, orginal_loc = orginal_loc)
+            # shifted_cmap = shiftedColorMap(custom_cmap, np.nanmin(reordered_template), np.nanmax(reordered_template), 'shifted_b_w_r')
+            # plt.imshow(reordered_template, extent = [-30, -30+2*(30+60), 2*3+1, 0], cmap=shifted_cmap, aspect='auto');
+            # plt.axvline(0, color='black', linestyle='--', linewidth=0.5)
+            # plt.axvline(30+60, color='black', linestyle='--', linewidth=0.5)
+            # plt.title(f'Unit_id: {unit_id} depth: {unit_locations[unit_id][1]:.2f}')
+            # plt.box(False)
+            # plt.colorbar();
+            # np.save(os.path.join(session_dir[f'opto_dir_{data_type}'], f'unit_waveform_{unit_id}.npy'), reordered_template)
+            opto_waveforms[unit_id] = reordered_template
+
+        with open(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_waveforms_{target}.pkl'), 'wb') as f:
+            pickle.dump(opto_waveforms, f)
+        print(f'Saved templates: {session}')
+    else:
+        print(f'No curated data found for {session}, skipping waveform saving.')
 
     # %%
     # %%

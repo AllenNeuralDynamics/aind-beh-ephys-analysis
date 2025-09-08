@@ -227,8 +227,9 @@ def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False
     with open(os.path.join('/root/capsule/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
         combined_tagged_units = pickle.load(f)
     stream_name = 'ProbeA'
-    recording_zarr = [os.path.join(session_dir['session_dir_raw'], f) for f in os.listdir(session_dir['session_dir_raw']) if stream_name in f and 'LFP' not in f][0]
+    recording_zarr = session_dir['raw_rec']
     recording = si.read_zarr(recording_zarr)
+    recording = recording.select_segments(session_dir['seg_id']-1)
     # load the LFP data 
     if probe == '2':
         recording_LFP = spre.bandpass_filter(recording, freq_min=1, freq_max=300)
@@ -236,12 +237,13 @@ def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False
     elif probe == 'opto':
         recording_LFP_zarr = [os.path.join(session_dir['session_dir_raw'], f) for f in os.listdir(session_dir['session_dir_raw']) if stream_name in f and 'LFP' in f][0]
         recording_LFP = si.read_zarr(recording_LFP_zarr)
+        recording_LFP = recording_LFP.select_segments(session_dir['seg_id']-1)
         recording_LFP = spre.common_reference(recording_LFP, reference='global', operator='median')    
     # load whole data
     recording = spre.bandpass_filter(recording, freq_min=300, freq_max=10000)
     recording = spre.common_reference(recording, reference='global', operator='median')
     # load the opto file
-    opto_tbl = pd.read_csv(os.path.join(session_dir['opto_dir_curated'], f'{session}_opto_session_soma.csv'))
+    opto_tbl = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_soma.csv'))
     # select 5 randoms blocks, calculate mean power specturm as baseline
     if len(opto_tbl['pre_post'].unique()) > 1:
         range_bh = [opto_tbl[opto_tbl['pre_post'] == 'pre']['laser_onset_samples'].max(), 
@@ -579,7 +581,7 @@ def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False
 
 # %%
 def plot_ephys_corr_band(session, 
-                    data_tpye='curated', 
+                    data_type='curated', 
                     probe = '2'):
     session_dir = session_dirs(session)
     stream_name = 'ProbeA'
@@ -587,17 +589,20 @@ def plot_ephys_corr_band(session,
     os.makedirs(save_dir, exist_ok=True)
     # load the LFP data 
     if probe == '2':
-        recording_zarr = [os.path.join(session_dir['session_dir_raw'], f) for f in os.listdir(session_dir['session_dir_raw']) if stream_name in f and 'LFP' not in f][0]
+        recording_zarr = session_dir['raw_rec']
         recording = si.read_zarr(recording_zarr)
+        recording = recording.select_segments(session_dir['seg_id']-1)
         recording_LFP = spre.bandpass_filter(recording, freq_min=1, freq_max=300)
         recording_LFP = spre.common_reference(recording_LFP, reference='global', operator='median')
     elif probe == 'opto':
-        recording_LFP_zarr = [os.path.join(session_dir['session_dir_raw'], f) for f in os.listdir(session_dir['session_dir_raw']) if stream_name in f and 'LFP' in f][0]
+        recording_LFP_zarr = session_dir['raw_rec']
+        recording_LFP_zarr = recording_LFP_zarr.replace('AP', 'LFP')
         recording_LFP = si.read_zarr(recording_LFP_zarr)
+        recording_LFP = recording_LFP.select_segments(session_dir['seg_id']-1)
         recording_LFP = spre.common_reference(recording_LFP, reference='global', operator='median')    
 
     # load the opto file
-    opto_tbl = pd.read_csv(os.path.join(session_dir['opto_dir_curated'], f'{session}_opto_session_soma.csv'))
+    opto_tbl = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_soma.csv'))
     # select 5 randoms blocks, calculate mean power specturm as baseline
     if len(opto_tbl['pre_post'].unique()) > 1:
         range_bh = [opto_tbl[opto_tbl['pre_post'] == 'pre']['laser_onset_samples'].max(), 
@@ -690,33 +695,40 @@ if __name__ == '__main__':
     probe_list = [probe for probe, session in zip(probe_list, session_list) if isinstance(session, str)]
     session_list = [session for session in session_list if isinstance(session, str)]    
     from joblib import Parallel, delayed
-    data_type = 'curated'
+    data_type = 'raw'
     def process(session, data_type, probe): 
-        print(f'Starting {session}')
+        print(f'Checking {session}')
         session_dir = session_dirs(session)
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-        print(session_dir[f'curated_dir_{data_type}'])
-        if session_dir[f'curated_dir_{data_type}'] is None and session_dir['curated_dir_raw'] is None:
-            try:
+        if not os.path.exists(os.path.join(session_dir['ephys_fig_dir_curated'], f'{session}_cross_corr_LFP_bands.png')) and not os.path.exists(os.path.join(session_dir['ephys_fig_dir_raw'], f'{session}_cross_corr_LFP_bands.png')):
+            if session_dir['raw_rec'] is None:
+                print(f'Skipping {session} as it does not have raw recording data')
+                return
+            if session_dir[f'curated_dir_{data_type}'] is None:
+                print(f'Skipping {session} as it does not have curated {data_type} data')
+                return
+            print(f'Processing {session}...')
+            # try:
                 # plot_ephys_probe(session, data_type=data_type, probe=probe) 
-                plot_ephys_corr_band(session, 
-                        data_type=data_type, 
-                        probe = probe)
-                plt.close('all')
-                print(f'Finished {session}')
-            except:
-                print(f'Error processing {session}')
-                plt.close('all')
+            plot_ephys_corr_band(session, 
+                    data_type=data_type, 
+                    probe = probe)
+            plt.close('all')
+            # plot_ephys_probe(session, data_type=data_type, probe=probe)
+            print(f'Finished {session}')
+            # except:
+            #     print(f'Error processing {session}')
+            #     plt.close('all')
         else: 
-            print(f'No curated data found for {session}') 
+            print(f'LFP calculated for {session}') 
         # elif session\_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw' 
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    Parallel(n_jobs=3)(delayed(process)(session, data_type, probe) for session, probe in zip(session_list, probe_list))
-    # # process('behavior_754897_2025-03-13_11-20-42', data_type)
-    # for session, probe in zip(session_list, probe_list):
-    #     process(session, data_type, probe)
-    #     plt.close('all')
+    # Parallel(n_jobs=3)(delayed(process)(session, data_type, probe) for session, probe in zip(session_list, probe_list))
+    # process('behavior_751766_2025-02-15_12-08-11', data_type, '2')
+    plot_ephys_corr_band('behavior_751766_2025-02-15_12-08-11', data_type,  '2')
+    # plot_ephys_probe('ecephys_713854_2024-03-08_14-54-25', data_type,  '2')
+  
 
 # # %%
 # # move all psd mean and opto to ephys_combined folder's subfolders mean and opto
