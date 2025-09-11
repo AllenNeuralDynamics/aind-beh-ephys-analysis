@@ -548,17 +548,19 @@ if __name__ == "__main__":
  
     def process(session): 
         session_dir = session_dirs(session)
-        if session_dir[f'curated_dir_{data_type}'] is not None: 
-            print(f'Processing {session}')
-            ephys_opto_preprocessing(session, data_type, target)
-            plt.close('all')
-            # ephys_opto_crosscorr(session, data_type)
-            print(f'Finished {session}')
+        print(f'Processing {session}')
+        if not os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], session+'_waveform_params.json')):
+            if session_dir[f'curated_dir_{data_type}'] is not None: 
+                print(f'Computing {session}')
+                ephys_opto_preprocessing(session, data_type, target)
+                plt.close('all')
+                # ephys_opto_crosscorr(session, data_type)
+        print(f'Finished {session}')
     # for session in session_list[-25:-10]:
     #     process(session)
-    Parallel(n_jobs=2)(delayed(process)(session) for session in session_list[-9:])
-    # process('behavior_782394_2025-04-22_10-53-28')
-    # for session in session_list[-14:-3]:
+    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list)
+    # process('ecephys_713854_2024-03-05_13-01-09')
+    # for session in session_list:
     #     process(session)
 
 

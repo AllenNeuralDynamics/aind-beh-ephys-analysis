@@ -43,7 +43,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 def opto_summary(session, data_type, target, save=True):
     session_dir = session_dirs(session)
-    we = si.load(session_dir['postprocessed_dir_curated'], load_extensions=False)
+    we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     y_loc = we.get_extension('unit_locations').get_data()[:,1]
 
      # %%
@@ -387,22 +387,21 @@ if __name__ == '__main__':
 
     warnings.filterwarnings("ignore")
     
-    
+    data_type = 'raw'
     from joblib import Parallel, delayed
     def process(session):
         print(f'Starting {session}')
         session_dir = session_dirs(session)
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-        if session_dir['curated_dir_curated'] is not None:
-            data_type = 'curated'
+        if session_dir[f'curated_dir_{data_type}'] is not None:
             opto_summary(session, data_type, target, save=True)
             print(f'Finished {session}')
         else: 
-            print(f'No curated data found for {session}')
+            print(f'No {data_type} data found for {session}')
         # elif session_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw'
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    # Parallel(n_jobs=4)(delayed(process)(session) for session in session_list[-25:-10])
+    Parallel(n_jobs=4)(delayed(process)(session) for session in session_list)
     # print(session_list[10:17])
     # for session in session_list:
     #     if session == 'ecephys_713854_2024-03-08_17-15-58':
@@ -411,7 +410,7 @@ if __name__ == '__main__':
     #     process(session)
         # except:
         #     print(f'Failed {session}')
-    process('behavior_782394_2025-04-22_10-53-28')
+    # process(session_list[0])
 
 
 

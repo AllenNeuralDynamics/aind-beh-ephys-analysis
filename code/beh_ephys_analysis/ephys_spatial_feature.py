@@ -607,8 +607,9 @@ def plot_ephys_corr_band(session,
     if len(opto_tbl['pre_post'].unique()) > 1:
         range_bh = [opto_tbl[opto_tbl['pre_post'] == 'pre']['laser_onset_samples'].max(), 
                     opto_tbl[opto_tbl['pre_post'] == 'post']['laser_onset_samples'].min()]
+        range_bh = [opto_tbl[opto_tbl['pre_post'] == 'post']['laser_onset_samples'].min()-30*30000, opto_tbl[opto_tbl['pre_post'] == 'post']['laser_onset_samples'].min()]
     else:
-        range_bh = [0, opto_tbl['laser_onset_samples'].min()]
+        range_bh = [opto_tbl['laser_onset_samples'].min()-30*30000, opto_tbl['laser_onset_samples'].min()]
 
     # plot baseline high-freq
     num_bins = 10
@@ -621,7 +622,10 @@ def plot_ephys_corr_band(session,
             'gamma': [100, 300]}
     gs_corr = gridspec.GridSpec(3, len(bands.keys()))
     fig = plt.figure(figsize=(5*len(bands.keys()), 15))
-    time_frames_opto = np.random.choice(opto_tbl[opto_tbl['power']==opto_tbl['power'].max()]['laser_onset_samples'].values, size=num_bins, replace=False)  # convert to samples
+    if len(opto_tbl['pre_post'].unique()) > 1:
+        time_frames_opto = np.random.choice(opto_tbl[(opto_tbl['power']==opto_tbl['power'].max()) & (opto_tbl['pre_post'] == 'post')]['laser_onset_samples'].values, size=num_bins, replace=False)  # convert to samples
+    else:
+        time_frames_opto = np.random.choice(opto_tbl[opto_tbl['power']==opto_tbl['power'].max()]['laser_onset_samples'].values, size=num_bins, replace=False)
     time_frames_rec_opto = time_frames_opto*recording_LFP.get_sampling_frequency()/30000
     for ind, band in enumerate(bands.keys()):
         freq_cut = bands[band]
@@ -695,38 +699,42 @@ if __name__ == '__main__':
     probe_list = [probe for probe, session in zip(probe_list, session_list) if isinstance(session, str)]
     session_list = [session for session in session_list if isinstance(session, str)]    
     from joblib import Parallel, delayed
-    data_type = 'raw'
-    def process(session, data_type, probe): 
+    def process(session, probe): 
         print(f'Checking {session}')
         session_dir = session_dirs(session)
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-        if not os.path.exists(os.path.join(session_dir['ephys_fig_dir_curated'], f'{session}_cross_corr_LFP_bands.png')) and not os.path.exists(os.path.join(session_dir['ephys_fig_dir_raw'], f'{session}_cross_corr_LFP_bands.png')):
-            if session_dir['raw_rec'] is None:
-                print(f'Skipping {session} as it does not have raw recording data')
-                return
-            if session_dir[f'curated_dir_{data_type}'] is None:
-                print(f'Skipping {session} as it does not have curated {data_type} data')
-                return
-            print(f'Processing {session}...')
-            # try:
-                # plot_ephys_probe(session, data_type=data_type, probe=probe) 
-            plot_ephys_corr_band(session, 
-                    data_type=data_type, 
-                    probe = probe)
-            plt.close('all')
-            # plot_ephys_probe(session, data_type=data_type, probe=probe)
-            print(f'Finished {session}')
-            # except:
-            #     print(f'Error processing {session}')
-            #     plt.close('all')
-        else: 
-            print(f'LFP calculated for {session}') 
-        # elif session\_dir['curated_dir_raw'] is not None:
+        if session_dir['curated_dir_curated'] is not None:
+            data_type = 'curated'
+        elif session_dir['curated_dir_raw'] is not None:
+            data_type = 'raw'
+        else:
+            print(f'Skipping {session} as it does not have curated or raw data')
+            return
+
+        if session_dir['raw_rec'] is None:
+            print(f'Skipping {session} as it does not have raw recording data')
+            return
+        if session_dir[f'curated_dir_{data_type}'] is None:
+            print(f'Skipping {session} as it does not have curated {data_type} data')
+            return
+        print(f'Processing {session}...')
+        # try:
+            # plot_ephys_probe(session, data_type=data_type, probe=probe)  
+        plot_ephys_corr_band(session, 
+                data_type=data_type, 
+                probe = probe)
+        plt.close('all')
+        # plot_ephys_probe(session, data_type=data_type, probe=probe)
+        print(f'Finished {session}')
+        # except:
+        #     print(f'Error processing {session}')
+        #     plt.close('all')
+
         #     data_type = 'raw' 
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    # Parallel(n_jobs=3)(delayed(process)(session, data_type, probe) for session, probe in zip(session_list, probe_list))
-    # process('behavior_751766_2025-02-15_12-08-11', data_type, '2')
-    plot_ephys_corr_band('behavior_751766_2025-02-15_12-08-11', data_type,  '2')
+    Parallel(n_jobs=3)(delayed(process)(session, probe) for session, probe in zip(session_list, probe_list))
+    # process('behavior_751766_2025-02-14_11-37-11', '2')
+    # plot_ephys_corr_band('behavior_751766_2025-02-15_12-08-11', data_type,  '2')
     # plot_ephys_probe('ecephys_713854_2024-03-08_14-54-25', data_type,  '2')
   
 

@@ -433,7 +433,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     # load waveforms info
     with open(os.path.join(session_dir[f'opto_dir_{data_type}'], session+'_waveform_params.json')) as f:
         waveform_params = json.load(f)
-    print(waveform_params)
+    # print(waveform_params)
 
     # load opto responses
     with open(os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'spiketimes.pkl'), 'rb') as f:
@@ -573,24 +573,40 @@ if __name__ == "__main__":
      
     
     from joblib import Parallel, delayed
+    import os
+    import pickle
     data_type = 'raw'
     def process(session, data_type): 
         print(f'Starting {session}')
+        finish = False
         session_dir = session_dirs(session)
-        # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-        print(session_dir[f'curated_dir_{data_type}'])
-        if session_dir[f'curated_dir_{data_type}'] is not None:
-            opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-            print(f'Finished {session}')
-        # else:
-        # #     print(f'No curated data found for {session}') 
-        # elif session_dir['curated_dir_raw'] is not None:
-        #     data_type = 'raw' 
-        #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    Parallel(n_jobs=5)(delayed(process)(session, data_type) for session in session_list[-8:-6])
-    # process('behavior_782394_2025-04-22_10-53-28', data_type)
-    # for session in [session_list[-13]]:
-    #     process(session)
+        # Build file path
+        file_path = os.path.join(session_dir[f'opto_dir_{data_type}'],
+                                f'{session}_opto_tagging_metrics.pkl')
+        if os.path.exists(file_path):
+            with open(file_path, "rb") as f:
+                data = pickle.load(f)
+            if isinstance(data, dict) and "opto_tagging_df_metrics" in data:
+                finish = True
+                print(f"{session} opto tagging up to date")
+# behavior_714116_2024-08-27_11-29-48 opto tagging up to date
+# Reprocess opto tagging behavior_714116_2024-08-27_11-29-48
+        if not finish:
+            # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+            print(f"Reprocess opto tagging {session}")
+            # print(session_dir[f'curated_dir_{data_type}'])
+            if session_dir[f'curated_dir_{data_type}'] is not None:
+                opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, save=True)
+        print(f'Finished {session}')
+            # else:
+            # #     print(f'No curated data found for {session}') 
+            # elif session_dir['curated_dir_raw'] is not None:
+            #     data_type = 'raw' 
+            #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
+    Parallel(n_jobs=5)(delayed(process)(session, data_type) for session in session_list)
+    # process('behavior_714116_2024-08-27_11-29-48', data_type)
+    # for session in session_list:
+    #     process(session, data_type)
     # print(session_list[-13])
 
     
