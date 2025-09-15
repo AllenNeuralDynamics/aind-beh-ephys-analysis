@@ -394,23 +394,30 @@ if __name__ == '__main__':
         session_dir = session_dirs(session)
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
         if session_dir[f'curated_dir_{data_type}'] is not None:
-            opto_summary(session, data_type, target, save=True)
-            print(f'Finished {session}')
+            if get_unit_tbl(session, data_type, summary=True) is None:
+                opto_summary(session, data_type, target, save=True)
+                print(f'Finished {session}')
+                return
+            else:
+                unit_tbl = get_unit_tbl(session, data_type, summary=True)
+                if 'p_max' not in unit_tbl.columns:
+                    opto_summary(session, data_type, target, save=True)
+                    print(f'Finished {session}')
+                    return
+            
         else: 
             print(f'No {data_type} data found for {session}')
         # elif session_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw'
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    Parallel(n_jobs=4)(delayed(process)(session) for session in session_list)
+    # Parallel(n_jobs=2)(delayed(process)(session) for session in session_list)
     # print(session_list[10:17])
-    # for session in session_list:
-    #     if session == 'ecephys_713854_2024-03-08_17-15-58':
-    #         continue
-    #     # try:
-    #     process(session)
-        # except:
+    for session in session_list:
+        # try:
+        process(session) 
+         # except:
         #     print(f'Failed {session}')
-    # process(session_list[0])
+    # process('behavior_761038_2025-04-15_10-25-11')
 
 
 
