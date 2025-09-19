@@ -95,15 +95,15 @@ class HDF5RecordingSegment(BaseRecordingSegment):
             traces = traces[:, channel_indices]
         return traces
     
-    def get_start_time(self) -> float:
-        if self._time_vector is not None:
-            return float(self._time_vector[0])
-        return 0.0
+    # def get_start_time(self) -> float:
+    #     if self._time_vector is not None:
+    #         return float(self._time_vector[0])
+    #     return 0.0
 
-    def get_end_time(self) -> float:
-        if self._time_vector is not None:
-            return float(self._time_vector[-1])
-        return float(self.get_num_samples())
+    # def get_end_time(self) -> float:
+    #     if self._time_vector is not None:
+    #         return float(self._time_vector[-1])
+    #     return float(self.get_num_samples())
 
 
 read_hdf5 = HDF5Recording

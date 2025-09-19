@@ -11,7 +11,9 @@ sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
 # from beh_functions import session_dirs
 from matplotlib import gridspec
 # from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
-# from aind_ephys_utils import align 
+# from aind_ephys_utils import align
+from utils.beh_functions import session_dirs 
+from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 import ast
 import json
 import pickle
@@ -695,7 +697,7 @@ class load_cross_corr():
                 raise ValueError(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
         return unit_cross_corr_data.to_dict(orient='records')[0] if unit_cross_corr_data is not None else None
 
-def make_summary_unit_tbl(session):
+def make_summary_unit_tbl(session): # this is for hopkins data
     session_dir = session_dirs(session)
     nwb = load_nwb_from_filename(session_dir['nwb_dir_raw'])
     if nwb.units is None:
