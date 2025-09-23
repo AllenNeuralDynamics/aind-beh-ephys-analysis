@@ -536,7 +536,7 @@ def ephys_opto_crosscorr(session, data_type):
 
 if __name__ == "__main__":
     # session = 'behavior_717121_2024-06-15_10-00-58'
-    data_type = 'raw'
+    data_type = 'curated'
     target = 'soma'
     # ephys_opto_preprocessing(session, data_type, target)
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -552,13 +552,13 @@ if __name__ == "__main__":
         if not os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], session+'_waveform_params.json')):
             if session_dir[f'curated_dir_{data_type}'] is not None: 
                 print(f'Computing {session}')
-                ephys_opto_preprocessing(session, data_type, target)
+                # ephys_opto_preprocessing(session, data_type, target)
                 plt.close('all')
-                # ephys_opto_crosscorr(session, data_type)
+                ephys_opto_crosscorr(session, data_type)
         print(f'Finished {session}')
     # for session in session_list[-25:-10]:
     #     process(session)
-    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list)
+    Parallel(n_jobs=1)(delayed(process)(session) for session in session_list[-8:])
     # process('ecephys_713854_2024-03-05_13-01-09')
     # for session in session_list:
     #     process(session)

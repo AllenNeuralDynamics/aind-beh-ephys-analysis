@@ -397,7 +397,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
     with open(session_qm_file) as f:
         qm = json.load(f)
     
-    sorting = si.load_extractor(session_dir[f'curated_dir_{data_type}'])
+    sorting = si.load(session_dir[f'curated_dir_{data_type}'])
     we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     spike_amplitude = we.get_extension('spike_amplitudes').get_data(outputs="by_unit")[0]
     unit_ids = sorting.get_unit_ids()
@@ -575,36 +575,37 @@ if __name__ == "__main__":
     from joblib import Parallel, delayed
     import os
     import pickle
-    data_type = 'raw'
+    data_type = 'curated'
     def process(session, data_type): 
         print(f'Starting {session}')
         finish = False
-        session_dir = session_dirs(session)
-        # Build file path
-        file_path = os.path.join(session_dir[f'opto_dir_{data_type}'],
-                                f'{session}_opto_tagging_metrics.pkl')
-        if os.path.exists(file_path):
-            with open(file_path, "rb") as f:
-                data = pickle.load(f)
-            if isinstance(data, dict) and "opto_tagging_df_metrics" in data:
-                finish = True
-                print(f"{session} opto tagging up to date")
+        # session_dir = session_dirs(session)
+        # # Build file path
+        # file_path = os.path.join(session_dir[f'opto_dir_{data_type}'],
+        #                         f'{session}_opto_tagging_metrics.pkl')
+        # if os.path.exists(file_path):
+        #     with open(file_path, "rb") as f:
+        #         data = pickle.load(f)
+        #     if isinstance(data, dict) and "opto_tagging_df_metrics" in data:
+        #         finish = True
+        #         print(f"{session} opto tagging up to date")
 # behavior_714116_2024-08-27_11-29-48 opto tagging up to date
 # Reprocess opto tagging behavior_714116_2024-08-27_11-29-48
-        if not finish:
-            # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-            print(f"Reprocess opto tagging {session}")
-            # print(session_dir[f'curated_dir_{data_type}'])
-            if session_dir[f'curated_dir_{data_type}'] is not None:
-                opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, save=True)
-        print(f'Finished {session}')
+        # if not finish:
+        #     # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
+        #     print(f"Process opto tagging {session}")
+        #     # print(session_dir[f'curated_dir_{data_type}'])
+        #     if session_dir[f'curated_dir_{data_type}'] is not None:
+        opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
+
             # else:
             # #     print(f'No curated data found for {session}') 
             # elif session_dir['curated_dir_raw'] is not None:
             #     data_type = 'raw' 
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    # Parallel(n_jobs=5)(delayed(process)(session, data_type) for session in session_list)
-    opto_plotting_session('behavior_761038_2025-04-15_10-25-11', 'raw', 'soma', resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = False, save=True)
+    # session_list = ['behavior_791691_2025-06-24_13-21-29', 'behavior_791691_2025-06-26_13-39-26', 'behavior_784806_2025-06-17_14-59-23']
+    Parallel(n_jobs=2)(delayed(process)(session, data_type) for session in session_list)
+    # opto_plotting_session('behavior_791691_2025-06-24_13-21-29', 'curated', 'soma', resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
     # for session in session_list:
     #     process(session, data_type)
     # print(session_list[-13]) 

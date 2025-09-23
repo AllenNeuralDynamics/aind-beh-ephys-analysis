@@ -37,13 +37,14 @@ import shutil
 from utils.beh_functions import get_unit_tbl
 from joblib import Parallel, delayed
 
-def load_and_preprocess_recording(session_folder, stream_name):
-    si.set_global_job_kwargs(n_jobs=5, progress_bar=True)
-    ephys_path = os.path.dirname(session_folder)
-    compressed_folder = os.path.join(ephys_path, 'ecephys_compressed')
-    recording_zarr = [os.path.join(compressed_folder, f) for f in os.listdir(compressed_folder) if stream_name in f and 'LFP' not in f][0]
+def load_and_preprocess_recording(rec_folder, segment_id = 0):
+    si.set_global_job_kwargs(n_jobs=8, progress_bar=True)
+    # ephys_path = os.path.dirname(session_folder)
+    # compressed_folder = os.path.join(ephys_path, 'ecephys_compressed')
+    # recording_zarr = [os.path.join(compressed_folder, f) for f in os.listdir(compressed_folder) if stream_name in f and 'LFP' not in f][0]
     
-    recording = si.read_zarr(recording_zarr)
+    recording = si.read_zarr(rec_folder)
+    recording.select_segments(segment_id)
     # preprocess
     recording_processed = spre.phase_shift(recording)
     recording_processed = spre.highpass_filter(recording_processed)
@@ -75,10 +76,10 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
     duration = opto_info['durations']
     pulse_offset = np.array([1/freq for freq in opto_info['freqs']])
     total_duration = (pulse_offset) * num_pulses
-    session_rec = Session(session_dir['session_dir'])
-    recording = session_rec.recordnodes[0].recordings[0]
-    timestamps = recording.continuous[0].timestamps
-    laser_onset_samples = opto_df['laser_onset_samples'].values
+    # session_rec = Session(session_dir['session_dir'])
+    # recording = session_rec.recordnodes[0].recordings[session_dir['rec_id_all']]
+    # timestamps = recording.continuous[0].timestamps
+    # laser_onset_samples = opto_df['laser_onset_samples'].values
 
     # %%
     if load_sorting_analyzer:
@@ -201,7 +202,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
 
         # %%
         # filter good channels
-        recording_processed = load_and_preprocess_recording(session_dir['session_dir'], 'ProbeA')
+        recording_processed = load_and_preprocess_recording(session_dir['raw_rec'], segment_id=session_dir['seg_id']-1)
         we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
         good_channel_ids = recording_processed.channel_ids[
             np.in1d(recording_processed.channel_ids, we.channel_ids)
@@ -362,7 +363,7 @@ def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = Tr
 
     # %%
     unit_ids = waveform_metrics['unit_id'].unique()
-    gs = gridspec.GridSpec(40, 10)
+    gs = gridspec.GridSpec(40, 20)
     fig = plt.figure(figsize=(20, 50))
     count = 0
     for unit_id in unit_ids:
@@ -474,7 +475,7 @@ def waveform_recompute_session(session, data_type, load_sorting_analyzer=True, o
                                     sampling_frequency=30000)
 
         # %%
-        recording_processed = load_and_preprocess_recording(session_dir['session_dir'], 'ProbeA')
+        recording_processed = load_and_preprocess_recording(session_dir['raw_rec'], segment_id=session_dir['seg_id']-1)
         good_channel_ids = recording_processed.channel_ids[
             np.in1d(recording_processed.channel_ids, sorting_analyzer.channel_ids)
         ]
@@ -931,8 +932,8 @@ def re_filter_opto_waveforms(session, data_type, opto_only = True, load_sorting_
         # two versions of filters
         compressed_folder = session_dir['session_dir_raw']
         stream_name = 'ProbeA'
-        recording_zarr = [os.path.join(compressed_folder, f) for f in os.listdir(compressed_folder) if stream_name in f and 'LFP' not in f][0]
-        recording = si.read_zarr(recording_zarr)
+        recording = si.read_zarr(session_dir['raw_rec'])
+        recording.select_segments(session_dir['seg_id']-1)
         good_channels = recording.channel_ids[np.isin(recording.channel_ids, analyzer_opto.channel_ids)]
         # raw
         recording_raw = spre.common_reference(recording, reference='global', operator='median')
@@ -1633,18 +1634,20 @@ if __name__ == "__main__":
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):   
         if session_dir['curated_dir_curated'] is not None:
             data_type = 'curated'
-            # outcome = opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+            # outcome = opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = True)
             # outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= load_sorting_analyzer, opto_only=True, plot=True, save=True)
             # del outcome
             re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
             # elif session_dir['nwb_dir_raw'] is not None:
             #     data_type = 'raw' 
-            #     opto_wf_p reprocessing(session, data_type, target, load_sorting_analyzer = load_sortin g_analyzer)
+
+            # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
     
-    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-25:-10]) 
-    # for session in session_list[-25:-10]:
-    #     process(session)  
-    # process('behavior_782394_2025-04-22_10-53-28') 
+    # Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-9:]) 
+    # session_list = ['behavior_791691_2025-06-24_13-21-29', 'behavior_791691_2025-06-26_13-39-26', 'behavior_784806_2025-06-17_14-59-23']
+    for session in session_list[-8:]:
+        process(session)  
+    # process('behavior_784806_2025-06-17_14-59-23') 
     # re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
     # short_isi_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
     # go_cue_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)

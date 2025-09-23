@@ -898,8 +898,8 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     if not os.path.exists(session_dir):
         session_dir = None
         session_dir_raw = None
-    sorted_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'sorted')
-    sorted_raw_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'sorted')
+    sorted_dir = os.path.join(raw_dir, 'ecephys', 'sorted')
+    sorted_raw_dir = os.path.join(raw_dir, 'ecephys', 'sorted')
     # nwb files
     nwb_dir_raw = None
     nwb_dir_curated = None
@@ -982,8 +982,8 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
 
     
     # curated dirs
-    curated_dir_raw = None
-    curated_dir_curated = None
+    curated_dir_raw = os.path.join(sorted_raw_dir, 'session')
+    curated_dir_curated = os.path.join(sorted_raw_dir, 'session')
     
     # if os.path.exists(sorted_dir):
     #     curated_dir_temp = os.path.join(sorted_dir, 'curated')
@@ -1399,11 +1399,15 @@ def get_unit_tbl(session, data_type, summary = True):
     session_dir = session_dirs(session)
     unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
     unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
+    ccf_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'],'ccf_unit_locations.csv')
     if summary: 
         if os.path.exists(unit_tbl_summary):
             with open(unit_tbl_summary, 'rb') as f:
                   unit_data = pickle.load(f)
             unit_tbl = unit_data
+            if os.path.exists(ccf_dir):
+                ccf_data = pd.read_csv(ccf_dir)
+                unit_tbl = pd.merge(unit_tbl, ccf_data, left_on='unit_id', right_on='unit_id', how='left')
         elif os.path.exists(unit_tbl_dir):
             with open(unit_tbl_dir, 'rb') as f:
                 unit_data = pickle.load(f)
