@@ -676,7 +676,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             experiment_id = 1
             seg_id = 1
             print(f'Single experiment found: experiment{experiment_id}, recording{seg_id}')
-            stream_name = experiment.split('.zarr')[0]
+            stream_name = experiment.split('.zarr')[0] + '_recording1'
             all_rec_count = experiment_id-1 + seg_id-1
             raw_recording_dir = os.path.join(session_dir_raw, experiment)
         else:
@@ -963,8 +963,9 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
                 nwb_dir_curated = None
                 print('There is no nwb file in the curated directory.')
     # postprocessed dirs
-    postprocessed_dir_raw = None
-    postprocessed_dir_curated = None
+    processed_dir = os.path.join(scratch_dir, aniID, session_id)
+    postprocessed_dir_raw = os.path.join(processed_dir, 'ephys', 'curated', 'analyzer.zarr')
+    postprocessed_dir_curated = os.path.join(processed_dir, 'ephys', 'curated', 'analyzer.zarr')
 
     # if os.path.exists(sorted_dir):
     #     postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')

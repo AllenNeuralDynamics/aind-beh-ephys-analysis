@@ -29,6 +29,7 @@ def apply_qc(combined_tagged_units, constraints):
     opto_list = ['p_max', 'eu', 'corr', 'tag_loc', 'lat_max_p', 'p_mean', 'sig_counts']
     multi_condition_list = ['p_max', 'eu', 'corr', 'lat_max_p', 'p_mean', 'sig_counts']
     for col, cfg in constraints.items():
+        curr_count_true = mask.sum()
         if col not in combined_tagged_units:
             print(f'Column {col} not found in combined_tagged_units, skipping...')
             continue
@@ -40,15 +41,18 @@ def apply_qc(combined_tagged_units, constraints):
             print(f'Applying bounds for {col}: {cfg["bounds"]}')
             lb, ub = np.array(cfg["bounds"], dtype=float)  # np.nan for null
             if not np.isnan(lb):
-                mask &= combined_tagged_units[col] > lb
+                mask &= combined_tagged_units[col] >= lb
             if not np.isnan(ub):
-                mask &= combined_tagged_units[col] < ub
+                mask &= combined_tagged_units[col] <= ub
+
 
         # Categorical list?
         elif "items" in cfg:
             print(f'Applying items for {col}: {cfg["items"]}')
             allowed = cfg["items"]
             mask &= combined_tagged_units[col].isin(allowed)
+        new_count_true = mask.sum()
+        print(f' - {col}: {curr_count_true} -> {new_count_true} units passed')
     mask_no_opto = mask.copy()  
     combined_tagged_units['selected_qc_only'] = mask
     # for each neuron, apply combined opto constraints

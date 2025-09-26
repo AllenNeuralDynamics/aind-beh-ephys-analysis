@@ -5,11 +5,14 @@
 # %%
 import sys
 import os
+
+from pandas._libs.tslibs import timestamps
 sys.path.append('/root/capsule/code/beh_ephys_analysis')
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from utils.beh_functions import *
+from utils.hdf5_extractor import read_hdf5
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import plot_lick_analysis, cal_metrics, plot_met, load_data
@@ -253,8 +256,11 @@ def beh_and_time_alignment_hopkins(session, ephys_cut = [0, 0]):
         # sorting.register_recording(recording)
         # if recording exists, then check if ephys is synced with sound card
         if not session_dir['raw_rec'] is None:
-            recording = HDF5Recording(session_dir['raw_rec'])
-            timestamps = recording.get_times()
+            rec = read_hdf5(session_dir['raw_rec'])
+            # %%
+            start_time = rec.get_start_time()
+            end_time = rec.get_end_time()
+            timestamps = rec.get_times()
             if load_nwb_from_filename(session_dir['nwb_dir_raw']).units is not None:
                 unit_spikes = load_nwb_from_filename(session_dir['nwb_dir_raw']).units[:]['spike_times']
                 mean_spike_times = [np.mean(unit_spike) for unit_spike in unit_spikes]
@@ -270,7 +276,7 @@ def beh_and_time_alignment_hopkins(session, ephys_cut = [0, 0]):
                     ax.hist(unit_spike, bins=100, density=True, alpha=0.2, color='k')
                 ax.legend()
             figure.savefig(os.path.join(session_dir['alignment_dir'], 'lick_goCue_ephys_time.pdf'))
-            if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]) and np.abs(np.mean(timestamps) - mean_spike_times) < 0.2*(timestamps[-1]-timestamps[0]): 
+            if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]): 
                 print(f'{session} ephys is synced.')
                 qm_dict['ephys_sync'] = True
             else:
@@ -283,10 +289,7 @@ def beh_and_time_alignment_hopkins(session, ephys_cut = [0, 0]):
             print(f'{session} ephys recording does not exist.')
             qm_dict['ephys_sync'] = None
             qm_dict['ephys_cut'] = None
-    else: 
-        qm_dict['ephys_sync'] = None
-        qm_dict['ephys_cut'] = None
-        qm_dict['soundcard_sync'] = None
+            qm_dict['soundcard_sync'] = None
 
     # %%
     qm_file = os.path.join(session_dir['processed_dir'], f"{session}_qm.json")

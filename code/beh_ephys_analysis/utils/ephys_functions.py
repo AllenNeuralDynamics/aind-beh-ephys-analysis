@@ -738,6 +738,10 @@ def make_summary_unit_tbl(session): # this is for hopkins data
                 unit_summary.at[row_ind, col] = row[col] * 1e3 if isinstance(row[col], float) else row[col]
             else:
                 unit_summary.at[row_ind, col] = np.nan
+        # check if unit has spike time
+        if len(unit_summary['spike_times'][row_ind]) == 0:
+            file = os.path.join(session_dir['session_dir'], f"{row['unit_id']}.txt")
+            unit_summary.at[row_ind, 'spike_times'] = np.array(np.loadtxt(file)/1000000)
     # save into pikle
     summary_path = os.path.join(session_dir['opto_dir_curated'], f'{session}_curated_soma_opto_tagging_summary.pkl')
     with open(summary_path, 'wb') as f:
