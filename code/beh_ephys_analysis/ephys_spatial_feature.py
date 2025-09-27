@@ -584,22 +584,44 @@ def plot_ephys_corr_band(session,
                     data_type='curated', 
                     probe = '2'):
     session_dir = session_dirs(session)
-    stream_name = 'ProbeA'
+    if session_dir['surface_rec'] is not None:
+        surface = True
+    else:
+        surface = False
     save_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], 'band_corr')
     os.makedirs(save_dir, exist_ok=True)
+    
+    # detect if there's mapping
     # load the LFP data 
     if probe == '2':
         recording_zarr = session_dir['raw_rec']
         recording = si.read_zarr(recording_zarr)
+        channel_locs = recording.get_channel_locations()[:,1] + 0.5*recording.get_channel_locations()[:,0]/32  # y + depth/2
         recording = recording.select_segments(session_dir['seg_id']-1)
         recording_LFP = spre.bandpass_filter(recording, freq_min=1, freq_max=300)
         recording_LFP = spre.common_reference(recording_LFP, reference='global', operator='median')
+        if surface:
+            recording_zarr_surface = session_dir['surface_rec']
+            recording_surface = si.read_zarr(recording_zarr_surface)
+            channel_locs_surface = recording_surface.get_channel_locations()[:,1] + 0.5*recording_surface.get_channel_locations()[:,0]/32
+            recording_surface = recording_surface.select_segments(session_dir['surface_seg_id']-1)
+            recording_LFP_surface = spre.bandpass_filter(recording_surface, freq_min=1, freq_max=300)
+            recording_LFP_surface = spre.common_reference(recording_LFP_surface, reference='global', operator='median')
+
     elif probe == 'opto':
         recording_LFP_zarr = session_dir['raw_rec']
         recording_LFP_zarr = recording_LFP_zarr.replace('AP', 'LFP')
         recording_LFP = si.read_zarr(recording_LFP_zarr)
         recording_LFP = recording_LFP.select_segments(session_dir['seg_id']-1)
-        recording_LFP = spre.common_reference(recording_LFP, reference='global', operator='median')    
+        recording_LFP = spre.common_reference(recording_LFP, reference='global', operator='median') 
+        channel_locs = recording_LFP.get_channel_locations()[:,1] + 0.5*recording_LFP.get_channel_locations()[:,0]/32
+        if surface:
+            recording_LFP_zarr_surface = session_dir['surface_rec']
+            recording_LFP_zarr_surface = recording_LFP_zarr_surface.replace('AP', 'LFP')
+            recording_LFP_surface = si.read_zarr(recording_LFP_zarr_surface)
+            recording_LFP_surface = recording_LFP_surface.select_segments(session_dir['surface_seg']-1)
+            recording_LFP_surface = spre.common_reference(recording_LFP_surface, reference='global', operator='median') 
+            channel_locs_surface = recording_LFP_surface.get_channel_locations()[:,1] + 0.5*recording_LFP_surface.get_channel_locations()[:,0]/32
 
     # load the opto file
     opto_tbl = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session_soma.csv'))
@@ -612,7 +634,7 @@ def plot_ephys_corr_band(session,
         range_bh = [opto_tbl['laser_onset_samples'].min()-30*30000, opto_tbl['laser_onset_samples'].min()]
 
     # plot baseline high-freq
-    num_bins = 10
+    num_bins = 5
     time_frames = np.linspace(range_bh[0], range_bh[1], num_bins + 1)
     time_frames_rec = time_frames*recording_LFP.get_sampling_frequency()/30000
     bands = {'delta': [0.5, 4],
@@ -631,17 +653,48 @@ def plot_ephys_corr_band(session,
         freq_cut = bands[band]
         recoding_curr = spre.bandpass_filter(recording_LFP, freq_min=freq_cut[0], freq_max=freq_cut[1])
         fig_temp, mean_signal, mean_psd, mean_corr, frequencys = plot_raw_psd_corr(recoding_curr, time_frames_rec, pre_chunk_size_second=0, post_chunk_size_second=1/freq_cut[0] * 5, plot=False, freq_cut=freq_cut)
-        np.save(os.path.join(save_dir, f'spont_{band}_mean_corr.npy'), mean_corr)
+    
         fig_temp_opto, mean_signal_opto, mean_psd_opto, mean_corr_opto, frequencys_opto = plot_raw_psd_corr(recoding_curr, time_frames_rec_opto, pre_chunk_size_second=0, post_chunk_size_second=1/freq_cut[0] * 5, plot=False, freq_cut=freq_cut)
-        np.save(os.path.join(save_dir, f'opto_{band}_mean_corr.npy'), mean_corr_opto)
-        np.save(os.path.join(save_dir, f'diff_{band}_mean_corr.npy'), mean_corr_opto - mean_corr)
+        # append surface if available
+        if surface:
+            recoding_curr_surface = spre.bandpass_filter(recording_LFP_surface, freq_min=freq_cut[0], freq_max=freq_cut[1])
+            fig_temp_surface, mean_signal_surface, mean_psd_surface, mean_corr_surface, frequencys_surface = plot_raw_psd_corr(recoding_curr_surface, np.zeros(1), pre_chunk_size_second=0, post_chunk_size_second=1/freq_cut[0] * 5, plot=False, freq_cut=freq_cut)
+            # align channels based on y-axis
+            channel_locs_all = np.sort(np.unique(np.concatenate((channel_locs, channel_locs_surface))))
+            aligned_mean_corr = np.zeros((len(channel_locs_all), len(channel_locs_all)))
+            locs_surface_inds = [np.where(channel_locs_all == loc)[0][0] for loc in channel_locs_surface]
+            locs_inds = [np.where(channel_locs_all == loc)[0][0] for loc in channel_locs]
+            aligned_mean_corr[np.ix_(locs_surface_inds, locs_surface_inds)] = mean_corr_surface
+            aligned_mean_corr[np.ix_(locs_inds, locs_inds)] = mean_corr
+            
+            # for opto
+            aligned_mean_corr_opto = np.zeros((len(channel_locs_all), len(channel_locs_all)))
+            aligned_mean_corr_opto[np.ix_(locs_surface_inds, locs_surface_inds)] = mean_corr_surface
+            aligned_mean_corr_opto[np.ix_(locs_inds, locs_inds)] = mean_corr_opto
+        else:
+            locs_inds = [np.where(np.sort(channel_locs) == loc)[0][0] for loc in channel_locs]
+            aligned_mean_corr = np.zeros((len(channel_locs), len(channel_locs)))
+            aligned_mean_corr[np.ix_(locs_inds, locs_inds)] = mean_corr
+
+            aligned_mean_corr_opto = np.zeros((len(channel_locs), len(channel_locs)))
+            aligned_mean_corr_opto[np.ix_(locs_inds, locs_inds)] = mean_corr_opto
+
+
+        np.save(os.path.join(save_dir, f'spont_{band}_mean_corr.npy'), aligned_mean_corr)
+        np.save(os.path.join(save_dir, f'opto_{band}_mean_corr.npy'), aligned_mean_corr_opto)
+        np.save(os.path.join(save_dir, f'diff_{band}_mean_corr.npy'), (aligned_mean_corr_opto - aligned_mean_corr))
+
+        mean_corr = aligned_mean_corr
+        mean_corr_opto = aligned_mean_corr_opto
+
         plt.close(fig_temp)
         plt.close(fig_temp_opto)
         ax = fig.add_subplot(gs_corr[0, ind])
         vmax = np.nanmax(np.abs(mean_corr))
         vmin = -vmax
+        max_loc = np.max(channel_locs_all) if surface else np.max(channel_locs)
         im = ax.imshow(mean_corr,
-                    extent=[0, mean_signal.shape[1], 0, mean_signal.shape[1]],
+                    extent=[0, max_loc, 0, max_loc],
                     aspect='auto',
                     origin='lower',
                     cmap='bwr',
@@ -654,7 +707,7 @@ def plot_ephys_corr_band(session,
         plt.colorbar(im, ax=ax, label='Correlation Coefficient')
         ax = fig.add_subplot(gs_corr[1, ind])
         im_opto = ax.imshow(mean_corr_opto,
-                    extent=[0, mean_signal.shape[1], 0, mean_signal.shape[1]],
+                    extent=[0, max_loc, 0, max_loc],
                     aspect='auto',
                     origin='lower',
                     cmap='bwr',
@@ -668,7 +721,7 @@ def plot_ephys_corr_band(session,
         vmax = np.nanmax(np.abs(mean_corr_opto - mean_corr))
         vmin = -vmax
         im_cmp = ax.imshow(mean_corr_opto - mean_corr,
-                    extent=[0, mean_signal.shape[1], 0, mean_signal.shape[1]],
+                    extent=[0, max_loc, 0, max_loc],
                     aspect='auto',
                     origin='lower',
                     cmap='bwr',
@@ -732,8 +785,11 @@ if __name__ == '__main__':
 
         #     data_type = 'raw' 
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    Parallel(n_jobs=3)(delayed(process)(session, probe) for session, probe in zip(session_list, probe_list))
-    # process('behavior_751766_2025-02-14_11-37-11', '2')
+    # Parallel(n_jobs=3)(delayed(process)(session, probe) for session, probe in zip(session_list[-9:], probe_list[-9:]))
+    for session, probe in zip(session_list[-3:], probe_list[-3:]):
+        print(f'Checking {session}')
+        process(session, probe)
+    # process('behavior_791691_2025-06-24_13-21-29', '2')
     # plot_ephys_corr_band('behavior_751766_2025-02-15_12-08-11', data_type,  '2')
     # plot_ephys_probe('ecephys_713854_2024-03-08_14-54-25', data_type,  '2')
   

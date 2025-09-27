@@ -666,6 +666,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     seg_id = None   
     max_len_ind = None
     all_rec_count = None
+    stream_name_surface = None
+    surface_exp_id = None
+    surface_seg_id = None
+    surface_recording_dir = None
+    all_rec_count_surface = None
     if os.path.exists(session_dir):
         stream_info = get_stream_info(session_dir)
         stream_info = stream_info[(stream_info['Stream'].str.contains('ProbeA')) & (~stream_info['Stream'].str.contains('LFP'))]
@@ -679,12 +684,16 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             stream_name = experiment.split('.zarr')[0] + '_recording1'
             all_rec_count = experiment_id-1 + seg_id-1
             raw_recording_dir = os.path.join(session_dir_raw, experiment)
+            surface_exp_id = None
+            surface_seg_id = None
+            surface_recording_dir = None
+            all_rec_count_surface = None
         else:
             # loop through experiments and segments to get the longest one
             lengths = []
             experiment_ids = []
             segment_inds = []
-            stream_name = []
+            stream_names = []
 
             for experiment in os.listdir(session_dir_raw):
                 if 'ProbeA' in experiment: 
@@ -699,16 +708,27 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                         lengths.append(recording_curr.get_num_samples(segment_index = rec_ind))
                         experiment_ids.append(int(exp_match.group(1)))
                         segment_inds.append(rec_ind)
-                        stream_name.append(experiment.split('.zarr')[0])
+                        stream_names.append(experiment.split('.zarr')[0])
 
             max_len_ind = np.argmax(np.array(lengths))
             experiment_id = experiment_ids[max_len_ind]
             seg_id = segment_inds[max_len_ind]+1
             print(f'Selected experiment{experiment_id} recording{seg_id}, length:{lengths[max_len_ind]/32000 :.2f}')
-            experiment_name = stream_name[max_len_ind]
+            experiment_name = stream_names[max_len_ind]
             stream_name = experiment_name + f'_recording{seg_id}'
             all_rec_count = experiment_id-1 + seg_id-1
             raw_recording_dir = os.path.join(session_dir_raw, experiment_name+'.zarr')
+            # check if there is a surface recording
+            if np.sum(np.array(experiment_ids)>experiment_id) > 0:
+                surface_inds = np.where(np.array(experiment_ids)>experiment_id)[0]
+                surface_ind = surface_inds[np.argmax(np.array(lengths)[surface_inds])]
+                surface_exp_id = experiment_ids[surface_ind]
+                surface_seg_id = segment_inds[surface_ind]+1
+                surface_experiment_name = stream_names[surface_ind]
+                stream_name_surface = surface_experiment_name + f'_recording{surface_seg_id}'
+                surface_recording_dir = os.path.join(session_dir_raw, surface_experiment_name+'.zarr')
+                all_rec_count_surface = surface_exp_id-1 + surface_seg_id-1
+                 
     else:
         print(f'No raw session directory found for {session_id}.')
 
@@ -868,9 +888,14 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'sorted_dir_raw': sorted_raw_dir,
                 'opto_csvs': opto_csvs,
                 'stream_name': stream_name,
+                'stream_name_surface': stream_name_surface,
                 'experiment_id': experiment_id,
                 'seg_id': seg_id,
-                'rec_id_all': all_rec_count}
+                'rec_id_all': all_rec_count,
+                'surface_exp_id': surface_exp_id,
+                'surface_seg_id': surface_seg_id,
+                'surface_rec': surface_recording_dir,
+                'surface_rec_id_all': all_rec_count_surface}
 
     # make directories
     makedirs(dir_dict)
