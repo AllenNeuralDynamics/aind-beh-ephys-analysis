@@ -738,6 +738,8 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     if os.path.exists(nwb_dir_temp):
         nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
         nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb) and (f'recording{seg_id}' in nwb)]
+        if len(nwb) == 0:
+            nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb)]
         if len(nwb) == 1:
             nwb_dir_raw = os.path.join(nwb_dir_temp, nwb[0])
         elif len(nwb) > 1:
@@ -765,6 +767,8 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         if nwb_dir_temp is not None:
             nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
             nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb) and (f'recording{seg_id}' in nwb)]
+            if len(nwb) == 0:
+                nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb)]
             if len(nwb) == 1:
                 nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
             elif len(nwb) > 1:
@@ -782,14 +786,27 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         if os.path.exists(postprocessed_dir_temp):
             postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
             postprocessed_sub_folder = [s for s in postprocessed_sub_folders if ('post' not in s) and (stream_name in s)]
-            postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+            if len(postprocessed_sub_folder) == 0:
+                postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name[:-1] in s]
+            if len(postprocessed_sub_folder) > 0:
+                postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+            else:
+                postprocessed_dir_curated = None
+                print('No postprocessed dir found in curated sorted dir')
 
     if os.path.exists(sorted_raw_dir):
         postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
         if os.path.exists(postprocessed_dir_temp):
             postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
             postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name in s]
-            postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+            if len(postprocessed_sub_folder) == 0:
+                postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name[:-1] in s]
+            if len(postprocessed_sub_folder) > 0:
+                postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+            else:
+                postprocessed_dir_raw = None
+                print('No postprocessed dir found in raw sorted dir')
+
 
     
     # curated dirs
@@ -801,14 +818,26 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         if os.path.exists(curated_dir_temp):
             curated_sub_folders = os.listdir(curated_dir_temp)
             curated_sub_folders = [s for s in curated_sub_folders if stream_name in s]
-            curated_dir_curated = os.path.join(curated_dir_temp, curated_sub_folders[0])    
+            if len(curated_sub_folders) == 0:
+                curated_sub_folders = [s for s in os.listdir(curated_dir_temp) if stream_name[:-1] in s]
+            if len(curated_sub_folders) > 0:
+                curated_dir_curated = os.path.join(curated_dir_temp, curated_sub_folders[0])
+            else:
+                curated_dir_curated = None
+                print('No curated dir found in curated sorted dir') 
     
     if os.path.exists(sorted_raw_dir):
         curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
         if os.path.exists(curated_dir_temp):
             curated_sub_folders = os.listdir(curated_dir_temp)
             curated_sub_folders = [s for s in curated_sub_folders if stream_name in s]
-            curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
+            if len(curated_sub_folders) == 0:
+                curated_sub_folders = [s for s in os.listdir(curated_dir_temp) if stream_name[:-1] in s]
+            if len(curated_sub_folders) > 0:
+                curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
+            else:
+                curated_dir_raw = None
+                print('No curated dir found in raw sorted dir')
 
     # model dir
     models_dir = os.path.join(data_dir, f'{aniID}_model_stan')
@@ -1206,10 +1235,11 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
     choice_time = tblTrials.loc[tblTrials['animal_response']!=2, 'reward_outcome_time']
 
     # outcome_time
-    outcome_time = tblTrials.loc[tblTrials['animal_response']!=2, 'reward_outcome_time'] + tblTrials.loc[tblTrials['animal_response']!=2, 'reward_delay']
+    outcome_time = tblTrials.loc[tblTrials['animal_response']!=2, 'reward_outcome_time'] + np.unique(tblTrials[~tblTrials['reward_delay'].isnull()]['reward_delay'])[0]
 
     
     # laser
+
     laserChoice = tblTrials.loc[tblTrials['animal_response']!=2, 'laser_on_trial'] == 1
     laser = tblTrials['laser_on_trial'] == 1
     laserPrev = np.concatenate((np.full((1), np.nan), laserChoice[:-1]))
@@ -1228,7 +1258,7 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
         'laser_prev': laserPrev,
         'choices_prev': choicesPrev,
         'go_cue_time': go_cue_time.values,
-        'choice_time': outcome_time.values,
+        'choice_time': choice_time.values,
         'outcome_time': outcome_time.values,
         'svs': svs
         })
