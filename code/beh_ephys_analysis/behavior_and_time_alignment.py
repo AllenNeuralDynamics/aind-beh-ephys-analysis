@@ -46,6 +46,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     # %%
     print(session)
     aniID, date_time, string = parseSessionID(session)
+    
     session_json_dir = os.path.join(session_dir['raw_dir'], 'behavior')
     session_json_files = []
     for dir, _, files in os.walk(session_json_dir):
@@ -56,18 +57,19 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
                 session_json_files.extend([os.path.join(dir, file)])
     print(f'{len(session_json_files)} session json files found.')
     nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
-    if len(session_json_files) == 1:
-        session_json_file = session_json_files[0]
-        if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):
-            print('NWB file already exists.')
-        else:
-            print('Processing NWB:')
-            success, nwb = bonsai_to_nwb(session_json_file, os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
+    if session.startswith('behavior'):
+        if len(session_json_files) == 1:
+            session_json_file = session_json_files[0]
+            if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):
+                print('NWB file already exists.')
+            else:
+                print('Processing NWB:')
+                success, nwb = bonsai_to_nwb(session_json_file, os.path.join(session_dir['beh_fig_dir'], session + '.nwb'))
 
     # %%
 
-    if not os.path.exists(nwb_file):
-        print('NWB file does not exist.')
+    if not os.path.exists(nwb_file) or session.startswiith('ecephys'):
+        print('Behavior NWB file does not exist.')
     else:
         print('Plotting session.')
         nwb = load_nwb_from_filename(nwb_file)

@@ -939,15 +939,15 @@ if __name__ == '__main__':
             # try:
             print(session)
             # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True, update_cut=True)
-            generate_session_opto_drift_trial_table(session, 'curated', opto_only=True, save=True)
+            generate_session_opto_drift_trial_table(session, 'curated', opto_only=False, save=True)
             print(f'{session} done')
             # except:
             #     print(f'{session} error')
  
-    # Parallel(n_jobs=5)(delayed(process)(session) for session in session_list)
-    # process('behavior_ZS061_2021-04-20_15-49-57')
-    session_ind = session_list.index('behavior_ZS059_2021-04-12_14-57-43')
-    for session in session_list[session_ind:]:
-        process(session)
+    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list)
+    # process('behavior_ZS061_2021-03-28_16-35-51')
+    # session_ind = session_list.index('behavior_ZS059_2021-04-12_14-57-43')
+    # for session in session_list[session_ind:]:
+    #     process(session)
     # generate_session_opto_drift_trial_table('behavior_716325_2024-05-31_10-31-14', 'curated', opto_only=True, save=True)
     # plot_session_opto_drift(session, 'curated', update_csv=False, plot=False)

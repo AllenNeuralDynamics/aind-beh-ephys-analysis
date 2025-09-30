@@ -290,7 +290,17 @@ def ephys_opto_preprocessing(session, data_type, target):
     if session_dir[f'curated_dir_{data_type}'] is not None:
         sorting = si.load(session_dir[f'curated_dir_{data_type}'])
         unit_ids = sorting.get_unit_ids()
-        unit_spikes  = [timestamps[sorting.get_unit_spike_train(unit_id=unit_id)] for unit_id in unit_ids]
+        if session_dir[f'postprocessed_dir_{data_type}'].endswith('recording.zarr'):
+            unit_spikes = [
+                            timestamps[sorting.get_unit_spike_train(unit_id=unit_id, segment_index=session_dir['seg_id']-1)]
+                            for unit_id in unit_ids
+                        ]
+        else:
+            unit_spikes = [
+                            sorting.get_unit_spike_train(unit_id=unit_id)
+                            for unit_id in unit_ids
+                        ]
+
         nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
         unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label']]
 
