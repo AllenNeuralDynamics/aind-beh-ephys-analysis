@@ -645,7 +645,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     # parse session_id 
     aniID, date_obj, raw_id = parseSessionID(session_id)
     if aniID.startswith('ZS'):
-        print('Old data, using hopkins formats')
+        # print('Old data, using hopkins formats')
         return session_dirs_hopkins(session_id, model_name, data_dir, scratch_dir)
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
@@ -680,7 +680,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             rec_path = os.path.join(session_dir_raw, experiment)
             experiment_id = 1
             seg_id = 1
-            print(f'Single experiment found: experiment{experiment_id}, recording{seg_id}')
+            # print(f'Single experiment found: experiment{experiment_id}, recording{seg_id}')
             stream_name = experiment.split('.zarr')[0] + '_recording1'
             all_rec_count = experiment_id-1 + seg_id-1
             raw_recording_dir = os.path.join(session_dir_raw, experiment)
@@ -713,7 +713,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             max_len_ind = np.argmax(np.array(lengths))
             experiment_id = experiment_ids[max_len_ind]
             seg_id = segment_inds[max_len_ind]+1
-            print(f'Selected experiment{experiment_id} recording{seg_id}, length:{lengths[max_len_ind]/32000 :.2f}')
+            # print(f'Selected experiment{experiment_id} recording{seg_id}, length:{lengths[max_len_ind]/32000 :.2f}')
             experiment_name = stream_names[max_len_ind]
             stream_name = experiment_name + f'_recording{seg_id}'
             all_rec_count = experiment_id-1 + seg_id-1
@@ -729,8 +729,8 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 surface_recording_dir = os.path.join(session_dir_raw, surface_experiment_name+'.zarr')
                 all_rec_count_surface = surface_exp_id-1 + surface_seg_id-1
                  
-    else:
-        print(f'No raw session directory found for {session_id}.')
+    # else:
+    #     print(f'No raw session directory found for {session_id}.')
 
     # raw version
     nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
@@ -743,11 +743,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         if len(nwb) == 1:
             nwb_dir_raw = os.path.join(nwb_dir_temp, nwb[0])
         elif len(nwb) > 1:
-            print('There are multiple recordings in the raw nwb directory. Picked one with units.')
+            # print('There are multiple recordings in the raw nwb directory. Picked one with units.')
             nwb_dir_raw = None
         else:
             nwb_dir_raw = None
-            print('There is no nwb file in the raw directory.')
+            # print('There is no nwb file in the raw directory.')
     nwb_dir_curated = None
     # curated version
     if os.path.exists(sorted_dir):
@@ -758,11 +758,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
             elif len(nwb_dir_temp) > 1:
                 nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
-                print('There are multiple nwb files in the curated directory. Picked first one.')
+                # print('There are multiple nwb files in the curated directory. Picked first one.')
             else:
                 nwb_dir_temp = None
                 nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
+                # print('There is no nwb file in the curated directory.')
 
         if nwb_dir_temp is not None:
             nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
@@ -772,11 +772,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             if len(nwb) == 1:
                 nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
             elif len(nwb) > 1:
-                print('There are multiple recordings in the curated nwb directory. Picked one with units.')
+                # print('There are multiple recordings in the curated nwb directory. Picked one with units.')
                 nwb_dir_curated = None
             else:
                 nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
+                # print('There is no nwb file in the curated directory.')
     # postprocessed dirs
     postprocessed_dir_raw = None
     postprocessed_dir_curated = None
@@ -792,7 +792,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
             else:
                 postprocessed_dir_curated = None
-                print('No postprocessed dir found in curated sorted dir')
+                # print('No postprocessed dir found in curated sorted dir')
 
     if os.path.exists(sorted_raw_dir):
         postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
@@ -805,7 +805,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
             else:
                 postprocessed_dir_raw = None
-                print('No postprocessed dir found in raw sorted dir')
+                # print('No postprocessed dir found in raw sorted dir')
 
 
     
@@ -824,7 +824,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 curated_dir_curated = os.path.join(curated_dir_temp, curated_sub_folders[0])
             else:
                 curated_dir_curated = None
-                print('No curated dir found in curated sorted dir') 
+                # print('No curated dir found in curated sorted dir') 
     
     if os.path.exists(sorted_raw_dir):
         curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
@@ -837,7 +837,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
             else:
                 curated_dir_raw = None
-                print('No curated dir found in raw sorted dir')
+                # print('No curated dir found in raw sorted dir')
 
     # model dir
     models_dir = os.path.join(data_dir, f'{aniID}_model_stan')

@@ -68,7 +68,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
 
     # %%
 
-    if not os.path.exists(nwb_file) or session.startswiith('ecephys'):
+    if not os.path.exists(nwb_file) or session.startswith('ecephys'):
         print('Behavior NWB file does not exist.')
     else:
         print('Plotting session.')

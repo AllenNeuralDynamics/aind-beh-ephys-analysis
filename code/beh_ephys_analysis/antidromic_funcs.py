@@ -1,3 +1,4 @@
+from json import load
 from scipy.stats import wilcoxon
 # Scientific libraries
 import numpy as np
@@ -9,6 +10,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as patches
+
+from utils.beh_functions import session_dirs, get_unit_tbl
+from utils.ephys_functions import load_drift
+import os
+from utils.beh_functions import get_unit_tbl
+from utils.plot_utils import combine_pdf_big
 
 
 def remove_spikes_during_laser_pulse(int_event_locked_timestamps, duration):    
@@ -64,14 +71,14 @@ def antidromic_latency_jitter(int_event_locked_timestamps):
     return antidromic_latency, antidromic_jitter
 
 
-def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
+def plot_opto_responses(unit_tbl, event_ids):
     """
     Find antidromic units based on opto stimulation data.
     """
     # Filter for opto tagged units
-    opto_criteria = (unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)
-    opto_units = unit_tbl[opto_criteria]["unit_id"].to_list()
-    print(f"Number of opto units: {len(opto_units)}")
+    # opto_criteria = (unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)
+    opto_units = unit_tbl["unit_id"].to_list()
+    # print(f"Number of opto units: {len(opto_units)}")
 
     
     # Unique values
@@ -87,14 +94,13 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
 
     # Create one figure for all units × sites (3 rows per unit: raster + PSTH + antidromic raster)
     fig_height_per_unit = 6
-    fig = plt.figure(figsize=(num_sites * 4, num_units * fig_height_per_unit))
-    fig.suptitle(f'{session_id} # units: {num_units}')    
+    fig = plt.figure(figsize=(num_sites * 4, num_units * fig_height_per_unit))   
     gs = gridspec.GridSpec(4 * num_units, num_sites, height_ratios=[3, 6, 2, 0.5] * num_units, hspace=0.8)
 
     # Loop through units
     for u_idx, unit_id in enumerate(opto_units):
         # if unit_id == 244:
-        unit_spike_times = spiketimes[unit_id]
+        unit_spike_times = unit_tbl[unit_tbl['unit_id'] == unit_id]['spike_times'].values[0]
 
         for i, site in enumerate(sites):
             if site == 'surface_LC':
@@ -109,6 +115,9 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
 
             # Filter trials
             tag_trials = event_ids.query('site == @site and pre_post == @prepost')
+            if tag_trials.empty:
+                prepost = 'pre'
+                tag_trials = event_ids.query('site == "surface_LC" and pre_post == @prepost')
             max_power = tag_trials.power.max()
             tag_trials = tag_trials.query('power == @max_power')
             if tag_trials.empty:
@@ -215,10 +224,80 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
 
 
     # Final layout adjustments
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])    
+    fig.tight_layout()    
     # plt.show()
 
     return fig
+
+def compute_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
+    results = []
+
+    # Filter for opto tagged units
+    opto_criteria = (unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)
+    opto_units = unit_tbl[opto_criteria]["unit_id"].to_list()
+    print(f"Session {session_id}: {len(opto_units)} opto-tagged units")
+
+    
+    # Unique values
+    sites = list(np.unique(event_ids.emission_location))
+    powers = list(np.unique(event_ids.power))
+    trial_types = np.unique(event_ids.type)
+    
+    # Settings
+    prepost = 'post'
+    num_sites = len(sites)
+    num_units = len(opto_units)
+
+   
+    # Loop through units
+    for u_idx, unit_id in enumerate(opto_units):
+        # if unit_id == 244:
+        unit_spike_times = spiketimes[unit_id]
+
+        for i, site in enumerate(sites):
+            base_window = (-0.02, 0)
+            roi_window = (0, 0.02) if site == 'surface_LC' else (0.02, 0.06)
+
+
+            # Filter trials
+            tag_trials = event_ids.query('site == @site and pre_post == @prepost')
+            max_power = tag_trials.power.max()
+            tag_trials = tag_trials.query('power == @max_power')
+            if tag_trials.empty:
+                continue
+
+            # Stimulation parameters
+            duration = np.unique(tag_trials.duration)[0]
+            num_pulses = np.unique(tag_trials.num_pulses)[0]
+            pulse_interval = np.unique(tag_trials.pulse_interval)[0]
+
+            # Time window
+            time_range_raster = np.array([-100 / 1000, 70 / 1000])
+            this_event_timestamps = tag_trials.time.tolist()
+
+            int_event_locked_timestamps = []
+            pulse_nums = []
+
+            for pulse_num in range(num_pulses):
+                time_shift = pulse_num * (duration + pulse_interval) / 1000
+                this_time_range = time_range_raster + time_shift
+
+                this_locked = af.event_locked_timestamps(
+                    unit_spike_times, this_event_timestamps, this_time_range, time_shift=time_shift
+                )
+                int_event_locked_timestamps.extend(this_locked)
+                pulse_nums.extend([pulse_num + 1] * len(this_locked))
+
+            # Perform significance test
+            if len(int_event_locked_timestamps) != 0:
+                p_val = opto_tagging_response(int_event_locked_timestamps, base_window, roi_window)
+            if not np.isnan(p_val):
+                results.append({
+                    'unit_id': unit_id,
+                    'site': site,
+                    'p_value': round(p_val, 3)
+                })
+    return results
 
 def Avg_y_over_x(x, y, bin_size):
     """
@@ -539,3 +618,53 @@ def collision_test(int_event_locked_timestamps, antidromic_latency, bin_size=10,
         'post_boundary_prob': post_prob,  # Probability of antidromic spike after collision boundary
         'last_orthodromic_spike_time':antidromic_df['last_orthodromic_spike_time'],
     }
+
+
+def plot_opto_responses_session(session, data_type='curated', opto_only=True):
+    session_dir = session_dirs(session)
+    unit_tbl = get_unit_tbl(session, data_type=data_type)
+    opto_csv_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv')
+    opto_save_dir = os.path.join(session_dir[f'opto_dir_fig_{data_type}'], 'antidromic')
+    if not os.path.exists(opto_save_dir):
+        os.makedirs(opto_save_dir)
+    if os.path.exists(opto_csv_file):
+        event_ids = pd.read_csv(opto_csv_file)
+    if opto_only:
+        unit_tbl = unit_tbl[unit_tbl['opto_pass'] & unit_tbl['default_qc'] & (unit_tbl['decoder_label']!='artifact')]
+
+    for i in range(len(unit_tbl)):
+        unit_df = unit_tbl.iloc[[i]]   # double brackets → keeps it as a DataFrame
+        unit_id = unit_tbl['unit_id'].values[i]
+        unit_drift = load_drift(session, unit_id, data_type=data_type)
+        event_ids_curr = event_ids.copy()
+        if unit_drift is not None:
+            if unit_drift['ephys_cut'][0] is not None:
+                event_ids_curr = event_ids_curr[event_ids_curr['time']>=unit_drift['ephys_cut'][0]]
+            if unit_drift['ephys_cut'][1] is not None:
+                event_ids_curr = event_ids_curr[event_ids_curr['time']<=unit_drift['ephys_cut'][1]]
+        fig = plot_opto_responses(unit_df, event_ids_curr)
+        fig.suptitle(f'{session} unit {unit_tbl["unit_id"].values[i]}')
+        fig.savefig(fname=os.path.join(opto_save_dir, f'{session}_unit{unit_tbl["unit_id"].values[i]}_opto_responses.pdf'))
+        plt.close(fig)
+        
+    combine_pdf_big(opto_save_dir, os.path.join(session_dir[f'opto_dir_fig_{data_type}'], f'{session}_antidromic_responses.pdf'))
+
+if __name__ == "__main__":
+
+
+    data_type = 'curated'  # 'raw' or 'curated'
+    session_df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    # remove opto sessions
+    session_list = session_df[session_df['probe'] == '2']['session_id'].to_list()
+    def process(session, data_type='curated'):
+        session_dir = session_dirs(session)
+        if session_dir[f'curated_dir_{data_type}'] is not None:
+            print(f"Processing session: {session}")
+            try:
+                plot_opto_responses_session(session, data_type=data_type, opto_only=True)
+            except:
+                print(f"Failed to process session: {session}")
+            print(f"Finished session: {session}")
+    from joblib import Parallel, delayed
+    Parallel(n_jobs=3)(delayed(process)(session, data_type=data_type) for session in session_list)
+    # process('behavior_717121_2024-06-15_10-00-58')
