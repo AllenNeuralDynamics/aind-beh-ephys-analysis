@@ -16,6 +16,7 @@ from utils.ephys_functions import load_drift
 import os
 from utils.beh_functions import get_unit_tbl
 from utils.plot_utils import combine_pdf_big
+from scipy.stats import mannwhitneyu
 
 
 def remove_spikes_during_laser_pulse(int_event_locked_timestamps, duration):    
@@ -93,9 +94,9 @@ def plot_opto_responses(unit_tbl, event_ids):
     num_units = len(opto_units)
 
     # Create one figure for all units × sites (3 rows per unit: raster + PSTH + antidromic raster)
-    fig_height_per_unit = 6
+    fig_height_per_unit = 10
     fig = plt.figure(figsize=(num_sites * 4, num_units * fig_height_per_unit))   
-    gs = gridspec.GridSpec(4 * num_units, num_sites, height_ratios=[3, 6, 2, 0.5] * num_units, hspace=0.8)
+    gs = gridspec.GridSpec(6 * num_units, num_sites, height_ratios=[3, 6, 2, 0.5, 1, 1] * num_units, hspace=0.8)
 
     # Loop through units
     for u_idx, unit_id in enumerate(opto_units):
@@ -148,7 +149,7 @@ def plot_opto_responses(unit_tbl, event_ids):
 
             int_event_locked_timestamps = remove_spikes_during_laser_pulse(int_event_locked_timestamps, duration)
             # Raster plot
-            ax_raster = fig.add_subplot(gs[4 * u_idx, i])
+            ax_raster = fig.add_subplot(gs[5 * u_idx, i])
             pf.raster_plot(int_event_locked_timestamps, time_range_raster, cond_each_trial=pulse_nums, ms=100, ax=ax_raster)
             p_val = opto_tagging_response(int_event_locked_timestamps, base_window, roi_window)
 
@@ -179,7 +180,7 @@ def plot_opto_responses(unit_tbl, event_ids):
 
             # Add laser pulse aligned but sorted by spike times
             # Antidromic raster plot
-            ax_antidromic = fig.add_subplot(gs[4 * u_idx + 1, i], sharex=ax_raster)
+            ax_antidromic = fig.add_subplot(gs[5 * u_idx + 1, i], sharex=ax_raster)
             sorted_data = sorted(int_event_locked_timestamps, key=lambda x: (len(x) == 0, x[0] if len(x) > 0 else np.inf))
             pf.raster_plot(sorted_data, time_range_raster)
             # pf.raster_plot(sorted_data, time_range_raster, ax=ax_antidromic)
@@ -200,7 +201,7 @@ def plot_opto_responses(unit_tbl, event_ids):
                 ax_antidromic.set_yticklabels([])
 
             # PSTH plot
-            ax_psth = fig.add_subplot(gs[4 * u_idx + 2, i], sharex=ax_raster)
+            ax_psth = fig.add_subplot(gs[5 * u_idx + 2, i], sharex=ax_raster)
             psth, _, bins = pf.psth(int_event_locked_timestamps, time_range_raster, bin_size=0.003, smooth_window_size=3)
             antidromic_latency, antidromic_jitter = antidromic_latency_jitter(int_event_locked_timestamps)
             ax_psth.plot(bins, psth, color='k')
@@ -219,8 +220,90 @@ def plot_opto_responses(unit_tbl, event_ids):
                 # ax_psth.legend()
             # Add title to PSTH
             # ax_psth.set_title(f'PSTH for {site}, {max_power} mW\nAntidromic latency: {antidromic_latency:.3f} s, Jitter: {antidromic_jitter:.3f} s')
+            # Add p(resp)-first spike latency
+            spike_time_range = (20, 50)
+            bin_num=100
+            # Convert spike time range to seconds
+            spike_time_range_sec = (spike_time_range[0] / 1000, spike_time_range[1] / 1000)
+            first_post_stim_spike_times = []
+            
+            for spike_times in sorted_data:
+                if spike_times.size > 0 and np.any(spike_times > 0):
+                    first_spike = spike_times[spike_times > 0][0]
+                    first_post_stim_spike_times.append(first_spike)
+                    
+                # Check if first spikes fall within the antidromic window
+                is_antidromic_spike = (spike_times >= spike_time_range_sec[0]/1000) & \
+                                (spike_times <= spike_time_range_sec[1]/1000)
+            
+            if not first_post_stim_spike_times:
+                continue
+            first_post_stim_spike_times = np.array(first_post_stim_spike_times)
+            # Calculate antidromic spike probability
+            antidromic_spike_prob = np.sum(is_antidromic_spike) / len(first_post_stim_spike_times)
+            # Find peak latency (for information only)
+            hist, bin_edges = np.histogram(first_post_stim_spike_times, bins=bin_num)
+            peak_x = bin_edges[np.argmax(hist)]
+            antidromic_latency = peak_x
+            ax_latency = fig.add_subplot(gs[5 * u_idx + 3, i])
+            ax_latency.plot(bin_edges[:-1], hist, color='k')
+            ax_latency.axvline(antidromic_latency, color='r', linestyle='--', label=f'Peak: {antidromic_latency:.3f} s')
+            ax_latency.set_xlabel('First post-stimulus spike time (s)')
+            ax_latency.set_ylabel('Count')
+            ax_latency.set_title(f'Prob: {antidromic_spike_prob:.2f}; Lat: {antidromic_latency*1000:.1f} ms')
+            # antidromic test
+            num_trials = len(sorted_data)
+            last_ortho_spike_times = np.full(num_trials, np.nan)
+            collision_flags = np.ones(num_trials, dtype=int)
+            for spike_i, spike_times in enumerate(sorted_data):
+                if spike_times.size == 0:
+                    continue
+                
+                ortho_mask = spike_times <= (antidromic_latency - antidromic_jitter)
+                anti_mask = (antidromic_latency - antidromic_jitter < spike_times) & (spike_times < antidromic_latency + antidromic_jitter)
+                
+                ortho_spikes = spike_times[ortho_mask]
+                anti_spikes = spike_times[anti_mask]
+                
+                if ortho_spikes.size > 0:
+                    last_ortho_spike_times[spike_i] = ortho_spikes[-1]  # Only keep the last orthodromic spike
+                
+                if anti_spikes.size > 0:
+                    collision_flags[spike_i] = 0  # If antidromic spike exists, collision = 0 (no collision)
+            antidromic_df = pd.DataFrame({
+                'trial_num': np.arange(num_trials),
+                'last_orthodromic_spike_time': last_ortho_spike_times,
+                'collision': collision_flags
+            })
 
+            # Step 4: ROI selection and plot
+            roi_df = antidromic_df.dropna(subset=['last_orthodromic_spike_time'])  # Keep only trials with orthodromic spikes
+            x = (roi_df['last_orthodromic_spike_time'].values - antidromic_latency) * 1000  # in ms
+            y = 1 - roi_df['collision'].values  # 1 = successful antidromic spike, 0 = collision
+            
+            # Define windows (you can adjust these)
+            early_window = (-100, -70)  # in ms
+            near_latency_window = (-30, 0)
 
+            # Select data in each window
+            early_indices = (x >= early_window[0]) & (x < early_window[1])
+            near_latency_indices = (x >= near_latency_window[0]) & (x <= near_latency_window[1])
+
+            early_probs = y[early_indices]
+            near_latency_probs = y[near_latency_indices]
+
+            # Perform Mann-Whitney U test
+            statistic, p_value = mannwhitneyu(early_probs, near_latency_probs, alternative='greater')
+            # Plot binned averages
+            result, edges = Avg_y_over_x(x, y, bin_size=10)
+            ax_compare = fig.add_subplot(gs[5 * u_idx + 4, i])
+            ax_compare.errorbar(result['x'], result['y'], yerr=result['sem'], fmt='o-', label='Average ± SEM')
+            ax_compare.set_xlabel('Time from antidromic latency (ms)')
+            ax_compare.set_ylabel('P(antidromic spike)')
+            ax_compare.set_title(f'Collision Test: p-value: {p_value:.2e}')  # <- use f-string
+            ax_compare.set_xlim([-100, 0])
+            ax_compare.set_ylim([-0.05, 1.05])
+            # plt.legend()
 
 
     # Final layout adjustments
