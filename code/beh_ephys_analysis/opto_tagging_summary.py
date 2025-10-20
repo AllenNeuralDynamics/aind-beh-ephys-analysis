@@ -181,7 +181,7 @@ def opto_summary(session, data_type, target, save=True):
     w.ax.set_title('All units')
 
     ax = fig.add_subplot(gs_probe[1, 1])
-    unit_ids_filtered = pd.Series(unit_ids)[opto_tag_tbl['real_unit'] & (opto_tag_tbl['lat_mean']>=0.007) & (opto_tag_tbl['euc_max_p']<=0.3)].values.tolist()
+    unit_ids_filtered = pd.Series(unit_ids)[opto_tag_tbl['real_unit'] & (opto_tag_tbl['lat_mean']>=0.004) & (opto_tag_tbl['corr_max_p']>=0.85)].values.tolist()
     w = sw.plot_unit_locations(we, backend="matplotlib", unit_ids=unit_ids_filtered, unit_colors=color_dict, ax = ax)
     w.ax.set_ylim(-200, 2000)
     w.ax.set_title('Real units')
@@ -232,7 +232,7 @@ def opto_summary(session, data_type, target, save=True):
     w.ax.set_title('All units')
 
     ax = fig.add_subplot(gs_probe[1, 5])
-    unit_ids_filtered = pd.Series(unit_ids)[opto_tag_tbl['real_unit'] & (opto_tag_tbl['lat_mean']>=0.005) & (opto_tag_tbl['euc_max_p']<=0.5)].values.tolist()
+    unit_ids_filtered = pd.Series(unit_ids)[opto_tag_tbl['real_unit'] & (opto_tag_tbl['lat_mean']>=0.005) & (opto_tag_tbl['corr_max_p']>=0.85)].values.tolist()
     w = sw.plot_unit_locations(we, backend="matplotlib", unit_ids=unit_ids_filtered, unit_colors=color_dict, ax = ax)
     w.ax.set_ylim(-200, 2000)
     w.ax.set_title('Real units')
@@ -290,13 +290,13 @@ def opto_summary(session, data_type, target, save=True):
                 (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) &\
                 (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02) &\
                 (opto_tag_tbl['real_unit']) &\
-                (opto_tag_tbl['euc_max_p']<=0.3)
+                (opto_tag_tbl['corr_max_p']>=0.85)
     
     mask = (opto_tag_tbl['p_max']>0.2) & (opto_tag_tbl['pass_count'] >=1)&\
-            (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) &\
-            (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02) &\
+            (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>=0.005) &\
+            (opto_tag_tbl['bl_max_p']>0.3*0.02) * (opto_tag_tbl['bl_max_p']<30*0.02) &\
             (opto_tag_tbl['real_unit']) &\
-            (opto_tag_tbl['euc_max_p']<=0.3)
+            (opto_tag_tbl['corr_max_p']>=0.85)
                 
 
     LC_range = opto_tag_tbl[mask]['y_loc'].values
@@ -321,10 +321,10 @@ def opto_summary(session, data_type, target, save=True):
         bottom = np.max([bottom, center-500])
         unit_tag_loc = (opto_tag_tbl['p_max']>=low_thresh) & (opto_tag_tbl['p_mean']>0.1) & (opto_tag_tbl['pass_count'] >=2) & \
                     (opto_tag_tbl['y_loc']<=top) & (opto_tag_tbl['y_loc']>=bottom) & \
-                    (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) & \
-                    (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02)& \
+                    (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>=0.005) & \
+                    (opto_tag_tbl['bl_max_p']>0.3*0.02) * (opto_tag_tbl['bl_max_p']<30*0.02)& \
                     (opto_tag_tbl['real_unit']) &\
-                    (opto_tag_tbl['euc_max_p']<=0.3)
+                    (opto_tag_tbl['corr_max_p']>=0.85)
 
         opto_tag_tbl_summary['tagged_loc'] = unit_tag_loc
         opto_tag_tbl_summary['tagged'] = unit_tag
@@ -412,14 +412,14 @@ if __name__ == '__main__':
         # elif session_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw'
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    Parallel(n_jobs=2)(delayed(process)(session) for session in session_list[-9:])
+    # Parallel(n_jobs=2)(delayed(process)(session) for session in session_list[-9:])
     # print(session_list[10:17])
     # for session in session_list[-9:]:
     #     # try:
     #     process(session) 
          # except:
         #     print(f'Failed {session}')
-    # process('behavior_791691_2025-06-24_13-21-29')
+    process('behavior_758018_2025-03-21_11-00-34')
 
 
 

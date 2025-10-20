@@ -786,11 +786,11 @@ if __name__ == '__main__':
         #     data_type = 'raw' 
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
     # Parallel(n_jobs=3)(delayed(process)(session, probe) for session, probe in zip(session_list[-9:], probe_list[-9:]))
-    for session, probe in zip(session_list[-3:], probe_list[-3:]):
-        print(f'Checking {session}')
-        process(session, probe)
+    # for session, probe in zip(session_list[-3:], probe_list[-3:]):
+    #     print(f'Checking {session}')
+    #     process(session, probe)
     # process('behavior_791691_2025-06-24_13-21-29', '2')
-    # plot_ephys_corr_band('behavior_751766_2025-02-15_12-08-11', data_type,  '2')
+    plot_ephys_corr_band('behavior_784803_2025-07-03_13-55-13', 'raw',  '2')
     # plot_ephys_probe('ecephys_713854_2024-03-08_14-54-25', data_type,  '2')
   
 
