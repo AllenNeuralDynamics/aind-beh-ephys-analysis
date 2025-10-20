@@ -26,6 +26,7 @@ from scipy.io import loadmat
 import pickle
 import shutil
 from open_ephys.analysis import Session
+import itertools
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
@@ -1439,7 +1440,24 @@ def plot_session_glm(session, tMax = 10, cut = [0, np.nan], model_name = None):
 
     return fig, session, coeffs_dict
 
-def get_session_tbl(session):
+def longest_zero_chunk(binary_list):
+    longest_len = 0
+    longest_start = None
+    longest_end = None
+
+    # group consecutive values (e.g., [0,0,1,0,0,0,1] -> [(0,2), (1,1), (0,3), (1,1)])
+    for value, group in itertools.groupby(enumerate(binary_list), key=lambda x: x[1]):
+        if value == 0:
+            indices = [idx for idx, _ in group]
+            length = len(indices)
+            if length > longest_len:
+                longest_len = length
+                longest_start = indices[0]
+                longest_end = indices[-1]
+
+    return longest_start, longest_end, longest_len
+
+def get_session_tbl(session, cut_interruptions = False):
     session_dir = session_dirs(session)
     nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
     if os.path.exists(nwb_file):
@@ -1447,6 +1465,50 @@ def get_session_tbl(session):
         tbl = nwb.trials.to_dataframe()
         tbl['lick_lat'] = tbl['reward_outcome_time'] - tbl['goCue_start_time']
         tbl['trial_ind'] = tbl.index
+        right_rewards = nwb.acquisition['right_reward_delivery_time'].timestamps[:]
+        left_rewards = nwb.acquisition['left_reward_delivery_time'].timestamps[:]
+        # In all sessions, find reward times before reward_outcome_times
+        right_rewards_times = [None] * len(tbl)
+        left_rewards_times = [None] * len(tbl)
+
+        for i, row in tbl.iterrows():
+            right_rewards_trial = right_rewards[(right_rewards <= row['reward_outcome_time'] + row['reward_delay']+0.1) & (right_rewards > row['goCue_start_time'])]
+            left_rewards_trial = left_rewards[(left_rewards <= row['reward_outcome_time'] + row['reward_delay']+0.1) & (left_rewards > row['goCue_start_time'])]
+            if len(right_rewards_trial) > 0:
+                right_rewards_times[i] = right_rewards_trial-row['goCue_start_time']
+            if len(left_rewards_trial) > 0:
+                left_rewards_times[i] = left_rewards_trial-row['goCue_start_time']
+        tbl['right_reward_times'] = right_rewards_times
+        tbl['left_reward_times'] = left_rewards_times
+        tbl['choice_time'] = tbl['reward_outcome_time'] - tbl['goCue_start_time']
+        auto_manual_trials = [
+            (
+                (tbl['right_reward_times'].values[i] is not None and 
+                np.any(tbl['right_reward_times'].values[i] < tbl['choice_time'].values[i] + tbl['reward_delay'].values[i]))
+                or
+                (tbl['left_reward_times'].values[i] is not None and 
+                np.any(tbl['left_reward_times'].values[i] < tbl['choice_time'].values[i] + tbl['reward_delay'].values[i]))
+            )
+            for i in range(len(tbl))
+        ]
+
+        extra_reward = [
+            (
+                (tbl['right_reward_times'].values[i] is not None and 
+                ~tbl['rewarded_historyR'].values[i])
+                or
+                (tbl['left_reward_times'].values[i] is not None and 
+                ~tbl['rewarded_historyL'].values[i])
+            )
+            for i in range(len(tbl))
+
+        ]
+        tbl['auto_manual_trial'] = auto_manual_trials
+        tbl['extra_reward'] = extra_reward
+        if cut_interruptions:
+            session_interruptions = tbl['auto_manual_trial'] | tbl['extra_reward']
+            longest_start, longest_end, longest_len = longest_zero_chunk(session_interruptions.tolist())
+            tbl = tbl.iloc[longest_start:longest_end+1]
     else:
         tbl = None
     return tbl
