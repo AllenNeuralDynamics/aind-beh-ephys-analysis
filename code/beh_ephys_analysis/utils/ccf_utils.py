@@ -14,3 +14,17 @@ def ccf_pts_convert_to_mm(ccf_pts, bregma_points=None, ccf_res=None):
     else:
         ccf_pts_mm[:, 0] = -1 * ccf_pts_mm[:, 0]  # flip AP-axis
     return ccf_pts_mm
+
+def pir_to_lps(points):
+    """
+    Convert point(s) from PIR to LPS.
+    points: shape (3,) or (N, 3) array-like in PIR order.
+    Returns: same shape in LPS.
+    """
+    pts = np.asarray(points)
+    M = np.array([[ 0,  0, -1],   # x_lps = -z_pir
+                  [ 1,  0,  0],   # y_lps =  x_pir
+                  [ 0, -1,  0]])  # z_lps = -y_pir
+    if pts.ndim == 1:
+        return M @ pts
+    return pts @ M.T

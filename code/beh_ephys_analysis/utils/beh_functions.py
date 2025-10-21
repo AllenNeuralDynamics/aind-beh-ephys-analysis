@@ -1480,14 +1480,14 @@ def get_session_tbl(session, cut_interruptions = False):
                 left_rewards_times[i] = left_rewards_trial-row['goCue_start_time']
         tbl['right_reward_times'] = right_rewards_times
         tbl['left_reward_times'] = left_rewards_times
-        tbl['choice_time'] = tbl['reward_outcome_time'] - tbl['goCue_start_time']
+        tbl['choice_time_trial'] = tbl['reward_outcome_time'] - tbl['goCue_start_time']
         auto_manual_trials = [
             (
                 (tbl['right_reward_times'].values[i] is not None and 
-                np.any(tbl['right_reward_times'].values[i] < tbl['choice_time'].values[i] + tbl['reward_delay'].values[i]))
+                np.any(tbl['right_reward_times'].values[i] < tbl['choice_time_trial'].values[i] + tbl['reward_delay'].values[i]))
                 or
                 (tbl['left_reward_times'].values[i] is not None and 
-                np.any(tbl['left_reward_times'].values[i] < tbl['choice_time'].values[i] + tbl['reward_delay'].values[i]))
+                np.any(tbl['left_reward_times'].values[i] < tbl['choice_time_trial'].values[i] + tbl['reward_delay'].values[i]))
             )
             for i in range(len(tbl))
         ]
@@ -1525,6 +1525,7 @@ def get_unit_tbl(session, data_type, summary = True):
             unit_tbl = unit_data
             if os.path.exists(ccf_dir):
                 ccf_data = pd.read_csv(ccf_dir)
+                unit_tbl.drop(columns=['x_ccf', 'y_ccf', 'z_ccf'], inplace=True, errors='ignore')
                 unit_tbl = pd.merge(unit_tbl, ccf_data, left_on='unit_id', right_on='unit_id', how='left')
         elif os.path.exists(unit_tbl_dir):
             with open(unit_tbl_dir, 'rb') as f:

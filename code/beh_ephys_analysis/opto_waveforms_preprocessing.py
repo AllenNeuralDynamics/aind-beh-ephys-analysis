@@ -1652,7 +1652,7 @@ if __name__ == "__main__":
     
     # Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-9:]) 
     # session_list = ['behavior_791691_2025-06-24_13-21-29', 'behavior_791691_2025-06-26_13-39-26', 'behavior_784806_2025-06-17_14-59-23']
-    for session in session_list[45:-1]:
+    for session in session_list[45:]:
         process(session)  
     # process('behavior_784806_2025-06-17_14-59-23') 
     # re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
