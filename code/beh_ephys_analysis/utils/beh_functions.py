@@ -33,6 +33,7 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 from scipy.stats import norm
 import statsmodels.api as sm
+from sklearn.metrics import r2_score
 
 import spikeinterface as si
 
@@ -1199,7 +1200,7 @@ def delete_files_without_name(folder_path, name):
                 # Delete the file
                 os.remove(file_path)
 
-def makeSessionDF(session, cut = [0, np.nan], model_name = None):
+def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptions = False):
     tblTrials = get_session_tbl(session)
 
     if model_name is not None:
@@ -1279,6 +1280,12 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
             Qchosen[np.where(session_df['choice']>0)] = session_df.loc[session_df['choice']>0, 'Q_r']
             session_df['Qchosen'] = Qchosen
         trialData = session_df.copy()
+    
+    if cut_interruptions:
+        session_interruptions = trialData['auto_manual_trial'] | trialData['extra_reward']
+        longest_start, longest_end, longest_len = longest_zero_chunk(session_interruptions.tolist())
+        trialData = trialData.iloc[longest_start:longest_end+1]
+        
 
     return trialData
 
@@ -1484,10 +1491,10 @@ def get_session_tbl(session, cut_interruptions = False):
         auto_manual_trials = [
             (
                 (tbl['right_reward_times'].values[i] is not None and 
-                np.any(tbl['right_reward_times'].values[i] < tbl['choice_time_trial'].values[i] + tbl['reward_delay'].values[i]))
+                np.any(tbl['right_reward_times'].values[i] < tbl['choice_time_trial'].values[i]))
                 or
                 (tbl['left_reward_times'].values[i] is not None and 
-                np.any(tbl['left_reward_times'].values[i] < tbl['choice_time_trial'].values[i] + tbl['reward_delay'].values[i]))
+                np.any(tbl['left_reward_times'].values[i] < tbl['choice_time_trial'].values[i]))
             )
             for i in range(len(tbl))
         ]

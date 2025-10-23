@@ -17,7 +17,15 @@ from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 import ast
 import json
 import pickle
+from sklearn.metrics import r2_score
 
+def regressors_to_formula(response_var, regressors):
+    terms = [r for r in regressors if r != 'Intercept']
+    has_intercept = 'Intercept' in regressors
+    rhs = '1' if has_intercept else '0'
+    if terms:
+        rhs += ' + ' + ' + '.join(terms)
+    return f'{response_var} ~ {rhs}'
 
 def filter_jc(x, time_constant = 20):
     # return filtered firing rate given time from spike (in ms)
@@ -746,3 +754,87 @@ def make_summary_unit_tbl(session): # this is for hopkins data
     summary_path = os.path.join(session_dir['opto_dir_curated'], f'{session}_curated_soma_opto_tagging_summary.pkl')
     with open(summary_path, 'wb') as f:
         unit_summary.to_pickle(f)
+
+def get_score(X_design, y_target, criterion='aic'):
+    model = sm.GLM(y_target, sm.add_constant(X_design)).fit()
+    score = model.aic if criterion == 'aic' else model.bic
+    return score, model
+
+    
+def stepwise_glm(X, y, forced_vars, candidate_vars, criterion='aic', verbose=True):
+    """
+    Perform stepwise regression (GLM) with forced inclusion of some variables.
+
+    Parameters:
+    - X: DataFrame of all regressors
+    - y: target variable (Series)
+    - forced_vars: list of variables to always include
+    - candidate_vars: list of variables to select from
+    - criterion: 'aic' or 'bic'
+    - verbose: whether to print step info
+
+    Returns:
+    - final_model: fitted statsmodels GLM
+    - selected_vars: list of all variables in final model
+    """
+    
+
+
+    included = forced_vars.copy()
+    optional = candidate_vars.copy()
+    
+    current_X = X[forced_vars].copy()
+    best_score, best_model = get_score(current_X, y, criterion='aic')
+
+    changed = True
+    while changed:
+        changed = False
+
+        # Try adding one variable
+        scores_with_addition = []
+        for var in optional:
+            if var not in included:
+                X_try = X[included + [var]]
+                score, _ = get_score(X_try, y)
+                scores_with_addition.append((score, var))
+        scores_with_addition.sort()
+        if scores_with_addition:
+            best_new_score, best_var = scores_with_addition[0]
+            if best_new_score < best_score:
+                included.append(best_var)
+                optional.remove(best_var)
+                best_score = best_new_score
+                changed = True
+                if verbose:
+                    print(f'Added: {best_var}, {criterion.upper()}: {best_score:.2f}')
+
+        # Try removing one variable (not from forced)
+        scores_with_removal = []
+        for var in included:
+            if var not in forced_vars:
+                X_try = X[[v for v in included if v != var]]
+                score, _ = get_score(X_try, y)
+                scores_with_removal.append((score, var))
+        scores_with_removal.sort()
+        if scores_with_removal:
+            best_new_score, worst_var = scores_with_removal[0]
+            if best_new_score < best_score:
+                included.remove(worst_var)
+                optional.append(worst_var)
+                best_score = best_new_score
+                changed = True
+                if verbose:
+                    print(f'Removed: {worst_var}, {criterion.upper()}: {best_score:.2f}')
+
+    final_model = sm.GLM(y, sm.add_constant(X[included])).fit()
+    R2_final = r2_score(y, final_model.fittedvalues)
+    forced_model = sm.GLM(y, sm.add_constant(X[forced_vars])).fit()
+    R2_forced = r2_score(y, forced_model.fittedvalues)
+    
+    return forced_model, final_model, included, R2_final, R2_forced
+
+def add_interactions(df, interaction_pairs):
+    for var1, var2 in interaction_pairs:
+        name = f"{var1}:{var2}"
+        df[name] = df[var1] * df[var2]
+    return df
