@@ -604,11 +604,12 @@ if __name__ == "__main__":
             #     data_type = 'raw' 
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
     # session_list = ['behavior_791691_2025-06-24_13-21-29', 'behavior_791691_2025-06-26_13-39-26', 'behavior_784806_2025-06-17_14-59-23']
-    Parallel(n_jobs=2)(delayed(process)(session, data_type) for session in session_list)
-    # opto_plotting_session('behavior_791691_2025-06-24_13-21-29', 'curated', 'soma', resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
+    # Parallel(n_jobs=2)(delayed(process)(session, data_type) for session in session_list)
+    opto_plotting_session('behavior_751766_2025-02-15_12-08-11', 'raw', 'soma', resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
     # for session in session_list:
     #     process(session, data_type)
     # print(session_list[-13]) 
+
 
     
 

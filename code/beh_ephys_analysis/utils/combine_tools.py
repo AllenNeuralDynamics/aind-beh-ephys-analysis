@@ -51,6 +51,48 @@ def apply_qc(combined_tagged_units, constraints):
             print(f'Applying items for {col}: {cfg["items"]}')
             allowed = cfg["items"]
             mask &= combined_tagged_units[col].isin(allowed)
+        
+        elif "conditional" in cfg:
+            print(f'Applying conditional bounds for {col}')
+            cond_mask = pd.Series(False, index=combined_tagged_units.index)
+            for cond in cfg["conditional"]:
+                if "if" in cond:
+                    for dep_col, (op, val) in cond["if"].items():
+                        if dep_col not in combined_tagged_units:
+                            print(f"Dependent column {dep_col} missing, skipping condition.")
+                            continue
+                        if op == "<":
+                            condition = combined_tagged_units[dep_col] < val
+                        elif op == "<=":
+                            condition = combined_tagged_units[dep_col] <= val
+                        elif op == ">":
+                            condition = combined_tagged_units[dep_col] > val
+                        elif op == ">=":
+                            condition = combined_tagged_units[dep_col] >= val
+                        elif op == "==":
+                            condition = combined_tagged_units[dep_col] == val
+                        else:
+                            raise ValueError(f"Unsupported operator: {op}")
+
+                        lb, ub = np.array(cond["bounds"], dtype=float)
+                        bounds_mask = pd.Series(True, index=combined_tagged_units.index)
+                        if not np.isnan(lb):
+                            bounds_mask &= combined_tagged_units[col] >= lb
+                        if not np.isnan(ub):
+                            bounds_mask &= combined_tagged_units[col] <= ub
+
+                        cond_mask |= (condition & bounds_mask)
+
+                elif "else" in cond:
+                    lb, ub = np.array(cond["bounds"], dtype=float)
+                    bounds_mask = pd.Series(True, index=combined_tagged_units.index)
+                    if not np.isnan(lb):
+                        bounds_mask &= combined_tagged_units[col] >= lb
+                    if not np.isnan(ub):
+                        bounds_mask &= combined_tagged_units[col] <= ub
+                    cond_mask |= (~condition & bounds_mask)
+
+            mask &= cond_mask
         new_count_true = mask.sum()
         print(f' - {col}: {curr_count_true} -> {new_count_true} units passed')
     mask_no_opto = mask.copy()  
@@ -193,3 +235,26 @@ def apply_qc(combined_tagged_units, constraints):
     plt.show()
 
     return combined_tagged_units_filtered, combined_tagged_units, fig
+
+def merge_df_with_suffix(dfs, on_list, prefixes = None, suffixes = None):
+    """
+    Merges multiple DataFrames on specified columns, renaming columns with prefixes and suffixes.
+    """
+    # check if dfs, prefixes, and suffixes are lists of same lengths
+    
+    for ind, df in enumerate(dfs):
+        # loop through columns and rename them with suffix
+        for col in df.columns:
+            if col not in on_list:
+                col_name = col
+                if prefixes is not None:
+                    col_name = f"{prefixes[ind]}_{col_name}"
+                if suffixes is not None:
+                    col_name = f"{col_name}_{suffixes[ind]}"
+                # print(f"Renaming column '{col}' in DataFrame to '{col}_{suffixes[ind]}'")
+                df.rename(columns={col: col_name}, inplace=True)
+    
+    merge_df = dfs[0]
+    for df in dfs[1:]:
+        merge_df = merge_df.merge(df, on=on_list, how='outer')
+    return merge_df

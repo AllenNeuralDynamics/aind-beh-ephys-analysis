@@ -56,5 +56,18 @@
     "items": [
       true
     ]
+  },
+  "y_loc":{
+    "conditional": [
+      {
+        "if": { "probe": ["==", "2"] },
+        "bounds": [0, 2000]
+      },
+      {
+        "else": true,
+        "bounds": [0, null]
+      }
+    ]
+
   }
 }
