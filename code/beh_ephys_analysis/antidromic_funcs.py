@@ -448,7 +448,7 @@ def analyze_antidromic_responses(session_id, data_type ='curated', plot=False, t
         return pd.DataFrame()
 
     antidromic_results = []
-    time_range_raster = np.array([-0.1, 0.07])  # in seconds
+    time_range_raster = np.array([-0.15, 0.15])  # in seconds
     for unit_ind, row in opto_units.iterrows():
         unit_spike_times = row['spike_times']
         unit_id = row['unit_id']
@@ -539,7 +539,7 @@ def analyze_antidromic_responses(session_id, data_type ='curated', plot=False, t
                 )
                 # add regression analysis
                 int_event_locked_timestamps_sham = []
-                this_event_timestamps_sham = np.linspace(np.min(unit_spike_times), np.max(unit_spike_times), max(len(this_event_timestamps), 20))
+                this_event_timestamps_sham = np.linspace(np.min(tag_trials.time.values)+1, np.max(tag_trials.time.values)-1, max(len(this_event_timestamps), 50))
                 for pulse_num in range(num_pulses):
                     time_shift = pulse_num * (duration + pulse_interval) / 1000
                     this_time_range = time_range_raster + time_shift
@@ -563,7 +563,7 @@ def analyze_antidromic_responses(session_id, data_type ='curated', plot=False, t
                         int_event_locked_timestamps,
                         int_event_locked_timestamps_sham,
                         antidromic_latency,
-                        antidromic_jitter
+                        antidromic_jitter,
                     )
 
                 result.update({
@@ -785,8 +785,11 @@ def antidromic_regression_analysis(int_event_locked_timestamps, int_event_locked
     trial_num_real = len(int_event_locked_timestamps)
     trial_num_sham = len(int_event_locked_timestamps_sham)
     trigger = np.array([1]*trial_num_real + [0]*trial_num_sham)
+    antidromic_jitter = 2* antidromic_jitter  # Double the jitter for both sides
     if antidromic_jitter < 0.005:
         antidromic_jitter = 0.005
+    if antidromic_jitter > antidromic_latency:
+        antidromic_jitter = antidromic_latency
     spont_spike = []
     spont_spike_count = []
     laser_evoked_spike = []
@@ -816,7 +819,7 @@ def antidromic_regression_analysis(int_event_locked_timestamps, int_event_locked
     # model_half = logit("laser_evoked_spike ~ trigger + spont_spike", data=df).fit(disp=0)
     # linear regresssion
     model_half = ols("laser_evoked_spike_count ~ trigger + spont_spike_count", data=df).fit()
-    if model_half.pvalues['trigger']<0.1:
+    if (model_half.pvalues['trigger']<0.1) and (model_half.tvalues['trigger']>0):
         try:
             # model_full = logit("laser_evoked_spike ~ trigger + spont_spike + trigger:spont_spike", data=df).fit(disp=0)
             model_full = ols("laser_evoked_spike_count ~ trigger + spont_spike_count + trigger:spont_spike", data=df).fit()
@@ -902,7 +905,7 @@ if __name__ == "__main__":
         else:
             print(f"No curated data for session: {session}, skipping.")
     from joblib import Parallel, delayed
-    # Parallel(n_jobs=3)(delayed(process)(session, data_type=data_type) for session in session_list)
+    Parallel(n_jobs=3)(delayed(process)(session, data_type=data_type) for session in session_list)
     # process('behavior_751181_2025-02-26_11-51-19')
-    for session in session_list:
-        process(session)
+    # for session in session_list:
+    #     process(session)

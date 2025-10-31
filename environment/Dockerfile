@@ -30,7 +30,7 @@ RUN pip install -U --no-cache-dir \
     open-ephys-python-tools==0.1.10 \
     pynwb==2.8.3 \
     pypdf2==3.0.1 \
-    spikeinterface[full]==0.102.1 \
+    spikeinterface[full]==0.103.0 \
     statsmodels==0.14.2 \
     wavpack-numcodecs==0.2.2 \
     natsort \
@@ -38,7 +38,9 @@ RUN pip install -U --no-cache-dir \
     aind-dynamic-foraging-data-utils==0.1.4 \
     pdf2image \
     seaborn \
-    trimesh
+    trimesh \
+    k3d \
+    codeocean
 
 COPY postInstall /
 RUN /postInstall
