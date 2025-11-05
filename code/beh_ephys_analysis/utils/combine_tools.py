@@ -157,8 +157,9 @@ def apply_qc(combined_tagged_units, constraints):
         filtered_data = combined_tagged_units_filtered[col].dropna()
         half_filtered_data = combined_tagged_units[mask_no_opto][col].dropna()
 
-        if "bounds" in cfg:
-            lb, ub = np.array(cfg["bounds"], dtype=float)
+        if "bounds" in cfg or "conditional" in cfg:
+            if "bounds" in cfg:
+                lb, ub = np.array(cfg["bounds"], dtype=float)
             # bins = np.linspace(np.nanmin(full_data), np.nanmax(full_data), 50)
             # bins[0] = bins[0]-0.0001
             # bins[-1] = bins[-1]+0.0001
@@ -188,14 +189,16 @@ def apply_qc(combined_tagged_units, constraints):
             
                 
 
-            ax.set_title(f'{col}\nBounds: [{lb}, {ub}]')
+            if "bounds" in cfg:
+                ax.set_title(f'{col}\nBounds: [{lb}, {ub}]')
             ax.set_xlabel(col)
             ax.set_ylabel('Density')
 
-            if not np.isnan(lb) and lb > full_data.min():
-                ax.axvline(lb, color='red', linestyle='--', label='Lower bound')
-            if not np.isnan(ub) and ub < full_data.max():
-                ax.axvline(ub, color='green', linestyle='--', label='Upper bound')
+            if "bounds" in cfg:
+                if not np.isnan(lb) and lb > full_data.min():
+                    ax.axvline(lb, color='red', linestyle='--', label='Lower bound')
+                if not np.isnan(ub) and ub < full_data.max():
+                    ax.axvline(ub, color='green', linestyle='--', label='Upper bound')
             ax.legend()
 
         elif "items" in cfg:
@@ -236,7 +239,36 @@ def apply_qc(combined_tagged_units, constraints):
 
     return combined_tagged_units_filtered, combined_tagged_units, fig
 
-def merge_df_with_suffix(dfs, on_list, prefixes = None, suffixes = None):
+def to_str_intlike(x):
+    """
+    Convert any integer-like or numeric-like value to a clean string without '.0'.
+
+    Examples:
+        297       → '297'
+        '297.0'   → '297'
+        297.0     → '297'
+        np.int64(297) → '297'
+        'abc'     → 'abc'   (unchanged)
+        np.nan    → np.nan   (kept as NaN)
+    """
+    if pd.isna(x):
+        return np.nan  # or return '' if you prefer empty string for NaN
+
+    # Try to convert to float first (handles both numeric and numeric-like strings)
+    try:
+        val = float(x)
+        # If it's a whole number like 297.0 → cast to int and then str
+        if val.is_integer():
+            return str(int(val))
+        else:
+            # Keep decimals if not an integer-like number
+            return str(val)
+    except (ValueError, TypeError):
+        # Non-numeric string: return as-is
+        return str(x)
+
+
+def merge_df_with_suffix(dfs, on_list, prefixes = None, suffixes = None, how = 'left'):
     """
     Merges multiple DataFrames on specified columns, renaming columns with prefixes and suffixes.
     """
@@ -256,5 +288,5 @@ def merge_df_with_suffix(dfs, on_list, prefixes = None, suffixes = None):
     
     merge_df = dfs[0]
     for df in dfs[1:]:
-        merge_df = merge_df.merge(df, on=on_list, how='outer')
+        merge_df = merge_df.merge(df, on=on_list, how=how)
     return merge_df

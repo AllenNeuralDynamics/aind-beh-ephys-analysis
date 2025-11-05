@@ -1,0 +1,114 @@
+{
+  "isi_violations": {
+    "bounds": [
+      0.0,
+      0.1
+    ]
+  },
+  "p_max": {
+    "bounds": [
+      0.5,
+      1.0
+    ]
+  },
+  "lat_max_p": {
+    "bounds": [
+      0.002,
+      0.02
+    ]
+  },
+  "eu": {
+    "bounds": [
+      0.0,
+      0.35
+    ]
+  },
+  "corr": {
+    "bounds": [
+      0.95,
+      1.0
+    ]
+  },
+  "qc_pass": {
+    "items": [
+      true
+    ]
+  },
+  "peak":{
+    "bounds": [
+      -1000,
+      500
+    ]
+  },
+  "sig_counts":{
+    "bounds": [
+      4.5,
+      6
+    ]
+  },
+  "in_df": {
+    "items": [
+      true
+    ]
+  },
+  "y_loc":{
+    "conditional": [
+      {
+        "if": { "probe": ["==", "2"] },
+        "bounds": [0, 2000]
+      },
+      {
+        "else": true,
+        "bounds": [0, null]
+      }
+    ]
+
+  },
+  "trial_count": {
+    "bounds": [
+      100,
+      2000
+    ]
+  },
+  "session_len": {
+    "bounds": [
+      100,
+      2000
+    ]
+  },
+  "p_sw_L": {
+    "bounds": [
+      0.05,
+      1
+    ]
+  },
+  "aN": {
+    "bounds": [
+      0.05,
+      1.0
+    ]
+  },
+  "diff_1": {
+    "bounds": [
+      0,
+      "nan"
+    ]
+  },
+  "intercept": {
+    "bounds": [
+      -3,
+      3
+    ]
+  },
+  "sw_bias": {
+    "bounds": [
+      -1,
+      1
+    ]
+  },
+  "lick_bias": {
+    "items": [
+      false
+    ]
+  }
+}
