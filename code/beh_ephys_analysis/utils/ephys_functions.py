@@ -12,12 +12,13 @@ sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
 from matplotlib import gridspec
 # from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 # from aind_ephys_utils import align
-from utils.beh_functions import session_dirs 
+from beh_functions import session_dirs 
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 import ast
 import json
 import pickle
 from sklearn.metrics import r2_score
+from aind_ephys_utils import align
 
 def regressors_to_formula(response_var, regressors):
     terms = [r for r in regressors if r != 'Intercept']

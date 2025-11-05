@@ -1,6 +1,8 @@
 # %%
 import sys
 import os
+
+from pandas.core.apply import com
 sys.path.append('/root/capsule/code/beh_ephys_analysis')
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,7 +24,7 @@ import re
 from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
 from utils.ephys_functions import*
 from utils.ccf_utils import ccf_pts_convert_to_mm, pir_to_lps
-from utils.combine_tools import apply_qc, merge_df_with_suffix
+from utils.combine_tools import apply_qc, merge_df_with_suffix, to_str_intlike
 import pickle
 import scipy.stats as stats
 import spikeinterface as si
@@ -43,14 +45,36 @@ warnings.filterwarnings('ignore')
 
 # %%
 criteria_name = 'beh_all'
-
+version = 'PrL_S1'
 overview = False
 
 # %%
 # load constraints and data
 with open(os.path.join('/root/capsule/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
     combined_tagged_units = pickle.load(f)
-    
+combined_tagged_units['unit_id'] = combined_tagged_units['unit'].apply(to_str_intlike)
+with open(os.path.join('/root/capsule/scratch/combined/combined_session_tbl', 'combined_beh_sessions.pkl'), 'rb') as f:
+    combined_session_qc = pickle.load(f)
+# combined_session_qc.drop(columns=['probe'], inplace=True, errors='ignore')
+# combined_tagged_units = combined_tagged_units.merge(combined_session_qc, on='session', how='left')
+
+# antidromic data
+antidromic_file = f'/root/capsule/scratch/combined/beh_plots/basic_ephys_low/{version}/combined_antidromic_results.pkl'
+with open(antidromic_file, 'rb') as f:
+    antidromic_df = pickle.load(f)
+
+antidromic_df.rename(columns={'unit': 'unit_id'}, inplace=True)
+antidromic_df['unit_id'] = antidromic_df['unit_id'].apply(to_str_intlike)
+antidromic_df = antidromic_df[['unit_id', 'session', 'p_auto_inhi', 't_auto_inhi',
+       'p_collision', 't_collision', 'p_antidromic', 't_antidromic', 'tier_1',
+       'tier_2', 'tier_1_long', 'tier_2_long']].copy()
+combined_tagged_units = combined_tagged_units.merge(antidromic_df, on=['session', 'unit_id'], how='left')
+combined_tagged_units['tier_1'].fillna(False, inplace=True)
+combined_tagged_units['tier_2'].fillna(False, inplace=True)
+combined_tagged_units['tier_1_long'].fillna(False, inplace=True)
+combined_tagged_units['tier_2_long'].fillna(False, inplace=True)
+
+
 with open(os.path.join('/root/capsule/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
     constraints = json.load(f)
 beh_folder = os.path.join('/root/capsule/scratch/combined/beh_plots', criteria_name)
@@ -62,9 +86,6 @@ mask = pd.Series(True, index=combined_tagged_units.index)
 
 # %%
 combined_tagged_units_filtered, combined_tagged_units, fig = apply_qc(combined_tagged_units, constraints)
-
-# %%
-combined_tagged_units_filtered[combined_tagged_units_filtered['session']=='behavior_ZS062_2021-05-10_19-15-51']
 
 if overview:
 # %% [markdown]
@@ -231,18 +252,18 @@ if overview:
 # # Regresssion in outcome focused window
 
 # %%
-regressors_focus = ['Qchosen', 'outcome', 'ipsi', 'outcome:ipsi', 'Intercept']
-regressors_sup = ['amp_abs']
+# regressors_focus = ['Qchosen', 'outcome', 'ipsi', 'outcome:ipsi', 'Intercept', 'amp_abs']
+# regressors_sup = []
 
-sig_regressors = pd.DataFrame(columns=['session', 'unit_id']+regressors_focus+regressors_sup)
-sig_regressors['session'] = combined_tagged_units_filtered['session']
-sig_regressors['unit_id'] = combined_tagged_units_filtered['unit']
-sig_regressors[regressors_focus] = 1
-sig_regressors[regressors_sup] = 1
+# sig_regressors = pd.DataFrame(columns=['session', 'unit_id']+regressors_focus+regressors_sup)
+# sig_regressors['session'] = combined_tagged_units_filtered['session']
+# sig_regressors['unit_id'] = combined_tagged_units_filtered['unit']
+# sig_regressors[regressors_focus] = 1
+# sig_regressors[regressors_sup] = 1
 
 # %%
 # regression for outcome focus window
-regressors_focus = ['Qchosen', 'outcome','ipsi', 'outcome:ipsi', 'amp']
+regressors_focus = ['Qchosen', 'outcome','ipsi', 'outcome:ipsi', 'amp_abs']
 regressors_sup = [] 
 # regressors_focus = regressors_focus + regressors_sup
 # regressors_sup = []

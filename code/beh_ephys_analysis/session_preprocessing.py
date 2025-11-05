@@ -297,9 +297,10 @@ def ephys_opto_preprocessing(session, data_type, target):
                         ]
         else:
             unit_spikes = [
-                            sorting.get_unit_spike_train(unit_id=unit_id)
+                            timestamps[sorting.get_unit_spike_train(unit_id=unit_id)]
                             for unit_id in unit_ids
                         ]
+                        
 
         nwb = load_nwb_from_filename(session_dir[f'nwb_dir_{data_type}'])
         unit_qc = nwb.units[:][['ks_unit_id', 'isi_violations_ratio', 'firing_rate', 'presence_ratio', 'amplitude_cutoff', 'decoder_label']]
@@ -559,17 +560,17 @@ if __name__ == "__main__":
     def process(session): 
         session_dir = session_dirs(session)
         print(f'Processing {session}')
-        if not os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], session+'_waveform_params.json')):
-            if session_dir[f'curated_dir_{data_type}'] is not None: 
-                print(f'Computing {session}')
-                # ephys_opto_preprocessing(session, data_type, target)
-                plt.close('all')
-                ephys_opto_crosscorr(session, data_type)
+        # if not os.path.exists(os.path.join(session_dir[f'opto_dir_{data_type}'], session+'_waveform_params.json')):
+        if session_dir[f'curated_dir_{data_type}'] is not None: 
+            print(f'Computing {session}')
+            ephys_opto_preprocessing(session, data_type, target)
+            plt.close('all')
+            # ephys_opto_crosscorr(session, data_type)
         print(f'Finished {session}')
     # for session in session_list[-25:-10]:
     #     process(session)
-    Parallel(n_jobs=1)(delayed(process)(session) for session in session_list[-8:])
-    # process('ecephys_713854_2024-03-05_13-01-09')
+    # Parallel(n_jobs=1)(delayed(process)(session) for session in session_list[-8:])
+    process('behavior_751004_2024-12-21_13-28-28')
     # for session in session_list:
     #     process(session)
 

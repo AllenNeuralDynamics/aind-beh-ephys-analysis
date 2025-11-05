@@ -1637,14 +1637,14 @@ if __name__ == "__main__":
             # outcome = opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = True)
             # outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= load_sorting_analyzer, opto_only=True, plot=True, save=True)
             # del outcome
-            unit_tbl = get_unit_tbl(session, data_type, summary=True)
-            if unit_tbl is not None:
-                if 'peak_waveform_raw_fake_aligned' in unit_tbl.columns:
-                    print(f'Session {session} already processed, skip.')
-                else:
-                    re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
-            else:
-                print(f'No unit table for session {session}, skip.')
+            # unit_tbl = get_unit_tbl(session, data_type, summary=True)
+            # if unit_tbl is not None:
+            #     if 'peak_waveform_raw_fake_aligned' in unit_tbl.columns:
+            #         print(f'Session {session} already processed, skip.')
+            #     else:
+            #         re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
+            # else:
+            #     print(f'No unit table for session {session}, skip.')
             # elif session_dir['nwb_dir_raw'] is not None:
             #     data_type = 'raw' 
 
@@ -1652,10 +1652,11 @@ if __name__ == "__main__":
     
     # Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-9:]) 
     # session_list = ['behavior_791691_2025-06-24_13-21-29', 'behavior_791691_2025-06-26_13-39-26', 'behavior_784806_2025-06-17_14-59-23']
-    for session in session_list[45:]:
-        process(session)  
-    # process('behavior_784806_2025-06-17_14-59-23') 
-    # re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
+    # for session in session_list[45:]:
+    #     process(session)  
+    # process('behavior_751004_2024-12-21_13-28-28') 
+    session = 'behavior_751004_2024-12-21_13-28-28'
+    re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
     # short_isi_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
     # go_cue_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
 

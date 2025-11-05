@@ -773,28 +773,53 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False, u
         combine_pdf_big(drift_dir, os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_drift.pdf'))
     return opto_drift_tbl
 
+import numpy as np
+
 def mode_by_bins(data, bins):
     """
     Calculate the mode of data within specified bins.
     
-    Parameters:
-    data (array-like): Input data to calculate the mode from.
+    Parameters
+    ----------
+    data : array-like
+        Input data to calculate the mode from.
+    bins : int, float, or list
+        - int: number of bins
+        - float: bin width
+        - list or array: explicit bin edges
     
-    Returns:
-    array: Mode of the data within each bin.
+    Returns
+    -------
+    mode : float
+        Mode (approximate) of the data.
+    bin_range : list
+        [lower_edge, upper_edge] of the mode bin.
     """
-    if isinstance(bins, list):
+    data = np.asarray(data)
+    
+    # Handle case where all values are identical
+    if np.all(data == data[0]):
+        return float(data[0]), [float(data[0]), float(data[0])]
+
+    # Determine bin edges
+    if isinstance(bins, list) or isinstance(bins, np.ndarray):
         bin_edges = np.array(bins)
     elif isinstance(bins, int):
         bin_edges = np.linspace(np.min(data), np.max(data), bins + 1)
     elif isinstance(bins, float):
         bin_edges = np.arange(np.min(data), np.max(data) + bins, bins)
+    else:
+        raise TypeError("bins must be int, float, or list/array of edges")
 
-    counts = np.histogram(data, bins=bin_edges)[0]
+    counts, _ = np.histogram(data, bins=bin_edges)
     max_bin = np.argmax(counts)
-    mode = np.mean(data[(data>=bin_edges[max_bin]) & (data<bin_edges[max_bin+1])])
+    mode_bin = (data >= bin_edges[max_bin]) & (data < bin_edges[max_bin + 1])
+
+    # In case all points fall in one bin, np.mean() still works
+    mode = np.mean(data[mode_bin]) if np.any(mode_bin) else np.mean(data)
 
     return mode, [bin_edges[max_bin], bin_edges[max_bin + 1]]
+
 
 def generate_session_opto_drift_trial_table(session, data_type, opto_only = True, save = True):
     session_dir = session_dirs(session)
@@ -890,7 +915,8 @@ def generate_session_opto_drift_trial_table(session, data_type, opto_only = True
                 temp = temp[(temp >= cut_off[0]) & (temp <= cut_off[1])]
                 if temp.size > 0:
                     unit_amp[i] = np.mean(temp)
-        
+        if unit_id == 43:
+            print(unit_id)
         amp_mode, _ = mode_by_bins(unit_amp, 10.0)
         _, time_edges = mode_by_bins(spike_times, 60*10.0)
         if motion_info is not None:
@@ -944,8 +970,8 @@ if __name__ == '__main__':
             # except:
             #     print(f'{session} error')
  
-    Parallel(n_jobs=5)(delayed(process)(session) for session in session_list)
-    # process('behavior_ZS061_2021-03-28_16-35-51')
+    # Parallel(n_jobs=5)(delayed(process)(session) for session in session_list)
+    process('behavior_751004_2024-12-21_13-28-28')
     # session_ind = session_list.index('behavior_ZS059_2021-04-12_14-57-43')
     # for session in session_list[session_ind:]:
     #     process(session)

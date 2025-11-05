@@ -50,6 +50,7 @@ from multiprocessing import Pool
 from functools import partial
 import time
 import shutil 
+from aind_ephys_utils import align
 
 def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue', curate_time=True, 
                         model_name = 'stan_qLearning_5params', 
@@ -974,9 +975,9 @@ if __name__ == '__main__':
     model_name = 'stan_qLearning_5params'
     data_type = 'curated'
     curate_time = True
-    align_name = 'response'
+    align_name = 'go_cue'
     formula = 'spikes ~ 1 + outcome + choice + Qchosen'
-    for session in session_ids[-14:-10]:
+    for session in session_ids[69:]:
         print(session)
         session_dir = session_dirs(session)
         if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
@@ -990,13 +991,13 @@ if __name__ == '__main__':
                 #     print(f'Already plotted {session} for curated data')
             else:
                 print(f'No curated data for {session}')
-            # elif session_dir['curated_dir_raw'] is not None:
-            #     if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
-            #         plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
-            #                         model_name = model_name, formula=formula,
-            #                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-            #                         units=None)
-    # session = 'behavior_751004_2024-12-19_11-50-37'
+        elif session_dir['curated_dir_raw'] is not None:
+            if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
+                plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
+                                model_name = model_name, formula=formula,
+                                pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+                                units=None)
+    # session = 'behavior_782394_2025-04-24_12-07-34'
     # plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
     #                     model_name = model_name, formula=formula,
     #                     pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,

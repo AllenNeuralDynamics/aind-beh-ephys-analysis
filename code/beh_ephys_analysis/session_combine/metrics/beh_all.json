@@ -1,8 +1,14 @@
 {
   "isi_violations": {
-    "bounds": [
-      0.0,
-      0.1
+    "conditional": [
+      {
+        "if": { "tier_2": ["==", true] },
+        "bounds": [0, 0.21]
+      },
+      {
+        "else": true,
+        "bounds": [0, 0.1]
+      }
     ]
   },
   "p_max": {
@@ -40,12 +46,6 @@
       500
     ]
   },
-  "trial_count": {
-    "bounds": [
-      100,
-      2000
-    ]
-  },
   "sig_counts":{
     "bounds": [
       4.5,
@@ -68,6 +68,11 @@
         "bounds": [0, null]
       }
     ]
-
+  },
+  "trial_count": {
+    "bounds": [
+      100,
+      2000
+    ]
   }
 }
