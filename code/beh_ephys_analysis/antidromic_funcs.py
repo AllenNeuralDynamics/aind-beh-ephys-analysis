@@ -83,7 +83,7 @@ def plot_opto_responses(unit_tbl, event_ids):
     # Filter for opto tagged units
     # opto_criteria = (unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)
     opto_units = unit_tbl["unit_id"].to_list()
-    # print(f"Number of opto units: {len(opto_units)}")
+    print(f"Number of opto units: {len(opto_units)}")
 
     
     # Unique values
@@ -208,6 +208,8 @@ def plot_opto_responses(unit_tbl, event_ids):
             ax_psth = fig.add_subplot(gs[5 * u_idx + 2, i], sharex=ax_raster)
             psth, _, bins = pf.psth(int_event_locked_timestamps, time_range_raster, bin_size=0.003, smooth_window_size=3)
             antidromic_latency, antidromic_jitter = antidromic_latency_jitter(int_event_locked_timestamps)
+            if antidromic_jitter > antidromic_latency:
+                antidromic_jitter = antidromic_latency
             ax_psth.plot(bins, psth, color='k')
             if i == 0:
                 ax_psth.set_ylabel('PSTH')
@@ -460,7 +462,9 @@ def analyze_antidromic_responses(session_id, data_type ='curated', plot=False, t
                 event_ids_curr = event_ids_curr[event_ids_curr['time']>=unit_drift['ephys_cut'][0]]
             if unit_drift['ephys_cut'][1] is not None:
                 event_ids_curr = event_ids_curr[event_ids_curr['time']<=unit_drift['ephys_cut'][1]]
-
+        if len(event_ids_curr)==0:
+            print(f"No opto events for unit {unit_id} after applying drift cuts.")
+            continue
         for site in event_ids_curr['site'].unique():    
             if isinstance(site, str):
                 if 'Failed' in site:
@@ -870,17 +874,22 @@ def plot_opto_responses_session(session, data_type='curated', opto_only=True):
     for i in range(len(unit_tbl)):
         unit_df = unit_tbl.iloc[[i]]   # double brackets → keeps it as a DataFrame
         unit_id = unit_tbl['unit_id'].values[i]
+        print(f'Plotting opto responses for unit {unit_id}')
         unit_drift = load_drift(session, unit_id, data_type=data_type)
         event_ids_curr = event_ids.copy()
+        
         if unit_drift is not None:
             if unit_drift['ephys_cut'][0] is not None:
                 event_ids_curr = event_ids_curr[event_ids_curr['time']>=unit_drift['ephys_cut'][0]]
             if unit_drift['ephys_cut'][1] is not None:
                 event_ids_curr = event_ids_curr[event_ids_curr['time']<=unit_drift['ephys_cut'][1]]
-        fig = plot_opto_responses(unit_df, event_ids_curr)
-        fig.suptitle(f'{session} unit {unit_tbl["unit_id"].values[i]}')
-        fig.savefig(fname=os.path.join(opto_save_dir, f'{session}_unit{unit_tbl["unit_id"].values[i]}_opto_responses.pdf'))
-        plt.close(fig)
+        if len(event_ids_curr) > 0:  
+            fig = plot_opto_responses(unit_df, event_ids_curr)
+            fig.suptitle(f'{session} unit {unit_tbl["unit_id"].values[i]}')
+            fig.savefig(fname=os.path.join(opto_save_dir, f'{session}_unit{unit_tbl["unit_id"].values[i]}_opto_responses.pdf'))
+            plt.close(fig)
+        else:
+            print(f"No opto events found for session {session}, skipping unit {unit_id}.")
         
     combine_pdf_big(opto_save_dir, os.path.join(session_dir[f'opto_dir_fig_{data_type}'], f'{session}_antidromic_responses.pdf'))
 
@@ -897,15 +906,15 @@ if __name__ == "__main__":
         if session_dir[f'curated_dir_{data_type}'] is not None:
             print(f"Processing session: {session}")
             # try:
-            # plot_opto_responses_session(session, data_type=data_type, opto_only=True)
+            plot_opto_responses_session(session, data_type=data_type, opto_only=True)
             analyze_antidromic_responses(session)
             # except:
                 # print(f"Failed to process session: {session}")
             print(f"Finished session: {session}")
         else:
             print(f"No curated data for session: {session}, skipping.")
-    from joblib import Parallel, delayed
-    Parallel(n_jobs=3)(delayed(process)(session, data_type=data_type) for session in session_list)
-    # process('behavior_751181_2025-02-26_11-51-19')
+    # from joblib import Parallel, delayed
+    # Parallel(n_jobs=3)(delayed(process)(session, data_type=data_type) for session in session_list)
+    process('behavior_751004_2024-12-21_13-28-28')
     # for session in session_list:
     #     process(session)

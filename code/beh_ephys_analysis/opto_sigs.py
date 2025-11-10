@@ -110,10 +110,10 @@ if __name__ == '__main__':
         # elif session\_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw' 
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    Parallel(n_jobs=-2)(
-        delayed(process)(session, data_type) 
-        for session in session_list[-9:]
-    )
-    # process(session_list[11], data_type)
+    # Parallel(n_jobs=-2)(
+    #     delayed(process)(session, data_type) 
+    #     for session in session_list[-9:]
+    # )
+    process('behavior_751004_2024-12-21_13-28-28', data_type)
 
 

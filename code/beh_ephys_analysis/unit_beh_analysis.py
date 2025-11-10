@@ -52,7 +52,7 @@ import time
 import shutil 
 from aind_ephys_utils import align
 
-def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue', curate_time=True, 
+def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue', curate_time=True, opto_only=False,
                         model_name = 'stan_qLearning_5params', 
                         formula = 'spikes ~ 1 + outcome + choice + Qchosen',
                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
@@ -449,14 +449,18 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     # with Pool(processes=4) as pool:  # Ensures cleanup
     #     result = pool.map(process, unit_tbl['unit_id'].values)
     if units is None:
-        units= unit_tbl['unit_id'].values
+        if not opto_only:
+            units= unit_tbl['unit_id'].values
+        else:
+            units = unit_tbl[unit_tbl['opto_pass']==True]['unit_id'].values
 
-    Parallel(n_jobs=8)(
-        delayed(process)(unit_id)
-        for unit_id in units
-    )
-    # for unit_id in unit_tbl['unit_id'].values:
-    #     process(unit_id)
+
+    # Parallel(n_jobs=12)(
+    #     delayed(process)(unit_id)
+    #     for unit_id in units
+    # )
+    for unit_id in units:
+        process(unit_id)
 
     output_pdf = os.path.join(session_dirs(session)[f'ephys_dir_{data_type}'],f'{session}_unit_beh_{align_name}.pdf')
 
@@ -975,15 +979,16 @@ if __name__ == '__main__':
     model_name = 'stan_qLearning_5params'
     data_type = 'curated'
     curate_time = True
-    align_name = 'go_cue'
+    align_name = 'response'
     formula = 'spikes ~ 1 + outcome + choice + Qchosen'
-    for session in session_ids[69:]:
+    
+    def process_session(session):
         print(session)
         session_dir = session_dirs(session)
         if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
             if session_dir['curated_dir_curated'] is not None:
                 # if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_curated'],f'{session}_unit_beh_{align_name}.pdf')):
-                plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, 
+                plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, opto_only=True,
                             model_name = model_name, formula=formula,
                             pre_event=-1.5, post_event=3, binSize=0.2, stepSize=0.05,
                             units=None)
@@ -991,12 +996,14 @@ if __name__ == '__main__':
                 #     print(f'Already plotted {session} for curated data')
             else:
                 print(f'No curated data for {session}')
-        elif session_dir['curated_dir_raw'] is not None:
-            if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
-                plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
-                                model_name = model_name, formula=formula,
-                                pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-                                units=None)
+        # elif session_dir['curated_dir_raw'] is not None:
+        #     if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
+        #         plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
+        #                         model_name = model_name, formula=formula,
+        #                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+        #                         units=None)
+        print('----------------------------------')
+        print(f'Finished plotting behavior alignment for session {session}')
     # session = 'behavior_782394_2025-04-24_12-07-34'
     # plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
     #                     model_name = model_name, formula=formula,
@@ -1007,4 +1014,5 @@ if __name__ == '__main__':
     #             model_name = model_name, formula=formula,
     #             pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
     #             units=[82])
+    Parallel(n_jobs=12)(delayed(process_session)(session) for session in session_ids[76:])
 
