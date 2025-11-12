@@ -315,7 +315,6 @@ def plot_opto_responses(unit_tbl, event_ids):
     # Final layout adjustments
     fig.tight_layout()    
     # plt.show()
-
     return fig
 
 def compute_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
@@ -887,6 +886,7 @@ def plot_opto_responses_session(session, data_type='curated', opto_only=True):
             fig = plot_opto_responses(unit_df, event_ids_curr)
             fig.suptitle(f'{session} unit {unit_tbl["unit_id"].values[i]}')
             fig.savefig(fname=os.path.join(opto_save_dir, f'{session}_unit{unit_tbl["unit_id"].values[i]}_opto_responses.pdf'))
+            fig.savefig(fname=os.path.join(opto_save_dir, f'{session}_unit{unit_tbl["unit_id"].values[i]}_opto_responses.svg'))
             plt.close(fig)
         else:
             print(f"No opto events found for session {session}, skipping unit {unit_id}.")
@@ -907,7 +907,7 @@ if __name__ == "__main__":
             print(f"Processing session: {session}")
             # try:
             plot_opto_responses_session(session, data_type=data_type, opto_only=True)
-            analyze_antidromic_responses(session)
+            # analyze_antidromic_responses(session)
             # except:
                 # print(f"Failed to process session: {session}")
             print(f"Finished session: {session}")
@@ -915,6 +915,6 @@ if __name__ == "__main__":
             print(f"No curated data for session: {session}, skipping.")
     # from joblib import Parallel, delayed
     # Parallel(n_jobs=3)(delayed(process)(session, data_type=data_type) for session in session_list)
-    process('behavior_751004_2024-12-21_13-28-28')
+    process('behavior_752014_2025-03-26_11-18-57')
     # for session in session_list:
     #     process(session)

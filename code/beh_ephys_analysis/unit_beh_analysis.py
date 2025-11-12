@@ -131,7 +131,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                                                         binSize=binSize, stepSize=stepSize)
 
             fig = plt.figure(figsize=(20, 10))
-            gs = gridspec.GridSpec(2, 7, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
+            gs = gridspec.GridSpec(2, 8, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
             # plot session
             ax = fig.add_subplot(gs[0, 0]) 
             choice_history, reward_history, p_reward, autowater_offered, trial_time = get_history_from_nwb(session_df_curr)
@@ -319,11 +319,13 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
             ax.set_title('Left: rwd nrwd', fontsize = fs+2)
 
             # go vs miss
-            map_value = tblTrials_curr['animal_response'].values!=2
+            no_reward_ind = (~tblTrials_curr['rewarded_historyL']) & (~tblTrials_curr['rewarded_historyR'])
+            tbl_subset = tblTrials_curr[no_reward_ind]
+            map_value = tbl_subset['animal_response'].values!=2
             bins = [-0.5, 0.5, 1.5]
             labels = ['miss', 'go']
             fig, ax = plot_rate(
-                                spike_matrix_all,
+                                spike_matrix_all[no_reward_ind, :],
                                 slide_times,
                                 map_value,
                                 bins,
@@ -335,6 +337,25 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                                 tf=post_event,
                                 )
 
+            # go vs miss
+            no_reward_ind = (~tblTrials_curr['rewarded_historyL']) & (~tblTrials_curr['rewarded_historyR'])
+            tbl_subset = tblTrials_curr[no_reward_ind]
+            bins = [-0.5, 0.5, 1.5]
+            labels = ['miss', 'go']
+            map_value = tbl_subset['animal_response'].values!=2
+            fig, ax1, ax2 = plot_raster_rate(spike_times_curr,
+                                            align_time_all[no_reward_ind], 
+                                            map_value, # sorted by certain value
+                                            bins,
+                                            labels,
+                                            custom_cmap,
+                                            fig,
+                                            gs[0, 6],
+                                            tb=pre_event,
+                                            tf=post_event,
+                                            time_bin=stepSize,
+                                            )
+            ax1.set_title('Miss vs Go', fontsize = fs+2)
 
             
             if len(session_df_curr) > 100 and np.sum((spike_times_curr>=session_df_curr['go_cue_time'].values[0]) & (spike_times_curr<=session_df_curr['go_cue_time'].values[-1]))/(session_df_curr['go_cue_time'].values[-1] - session_df_curr['go_cue_time'].values[0]) > 0.1:
@@ -392,7 +413,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                         ax.plot(range(trials_back[0], trials_back[1] + 1), np.zeros(trials_back[1]-trials_back[0]+1), c = 'c', lw = 2, label = 'right failed')
 
                 # plot regresssions
-                gs = gridspec.GridSpec(3, 7, height_ratios=[1, 1, 1], wspace=0.3, hspace=0.3)
+                gs = gridspec.GridSpec(3, 8, height_ratios=[1, 1, 1], wspace=0.3, hspace=0.3)
                 ax = fig.add_subplot(gs[0,-1])
                 try: 
                     regressors, TvCurrU, PvCurrU, EvCurrU = fitSpikeModelG(session_df_curr, spike_matrix_LM, formula)
@@ -464,9 +485,9 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
 
     output_pdf = os.path.join(session_dirs(session)[f'ephys_dir_{data_type}'],f'{session}_unit_beh_{align_name}.pdf')
 
-    if os.path.exists(pdf_dir):
-        print(f'Combining {session}')
-        combine_pdf_big(pdf_dir, output_pdf)
+    # if os.path.exists(pdf_dir):
+    #     print(f'Combining {session}')
+    #     combine_pdf_big(pdf_dir, output_pdf)
     
     plt.close('all')
 
@@ -979,7 +1000,7 @@ if __name__ == '__main__':
     model_name = 'stan_qLearning_5params'
     data_type = 'curated'
     curate_time = True
-    align_name = 'response'
+    align_name = 'go_cue'
     formula = 'spikes ~ 1 + outcome + choice + Qchosen'
     
     def process_session(session):
@@ -1004,15 +1025,16 @@ if __name__ == '__main__':
         #                         units=None)
         print('----------------------------------')
         print(f'Finished plotting behavior alignment for session {session}')
-    # session = 'behavior_782394_2025-04-24_12-07-34'
-    # plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
-    #                     model_name = model_name, formula=formula,
-    #                     pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-    #                     units=None)
+    session = 'behavior_784806_2025-06-20_13-39-16'
+    # session = 'behavior_763590_2025-05-02_11-07-09'
+    plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
+                        model_name = model_name, formula=formula,
+                        pre_event=-1, post_event=3, binSize=0.3, stepSize=0.01,
+                        units=[649], opto_only=False)
 
     # plot_unit_beh_session('behavior_754897_2025-03-14_11-28-53', data_type = 'curated', align_name = align_name, curate_time=curate_time, 
     #             model_name = model_name, formula=formula,
     #             pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
     #             units=[82])
-    Parallel(n_jobs=12)(delayed(process_session)(session) for session in session_ids[76:])
+    # Parallel(n_jobs=12)(delayed(process_session)(session) for session in session_ids[76:])
 

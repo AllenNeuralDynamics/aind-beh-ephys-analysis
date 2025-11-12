@@ -48,14 +48,73 @@ def shiftedColorMap(cmap, min_val, max_val, name):
     return newcmap
 
 
-def raster_plot(event_locked_spike_times, time_range, cond_each_trial=None, raster=None, color='k', cond_colors=None, trial_start=0, ax=None, **kwargs):
-    '''
-    :param event_locked_spike_times: spike timestamps each trial relative to an event
-    :param cond_each_trial: (OPTIONAL) some sort of label for each trial so that trials with the same parameters can be grouped together.
-    :param ax: matplotlib axis to plot on
-    :return: a cool raster plot
-    '''
+# def raster_plot(event_locked_spike_times, time_range, cond_each_trial=None, raster=None, color='k', cond_colors=None, trial_start=0, ax=None, **kwargs):
+#     '''
+#     :param event_locked_spike_times: spike timestamps each trial relative to an event
+#     :param cond_each_trial: (OPTIONAL) some sort of label for each trial so that trials with the same parameters can be grouped together.
+#     :param ax: matplotlib axis to plot on
+#     :return: a cool raster plot
+#     '''
+#     import matplotlib.pyplot as plt
+#     if raster is None:
+#         raster = []
+
+#     if ax is None:
+#         ax = plt.gca()
+
+#     if cond_each_trial is not None:
+#         conds = np.unique(cond_each_trial)
+
+#         if type(color) == str:
+#             color = np.tile(color, len(conds))
+#         if cond_colors is None:
+#             cond_colors = np.tile(['0.5', '0.75'], int(np.ceil(len(conds)/2)))
+
+#         total_trials = 0
+#         cond_lines = []
+#         cond_bars = []
+
+#         for indcond, cond in enumerate(conds):
+#             this_event_locked_spike_times = np.array(event_locked_spike_times, dtype=object)[cond_each_trial == cond]
+#             raster, none_cond_lines, none_cond_bars = raster_plot(this_event_locked_spike_times, time_range, raster=raster, color=color[indcond], trial_start=total_trials, ax=ax)
+#             total_trials += len(this_event_locked_spike_times)
+
+#             xpos = [time_range[0]-0.03*(time_range[1]-time_range[0]),time_range[0]]
+#             ybot = [total_trials-len(this_event_locked_spike_times), total_trials-len(this_event_locked_spike_times)]
+#             ytop = [total_trials, total_trials]
+#             cond_bar = ax.fill_between(xpos, ybot, ytop,ec='none',fc=cond_colors[indcond], clip_on=False)
+#             cond_bars.append(cond_bar)
+
+#         trials_per_cond = total_trials/len(conds)
+#         ax.set_yticks(np.arange(trials_per_cond/2, total_trials, trials_per_cond))
+#         ax.set_yticklabels([f'{cond}' for cond in conds])
+#         ax.tick_params('y', length=0, pad=8)
+
+#     else:
+#         Ntrials = len(event_locked_spike_times)
+#         for trial in range(Ntrials):
+#             this_raster = ax.plot(event_locked_spike_times[trial],
+#                                    (trial + 1 + trial_start) * np.ones(len(event_locked_spike_times[trial])),
+#                                    '.', color=color, rasterized=False, ms=1, **kwargs)
+#             raster.append(this_raster)
+
+#         cond_lines = None
+#         cond_bars = None
+#         ax.set_ylim(0,Ntrials+2+trial_start)
+
+#     ax.set_xlim(time_range)
+#     return raster, cond_lines, cond_bars
+
+def raster_plot(event_locked_spike_times, time_range, cond_each_trial=None, raster=None,
+                color='k', cond_colors=None, trial_start=0, ax=None,
+                spike_height=0.8, rasterized=False, **kwargs):
+    """
+    Raster plot with vertical bars for spikes instead of dots.
+    Each spike is a short line segment centered on the trial index.
+    """
     import matplotlib.pyplot as plt
+    import numpy as np
+
     if raster is None:
         raster = []
 
@@ -64,11 +123,10 @@ def raster_plot(event_locked_spike_times, time_range, cond_each_trial=None, rast
 
     if cond_each_trial is not None:
         conds = np.unique(cond_each_trial)
-
-        if type(color) == str:
+        if isinstance(color, str):
             color = np.tile(color, len(conds))
         if cond_colors is None:
-            cond_colors = np.tile(['0.5', '0.75'], int(np.ceil(len(conds)/2)))
+            cond_colors = np.tile(['0.5', '0.75'], int(np.ceil(len(conds) / 2)))
 
         total_trials = 0
         cond_lines = []
@@ -76,34 +134,41 @@ def raster_plot(event_locked_spike_times, time_range, cond_each_trial=None, rast
 
         for indcond, cond in enumerate(conds):
             this_event_locked_spike_times = np.array(event_locked_spike_times, dtype=object)[cond_each_trial == cond]
-            raster, none_cond_lines, none_cond_bars = raster_plot(this_event_locked_spike_times, time_range, raster=raster, color=color[indcond], trial_start=total_trials, ax=ax)
+            raster, none_cond_lines, none_cond_bars = raster_plot(
+                this_event_locked_spike_times, time_range,
+                raster=raster, color=color[indcond],
+                trial_start=total_trials, ax=ax,
+                spike_height=spike_height, rasterized=rasterized
+            )
             total_trials += len(this_event_locked_spike_times)
 
-            xpos = [time_range[0]-0.03*(time_range[1]-time_range[0]),time_range[0]]
-            ybot = [total_trials-len(this_event_locked_spike_times), total_trials-len(this_event_locked_spike_times)]
+            xpos = [time_range[0] - 0.03 * (time_range[1] - time_range[0]), time_range[0]]
+            ybot = [total_trials - len(this_event_locked_spike_times), total_trials - len(this_event_locked_spike_times)]
             ytop = [total_trials, total_trials]
-            cond_bar = ax.fill_between(xpos, ybot, ytop,ec='none',fc=cond_colors[indcond], clip_on=False)
+            cond_bar = ax.fill_between(xpos, ybot, ytop, ec='none', fc=cond_colors[indcond], clip_on=False)
             cond_bars.append(cond_bar)
 
-        trials_per_cond = total_trials/len(conds)
-        ax.set_yticks(np.arange(trials_per_cond/2, total_trials, trials_per_cond))
+        trials_per_cond = total_trials / len(conds)
+        ax.set_yticks(np.arange(trials_per_cond / 2, total_trials, trials_per_cond))
         ax.set_yticklabels([f'{cond}' for cond in conds])
         ax.tick_params('y', length=0, pad=8)
 
     else:
         Ntrials = len(event_locked_spike_times)
         for trial in range(Ntrials):
-            this_raster = ax.plot(event_locked_spike_times[trial],
-                                   (trial + 1 + trial_start) * np.ones(len(event_locked_spike_times[trial])),
-                                   '.', color=color, rasterized=True, ms=1, **kwargs)
-            raster.append(this_raster)
-
+            y_bottom = trial + 1 + trial_start - spike_height / 2
+            y_top = trial + 1 + trial_start + spike_height / 2
+            for spike_time in event_locked_spike_times[trial]:
+                ax.vlines(spike_time, y_bottom, y_top,
+                          color=color, linewidth=0.5, rasterized=rasterized, **kwargs)
+            # (Alternatively: use LineCollection for performance if many spikes)
         cond_lines = None
         cond_bars = None
-        ax.set_ylim(0,Ntrials+2+trial_start)
+        ax.set_ylim(0, Ntrials + 2 + trial_start)
 
     ax.set_xlim(time_range)
     return raster, cond_lines, cond_bars
+
 
 
 
@@ -152,7 +217,7 @@ def raster_plot_demo(event_locked_spike_times, time_range, cond_each_trial=None,
         for trial in range(Ntrials):
             this_raster = plt.plot(event_locked_spike_times[trial], 
                                    (trial + 1 + trial_start) * np.ones(len(event_locked_spike_times[trial])),
-                                   ".", color=color, rasterized=True, ms=1) #, **kwargs)
+                                   ".", color=color, rasterized=False, ms=1) #, **kwargs)
             raster.append(this_raster)
 
         cond_lines = None
