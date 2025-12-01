@@ -1025,12 +1025,12 @@ if __name__ == '__main__':
         #                         units=None)
         print('----------------------------------')
         print(f'Finished plotting behavior alignment for session {session}')
-    session = 'behavior_784806_2025-06-20_13-39-16'
-    # session = 'behavior_763590_2025-05-02_11-07-09'
+    session = 'behavior_761038_2025-04-18_12-37-39'
+    # session = 'behavior_763590_2025-05-02_11-07-09' 
     plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
                         model_name = model_name, formula=formula,
-                        pre_event=-1, post_event=3, binSize=0.3, stepSize=0.01,
-                        units=[649], opto_only=False)
+                        pre_event=-1, post_event=3, binSize=0.3, stepSize=0.1,
+                        units=[12], opto_only=False)
 
     # plot_unit_beh_session('behavior_754897_2025-03-14_11-28-53', data_type = 'curated', align_name = align_name, curate_time=curate_time, 
     #             model_name = model_name, formula=formula,
