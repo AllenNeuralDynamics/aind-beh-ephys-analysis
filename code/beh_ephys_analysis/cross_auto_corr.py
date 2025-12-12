@@ -22,42 +22,46 @@ def cross_auto_corr(session, data_type):
     go_cue_period = 2
     session_dir = session_dirs(session)
     unit_tbl = get_unit_tbl(session, data_type) 
-    if unit_tbl['LC_range_top'].unique()[0] is None:
+    if unit_tbl['LC_range_top'].unique()[0] is None and 'ZS' not in session:
         print(f'LC range not inferred, probably no opto units in {session}. Exiting.')
         return None
     session_tbl = get_session_tbl(session)
-    
     session_qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
     with open(session_qm_file, 'r') as f:
         session_qm = json.load(f)
     rec_start = session_qm['ephys_cut'][0]
     rec_end = session_qm['ephys_cut'][1]
 
-    opto_file = os.path.join(session_dir['opto_dir_curated'], 
-                                f'{session}_opto_session.csv')
-    opto_tbl = pd.read_csv(opto_file)
-    opto_times = opto_tbl['time'].values
+    # find opto-free periods for np data
 
-    if len(opto_tbl['pre_post'].unique()) > 1:
-        rec_start = opto_tbl[opto_tbl['pre_post'] == 'pre']['time'].max()
-        rec_end = opto_tbl[opto_tbl['pre_post'] == 'post']['time'].min()
-    elif len(opto_tbl['pre_post'].unique()) == 1:
-        rec_end = opto_tbl['time'].min()
+    if 'ZS' not in session:
+        opto_file = os.path.join(session_dir['opto_dir_curated'], 
+                                    f'{session}_opto_session.csv')
+        opto_tbl = pd.read_csv(opto_file)
+        if len(opto_tbl['pre_post'].unique()) > 1:
+            rec_start = opto_tbl[opto_tbl['pre_post'] == 'pre']['time'].max()
+            rec_end = opto_tbl[opto_tbl['pre_post'] == 'post']['time'].min()
+        elif len(opto_tbl['pre_post'].unique()) == 1:
+            rec_end = opto_tbl['time'].min()
 
-    filter = (
-        (unit_tbl['decoder_label'] != 'artifact') &
-        (unit_tbl['decoder_label'] != 'noise') &
-        (unit_tbl['isi_violations_ratio'] < 0.1) &
-        (unit_tbl['y_loc'] >= unit_tbl['LC_range_bottom'].unique()[0] - 0.1) &
-        (unit_tbl['y_loc'] <= unit_tbl['LC_range_top'].unique()[0] + 0.1)
-    )
+    if 'ZS' not in session:
+        filter = (
+            (unit_tbl['decoder_label'] != 'artifact') &
+            (unit_tbl['decoder_label'] != 'noise') &
+            (unit_tbl['isi_violations_ratio'] < 0.1) &
+            (unit_tbl['y_loc'] >= unit_tbl['LC_range_bottom'].unique()[0] - 0.1) &
+            (unit_tbl['y_loc'] <= unit_tbl['LC_range_top'].unique()[0] + 0.1)
+        )
 
-    unit_ids_focus = unit_tbl[filter]['unit_id'].to_list()
+        unit_ids_focus = unit_tbl[filter]['unit_id'].to_list()
+    else:
+        unit_ids_focus = unit_tbl['unit_id'].to_list()
     print(f'Number of units in LC range: {len(unit_ids_focus)}')
 
     cross_corr_df = pd.DataFrame(columns=['unit_1', 'unit_2', 'cross_corr_long', 'cross_corr_short', 'cross_corr_long_nogo', 'cross_corr_short_nogo', 'start', 'end', 'long_lags', 'short_lags'])
     auto_corr_df = pd.DataFrame(columns=['unit', 'auto_corr_long', 'auto_corr_short', 'auto_corr_long_nogo', 'auto_corr_short_nogo', 'start', 'end', 'long_lags', 'short_lags'])
     for unit_ind_1, unit_1 in enumerate(unit_ids_focus):
+        session_tbl_curr = None
         if session_tbl is not None:
             session_tbl_curr = session_tbl.copy()
         print(f'Processing unit {session} {unit_1}')
@@ -153,17 +157,26 @@ def cross_auto_corr(session, data_type):
 
 def plot_cross_auto_corr(session, data_type):
     unit_tbl = get_unit_tbl(session, data_type)
-    if unit_tbl['LC_range_top'].unique()[0] is None:
+    if unit_tbl['LC_range_top'].unique()[0] is None and 'ZS' not in session:
         print(f'LC range not inferred, probably no opto units in {session}. Exiting.')
         return None
-    filter = (
-        (unit_tbl['decoder_label'] != 'artifact') &
-        (unit_tbl['decoder_label'] != 'noise') &
-        (unit_tbl['isi_violations_ratio'] < 0.1) &
-        (unit_tbl['y_loc'] >= unit_tbl['LC_range_bottom'].unique()[0] - 0.1) &
-        (unit_tbl['y_loc'] <= unit_tbl['LC_range_top'].unique()[0] + 0.1)
-    )
-    unit_ids_focus = unit_tbl[filter]['unit_id'].to_list()
+    if 'ZS' not in session:
+        filter = (
+            (unit_tbl['decoder_label'] != 'artifact') &
+            (unit_tbl['decoder_label'] != 'noise') &
+            (unit_tbl['isi_violations_ratio'] < 0.1) &
+            (unit_tbl['y_loc'] >= unit_tbl['LC_range_bottom'].unique()[0] - 0.1) &
+            (unit_tbl['y_loc'] <= unit_tbl['LC_range_top'].unique()[0] + 0.1)
+        )
+
+        unit_ids_focus = unit_tbl[filter]['unit_id'].to_list()
+    else:
+        unit_ids_focus = unit_tbl['unit_id'].to_list()
+    
+    if len(unit_ids_focus) == 0:
+        print(f'No units found for plotting in {session}. Exiting.')
+        return None
+    
     auto_corr = load_auto_corr(session, data_type)
     cross_corr = load_cross_corr(session, data_type)
     if auto_corr is None or cross_corr is None:
@@ -232,7 +245,9 @@ def plot_cross_auto_corr(session, data_type):
 if __name__ == '__main__':
 
 # %%
-    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
+            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')]
+    session_assets = pd.concat(dfs)
     session_list = session_assets['session_id']
     probe_list = session_assets['probe']
     probe_list = [probe for probe, session in zip(probe_list, session_list) if isinstance(session, str)]
@@ -251,10 +266,14 @@ if __name__ == '__main__':
             else:
             # try:
             # plot_ephys_probe(session, data_type=data_type, probe=probe) 
-                cross_auto_corr(session, data_type)
-                plot_cross_auto_corr(session, data_type)
-                plt.close('all')
-                print(f'Finished {session}')
+                try:
+                    cross_auto_corr(session, data_type);
+                    plot_cross_auto_corr(session, data_type);
+                    plt.close('all')
+                    print(f'Finished {session}')
+                except Exception as e:
+                    print(f'Error processing {session}: {e}')
+                    plt.close('all')
         # except:
             # print(f'Error processing {session}')
             # plt.close('all')
@@ -265,7 +284,7 @@ if __name__ == '__main__':
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
     Parallel(n_jobs=10, backend='loky')(
         delayed(process)(session, data_type) 
-        for session in session_list[19:64]
+        for session in session_list
     )
 
     # process('behavior_754897_2025-03-13_11-20-42', data_type)

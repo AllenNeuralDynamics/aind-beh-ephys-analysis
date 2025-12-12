@@ -10,6 +10,7 @@ from matplotlib.colors import LinearSegmentedColormap
 sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
 # from beh_functions import session_dirs
 from matplotlib import gridspec
+import matplotlib.pyplot as plt
 # from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 # from aind_ephys_utils import align
 from beh_functions import session_dirs 
@@ -644,6 +645,7 @@ def auto_corr_train_nogo(spike_times, bin_size, window_length, rec_start, rec_en
 
 class load_auto_corr():
     def __init__(self, session, data_type):
+        self.session = session
         """Initialize the object with a DataFrame."""
         session_dir = session_dirs(session)
         auto_corr_tbl_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], f'{session}_{data_type}_auto_corr.pkl')
@@ -664,10 +666,28 @@ class load_auto_corr():
             if len(unit_auto_corr_data) == 0:
                 unit_auto_corr_data = None
         return unit_auto_corr_data.to_dict(orient='records')[0] if unit_auto_corr_data is not None else None
+    
+    def plot_unit(self, unit_id):
+        """Plot the autocorrelation data for a specific unit."""
+        unit_auto_corr_data = self.load_unit(unit_id)
+        if unit_auto_corr_data is None:
+            print(f"No autocorrelation data found for unit {unit_id}.")
+            return None
+        else:
+            fig, ax = plt.subplots(1, 2, figsize=(8, 3))
+            ax[0].plot(unit_auto_corr_data['long_lags'][1:], unit_auto_corr_data['auto_corr_long'][1:], label='Long window')
+            ax[1].plot(unit_auto_corr_data['short_lags'][1:], unit_auto_corr_data['auto_corr_short'][1:], label='Short window')
+            ax[0].set_xlabel('Lag Time (s)')
+            ax[1].set_xlabel('Lag Time (s)')
+            ax[0].set_ylabel('Autocorrelation')
+            plt.suptitle(f'Autocorrelation for Unit {unit_id} session {self.session}')
+            plt.show()
+            return fig, ax
 
 class load_cross_corr():
     def __init__(self, session, data_type):
         """Initialize the object with a DataFrame."""
+        self.session = session
         session_dir = session_dirs(session)
         cross_corr_tbl_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], f'{session}_{data_type}_cross_corr.pkl')
         if not os.path.exists(cross_corr_tbl_dir):
@@ -705,6 +725,27 @@ class load_cross_corr():
             else:
                 raise ValueError(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
         return unit_cross_corr_data.to_dict(orient='records')[0] if unit_cross_corr_data is not None else None
+    
+    def plot_units(self, unit_1, unit_2):
+        """Plot the autocorrelation data for a specific unit."""
+        unit_cross_corr_data = self.load_units(unit_1, unit_2)
+        if unit_cross_corr_data is None:
+            print(f"No cross-correlation data found for units {unit_1} and {unit_2}.")
+            return None
+        else:
+            fig, ax = plt.subplots(1, 2, figsize=(8, 3))
+            ax[0].plot(unit_cross_corr_data['long_lags'], unit_cross_corr_data['cross_corr_long'], label='all')
+            ax[0].plot(unit_cross_corr_data['long_lags'], unit_cross_corr_data['cross_corr_long_nogo'], label='Go cue removed')
+            ax[1].plot(unit_cross_corr_data['short_lags'], unit_cross_corr_data['cross_corr_short'], label='all')
+            ax[1].plot(unit_cross_corr_data['short_lags'], unit_cross_corr_data['cross_corr_short_nogo'], label='Go cue removed')
+            ax[0].set_xlabel('Lag Time (s)')
+            ax[1].set_xlabel('Lag Time (s)')
+            ax[0].set_ylabel('Cross-correlation')
+            ax[0].legend()
+            ax[1].legend()
+            plt.suptitle(f'Cross-correlation for Units {unit_1} & {unit_2} session {self.session}')
+            plt.show()
+            return fig, ax
 
 def make_summary_unit_tbl(session): # this is for hopkins data
     session_dir = session_dirs(session)
