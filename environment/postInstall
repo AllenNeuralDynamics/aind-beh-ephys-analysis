@@ -29,3 +29,36 @@ cd -
 # pip install codeocean
 # pip install pandas
 # pip install numpy
+
+# install updated version of code-server
+# VERSION=4.103.2
+# mkdir /.code-server
+# cd /.code-server
+# curl -fL "https://github.com/coder/code-server/releases/download/v$VERSION/code-server-$VERSION-linux-amd64.tar.gz" \
+#   | tar -xz
+# ln -s /.code-server/code-server-$VERSION-linux-amd64/bin/code-server  /usr/bin/code-server
+# cd -
+
+
+# mkdir -p /.vscode/extensions
+# code-server --extensions-dir=/.vscode/extensions --install-extension ms-toolsai.jupyter 
+# code-server --extensions-dir=/.vscode/extensions --install-extension ms-python.python 
+# code-server --extensions-dir=/.vscode/extensions --install-extension detachhead.basedpyright
+# code-server --extensions-dir=/.vscode/extensions --install-extension saoudrizwan.claude-dev
+
+# # download and install vscode extension from file
+# # for extensions not available in the default open-vsx registry
+
+# # run from within a workstation or in postinstall
+# # won't work in postinstall if extensions folder has been moved to inside capsule filesystem!
+# download_and_install_extension() {
+#     publisher=$1
+#     name=$2
+#     version=$3
+#     file=/tmp/$publisher.$name.$version.vsix
+#     curl -fL http://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${name}/${version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage \
+#         --output $file
+#     code-server --extensions-dir=/.vscode/extensions --install-extension $file
+# }
+# download_and_install_extension github copilot 1.364.0
+# download_and_install_extension github copilot-chat 0.30.3

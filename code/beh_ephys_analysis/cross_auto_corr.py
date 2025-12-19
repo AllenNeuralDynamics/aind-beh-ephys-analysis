@@ -282,15 +282,16 @@ if __name__ == '__main__':
         # elif session\_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw' 
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
-    Parallel(n_jobs=10, backend='loky')(
-        delayed(process)(session, data_type) 
-        for session in session_list
-    )
+    # Parallel(n_jobs=10, backend='loky')(
+    #     delayed(process)(session, data_type) 
+    #     for session in session_list
+    # )
 
-    # process('behavior_754897_2025-03-13_11-20-42', data_type)
+    # process('ecephys_687697_2023-09-15_12-36-06', data_type)
     # for session, probe in zip(session_list, probe_list):
     #     process(session, data_type, probe)
     #     plt.close('all')
+    cross_auto_corr('ecephys_687697_2023-09-15_12-36-06', data_type)
 
 
 

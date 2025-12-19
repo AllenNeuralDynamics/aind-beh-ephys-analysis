@@ -1,4 +1,4 @@
-  # hash:sha256:8d5d3da8954239b6d5b596e398a691544b9471cecd013aadb57a59f47ce13dd2
+# hash:sha256:8d5d3da8954239b6d5b596e398a691544b9471cecd013aadb57a59f47ce13dd2
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/cuda-miniconda-jupyterlab:latest
 
@@ -11,6 +11,10 @@ ARG GIT_ASKPASS
 ARG GIT_ACCESS_TOKEN
 COPY git-askpass /
 
+RUN conda install -y \
+        ipykernel==6.30.1 \
+    && conda clean -ya
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -20,6 +24,8 @@ RUN apt-get update \
         pkg-config \
         poppler-utils \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip install -U --no-cache-dir uv==0.7.15
 
 RUN pip install -U --no-cache-dir \
     aind-ephys-utils==0.0.15 \
@@ -40,7 +46,11 @@ RUN pip install -U --no-cache-dir \
     seaborn \
     trimesh \
     k3d \
-    codeocean
+    aind-s3-cache==0.1.0 \
+    codeocean==0.10.0 \
+    pandas==2.3.2
+
 
 COPY postInstall /
 RUN /postInstall
+
