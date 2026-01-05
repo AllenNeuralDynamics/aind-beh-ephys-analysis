@@ -1251,6 +1251,11 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
     svs = np.zeros(len(choices), dtype=bool)
     svs[choices!=choicesPrev] = True
 
+    # time since last trial
+    time_between_trials = np.diff(tblTrials['goCue_start_time'], prepend = np.nan)
+    time_between_trials = time_between_trials[responseInds]
+    # create dataframe
+
     trialData = pd.DataFrame({
         # 'trial_id': trial_id,
         'outcome': outcomes.values.astype(float), 
@@ -1262,7 +1267,8 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
         'go_cue_time': go_cue_time.values,
         'choice_time': choice_time.values,
         'outcome_time': outcome_time.values,
-        'svs': svs
+        'svs': svs,
+        'time_between_trials': time_between_trials,
         })
     # combine all columns of trialData and tblTrials
     choice_tbl = tblTrials.loc[tblTrials['animal_response']!=2].copy()

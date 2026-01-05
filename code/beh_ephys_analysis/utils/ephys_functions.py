@@ -144,7 +144,141 @@ def fitSpikeModelG(dfTrial, matSpikes, formula, matIso = None):
         PvCurrU = np.concatenate((PvCurrU, pv), axis = 0)
         EvCurrU = np.concatenate((EvCurrU, ev), axis = 0)
 
-    return regressors, TvCurrU, PvCurrU, EvCurrU
+        used_idx = model.model.data.row_labels
+
+        r2_score_value = r2_score(
+            currData.loc[used_idx, 'spikes'],
+            model.fittedvalues
+        )
+
+    return regressors, TvCurrU, PvCurrU, EvCurrU, r2_score_value
+
+
+def fitSpikeModelG_CI(
+    dfTrial,
+    matSpikes,
+    formula,
+    matIso=None,
+    alpha=0.05,          # 95% CI by default
+):
+    """
+    Fit GLM per timepoint (column in matSpikes) and return t/p/coef plus CI.
+
+    Returns
+    -------
+    regressors : list[str]
+    TvCurrU : (n_timepoints, n_regressors) ndarray
+    PvCurrU : (n_timepoints, n_regressors) ndarray
+    EvCurrU : (n_timepoints, n_regressors) ndarray
+    CILowCurrU : (n_timepoints, n_regressors) ndarray
+    CIHighCurrU : (n_timepoints, n_regressors) ndarray
+    r2_scores : (n_timepoints,) ndarray
+    """
+
+    n_timepoints = np.shape(matSpikes)[1]
+
+    TvCurrU = np.empty((0, 0))
+    PvCurrU = np.empty((0, 0))
+    EvCurrU = np.empty((0, 0))
+    CILowCurrU = np.empty((0, 0))
+    CIHighCurrU = np.empty((0, 0))
+    valid_points = []
+
+    r2_scores = np.full(n_timepoints, np.nan)
+    regressors = None
+
+    for i in range(n_timepoints):
+        currSpikes = np.squeeze(matSpikes[:, i])
+        valid_mask = ~np.isnan(currSpikes)
+
+        currData = dfTrial.copy()
+        currData["spikes"] = currSpikes
+
+        if np.sum(valid_mask) < 30:
+            # append NaNs for this unit
+            continue
+           
+
+        if matIso is not None:
+            currData["iso"] = np.squeeze(matIso[:, i])
+
+        # Fit GLM
+        model = sm.GLM.from_formula(
+            formula=formula,
+            data=currData,
+            family=sm.families.Gaussian()
+        ).fit()
+
+        # Regressor names (strip category levels etc.)
+        reg_names = [re.sub(r"\[.*?\]", "", x) for x in model.tvalues.index]
+
+        # On first timepoint, initialize matrices with correct width
+        if regressors is None:
+            regressors = reg_names
+            p = len(regressors)
+
+            TvCurrU = np.empty((0, p))
+            PvCurrU = np.empty((0, p))
+            EvCurrU = np.empty((0, p))
+            CILowCurrU = np.empty((0, p))
+            CIHighCurrU = np.empty((0, p))
+        else:
+            # Safety check: formula/design should produce same columns every unit
+            if reg_names != regressors:
+                raise ValueError(
+                    f"Regressor mismatch at time {i}. "
+                    f"Expected {regressors}, got {reg_names}."
+                )
+
+        tv = model.tvalues.values.reshape(1, -1)
+        pv = model.pvalues.values.reshape(1, -1)
+        ev = model.params.values.reshape(1, -1)
+
+        ci = model.conf_int(alpha=alpha)  # (p, 2)
+        ci_low = ci[0].values.reshape(1, -1)
+        ci_high = ci[1].values.reshape(1, -1)
+
+        TvCurrU = np.concatenate((TvCurrU, tv), axis=0)
+        PvCurrU = np.concatenate((PvCurrU, pv), axis=0)
+        EvCurrU = np.concatenate((EvCurrU, ev), axis=0)
+        CILowCurrU = np.concatenate((CILowCurrU, ci_low), axis=0)
+        CIHighCurrU = np.concatenate((CIHighCurrU, ci_high), axis=0)
+
+        used_idx = model.model.data.row_labels
+        r2_scores[i] = r2_score(
+            currData.loc[used_idx, "spikes"],
+            model.fittedvalues
+        )
+        valid_points.append(i)
+    
+    if len(valid_points) < n_timepoints:
+        # fill missed timepoints with NaNs
+        TvCurrU_full = np.full((n_timepoints, TvCurrU.shape[1]), np.nan)
+        PvCurrU_full = np.full((n_timepoints, PvCurrU.shape[1]), np.nan)
+        EvCurrU_full = np.full((n_timepoints, EvCurrU.shape[1]), np.nan)
+        CILowCurrU_full = np.full((n_timepoints, CILowCurrU.shape[1]), np.nan)
+        CIHighCurrU_full = np.full((n_timepoints, CIHighCurrU.shape[1]), np.nan)
+        for idx, timepoint in enumerate(valid_points):
+            TvCurrU_full[timepoint, :] = TvCurrU[idx, :]
+            PvCurrU_full[timepoint, :] = PvCurrU[idx, :]
+            EvCurrU_full[timepoint, :] = EvCurrU[idx, :]
+            CILowCurrU_full[timepoint, :] = CILowCurrU[idx, :]
+            CIHighCurrU_full[timepoint, :] = CIHighCurrU[idx, :]
+        TvCurrU = TvCurrU_full
+        PvCurrU = PvCurrU_full
+        EvCurrU = EvCurrU_full
+        CILowCurrU = CILowCurrU_full
+        CIHighCurrU = CIHighCurrU_full
+
+
+    return {'regressors': regressors,
+            'TvCurrU': TvCurrU,
+            'PvCurrU': PvCurrU,
+            'EvCurrU': EvCurrU,
+            'CILowCurrU': CILowCurrU,
+            'CIHighCurrU': CIHighCurrU,
+            'r2_scores': r2_scores
+           }
 
 
 def fitSpikeModelP(dfTrial, matSpikes, formula):
@@ -281,7 +415,7 @@ def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, st
 
 def plot_filled_sem(time, y_mat, color, ax, label):
     ax.plot(time, np.nanmean(y_mat, 0), c = color, label = label)
-    sem = np.std(y_mat, axis = 0)/np.sqrt(np.shape(y_mat)[0])
+    sem = np.nanstd(y_mat, axis = 0)/np.sqrt(np.shape(y_mat)[0])
     ax.fill_between(time, np.nanmean(y_mat, 0) - sem, np.nanmean(y_mat, 0) + sem, color = color, alpha = 0.25, edgecolor = None)
 
 def plot_raster_rate(
