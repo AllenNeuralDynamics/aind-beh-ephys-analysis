@@ -144,7 +144,14 @@ def fitSpikeModelG(dfTrial, matSpikes, formula, matIso = None):
         PvCurrU = np.concatenate((PvCurrU, pv), axis = 0)
         EvCurrU = np.concatenate((EvCurrU, ev), axis = 0)
 
-    return regressors, TvCurrU, PvCurrU, EvCurrU
+        used_idx = model.model.data.row_labels
+
+        r2_score_value = r2_score(
+            currData.loc[used_idx, 'spikes'],
+            model.fittedvalues
+        )
+
+    return regressors, TvCurrU, PvCurrU, EvCurrU, r2_score_value
 
 
 def fitSpikeModelP(dfTrial, matSpikes, formula):
@@ -281,7 +288,7 @@ def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, st
 
 def plot_filled_sem(time, y_mat, color, ax, label):
     ax.plot(time, np.nanmean(y_mat, 0), c = color, label = label)
-    sem = np.std(y_mat, axis = 0)/np.sqrt(np.shape(y_mat)[0])
+    sem = np.nanstd(y_mat, axis = 0)/np.sqrt(np.shape(y_mat)[0])
     ax.fill_between(time, np.nanmean(y_mat, 0) - sem, np.nanmean(y_mat, 0) + sem, color = color, alpha = 0.25, edgecolor = None)
 
 def plot_raster_rate(
