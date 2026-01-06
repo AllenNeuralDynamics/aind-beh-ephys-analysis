@@ -48,7 +48,9 @@ RUN pip install -U --no-cache-dir \
     k3d \
     aind-s3-cache==0.1.0 \
     codeocean==0.10.0 \
-    pandas==2.3.2
+    pandas==2.3.2 \
+    scikit-image
+
 
 
 COPY postInstall /
