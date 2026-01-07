@@ -131,7 +131,7 @@ def pupil_analysis_session(session, plot_licks=False, plot=True,
     beh_df_z = beh_df.copy()
     beh_df_z['hit'] = (beh_df_z['animal_response']!=2).astype(int)
     beh_df_z = beh_df_z[qual_mask_all].reset_index(drop=True)
-    if np.sum(~beh_df_z['hit']) >= 5:
+    if np.sum(beh_df_z['animal_response'].values==2) >= 3:
         beh_df_z['time_between_trials'] = np.diff(np.concatenate(([np.nan], beh_df_z['goCue_start_time'].values)))
         for col in beh_df_z.select_dtypes(include=[np.number]).columns:
             # if not 0, 1 and -1
@@ -707,14 +707,14 @@ data_df = pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets
 sessions = data_df['session_id'].values.tolist()
 def safe_plot(session):
     # try:
-    # pupil_analysis_session(session, plot_licks=False, plot=True)
-    plot_unit_pupil_correlation(session, bin_size=5, step_size=0.1, win_length=20, plot=True)
+    pupil_analysis_session(session, plot_licks=False, plot=True)
+    # plot_unit_pupil_correlation(session, bin_size=5, step_size=0.1, win_length=20, plot=True)
 
     #     print(f'Success {session}')
     # except Exception as e:
     #     print(f'Error processing session {session}: {e}')
-# Parallel(n_jobs=-1)(delayed(safe_plot)(session) for session in sessions)
-pupil_analysis_session('behavior_ZS060_2021-03-29_16-21-37', plot_licks=False, plot=True)
+Parallel(n_jobs=-1)(delayed(safe_plot)(session) for session in sessions)
+# pupil_analysis_session('behavior_ZS060_2021-03-29_16-21-37', plot_licks=False, plot=True)
 # plot_unit_pupil_correlation('behavior_ZS061_2021-03-20_18-03-26')
 # plot_unit_pupil_correlation('behavior_ZS060_2021-03-29_16-21-37', bin_size=5, step_size=0.1, win_length=20, plot=True)
 # for session in sessions:
