@@ -189,8 +189,11 @@ def parse_lick_trains(licks, window_size = 1000, height = 2, min_dist = 2000, in
 
 def load_licks(session, plot = False):
     session_dir = session_dirs(session)
-    raw_nwb_file = [f for f in os.listdir(session_dir['raw_dir']) if f.endswith('.nwb.zarr')][0]
-    raw_nwb = load_nwb_from_filename(os.path.join(session_dir['raw_dir'], raw_nwb_file))
+    if session_dir['aniID'].startswith('ZS'):
+        raw_nwb_file = [f for f in os.listdir(session_dir['raw_dir']) if f.endswith('.nwb.zarr')][0]
+        raw_nwb = load_nwb_from_filename(os.path.join(session_dir['raw_dir'], raw_nwb_file))
+    else:
+        raw_nwb = load_nwb_from_filename(session_dir['nwb_beh'])
     raw_df = raw_nwb.intervals['trials'].to_dataframe()
     licks_L = raw_nwb.acquisition['left_lick_time'].timestamps[:]
     licks_R = raw_nwb.acquisition['right_lick_time'].timestamps[:]

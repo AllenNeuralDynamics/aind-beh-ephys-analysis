@@ -437,7 +437,7 @@ def plot_raster_rate(
     # get spike matrix
     currArray, slide_times = get_spike_matrix(spike_times, align_events, 
                                             pre_event=tb, post_event=tf, 
-                                            binSize=time_bin, stepSize=0.5*time_bin)
+                                            binSize=time_bin, stepSize=0.25*time_bin)
 
     """Plot raster and rate aligned to events"""
     nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, height_ratios= [3, 1], subplot_spec=subplot_spec)
@@ -454,7 +454,16 @@ def plot_raster_rate(
     ax1.axvline(x=0, c="r", ls="--", lw=1, zorder=1)
 
     # raster plot
-    ax1.scatter(df.time, df.event_index, c="k", marker="|", s=1)
+    N_lines = df['event_index'].max() + 1
+
+    # full bar height in y-units
+    bar_height =1
+
+    y0 = df.event_index - bar_height / 2
+    y1 = df.event_index + bar_height / 2
+
+    ax1.vlines(df.time, y0, y1, color="k", linewidth=1)
+
 
     # horizontal line for each type if discrete
     if len(np.unique(map_value)) <= 4:
