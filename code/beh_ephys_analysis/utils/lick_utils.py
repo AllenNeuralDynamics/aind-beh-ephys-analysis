@@ -227,7 +227,12 @@ def load_licks(session, plot = False):
     # combine left and right licks trains by combining each field in the dicts
     lick_trains_all = {}
     for key in lick_trains_L.keys():
-        lick_trains_all[key] = np.sort(np.concatenate([lick_trains_L[key], lick_trains_R[key]]))
+        lick_trains_all[key] = np.concatenate([lick_trains_L[key], lick_trains_R[key]])
+    # sort by train_starts
+    sort_idx = np.argsort(lick_trains_all['train_starts'])
+    for key in lick_trains_all.keys():
+        if len(lick_trains_all[key]) == len(sort_idx):
+            lick_trains_all[key] = lick_trains_all[key][sort_idx]
     lick_trains_all['side'] = np.concatenate([np.array([0]*len(lick_trains_L['train_starts'])), np.array([1]*len(lick_trains_R['train_starts']))])
     return {'licks_L_cleaned': licks_L_cleaned,
             'licks_R_cleaned': licks_R_cleaned,
