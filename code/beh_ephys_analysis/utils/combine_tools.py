@@ -21,6 +21,13 @@ import shutil
 import seaborn as sns
 import math  
 import seaborn as sns
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.metrics import r2_score
+import statsmodels.api as sm
+from sklearn.model_selection import KFold
+from scipy.stats import fisher_exact
+from statsmodels.stats.proportion import proportions_ztest
+from scipy.stats import ttest_ind
 
 def apply_qc(combined_tagged_units, constraints):
     # start with a mask of all True
@@ -290,3 +297,292 @@ def merge_df_with_suffix(dfs, on_list, prefixes = None, suffixes = None, how = '
     for df in dfs[1:]:
         merge_df = merge_df.merge(df, on=on_list, how=how)
     return merge_df
+
+
+def spatial_dependence_summary(
+    coords,
+    values,
+    *,
+    k_neighbors=15,
+    n_splits=5,
+    permutations=5000,
+    seed=0,
+    return_null=False,
+):
+    """
+    Combines:
+      (1) Linear trend test: value ~ x + y + z (F-test vs intercept-only)
+      (2) 5-fold CV predictability with kNN (distance-weighted) + permutation p-value
+
+    Returns a dictionary of results.
+    """
+    rng = np.random.default_rng(seed)
+
+    X = np.asarray(coords, float)
+    y = np.asarray(values, float)
+
+    # drop NaNs / infs
+    ok = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
+    X = X[ok]
+    y = y[ok]
+    n = y.size
+    if n < 10:
+        raise ValueError(f"Too few valid points after filtering (n={n}).")
+
+    # -------------------------
+    # (1) Linear regression trend
+    # -------------------------
+    X_const = sm.add_constant(X)  # [1, x, y, z]
+    model_full = sm.OLS(y, X_const).fit()
+    model_null = sm.OLS(y, np.ones((n, 1))).fit()
+    f_stat, p_trend, _ = model_full.compare_f_test(model_null)
+
+    # -------------------------
+    # (2) CV predictability (kNN) + permutation test
+    # -------------------------
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
+
+    def cv_r2(y_target):
+        preds = np.zeros_like(y_target)
+        for tr, te in kf.split(X):
+            model = KNeighborsRegressor(
+                n_neighbors=min(k_neighbors, len(tr)),
+                weights="distance",
+            )
+            model.fit(X[tr], y_target[tr])
+            preds[te] = model.predict(X[te])
+        return r2_score(y_target, preds)
+
+    r2_cv_obs = cv_r2(y)
+
+    r2_cv_perm = np.empty(permutations, float)
+    for i in range(permutations):
+        r2_cv_perm[i] = cv_r2(rng.permutation(y))
+
+    p_cv = (np.sum(r2_cv_perm >= r2_cv_obs) + 1) / (permutations + 1)
+
+    out = {
+        "n_used": int(n),
+        "inputs": {
+            "k_neighbors": int(k_neighbors),
+            "n_splits": int(n_splits),
+            "permutations": int(permutations),
+            "seed": int(seed),
+        },
+        "linear_trend": {
+            "coef_const_x_y_z": model_full.params.tolist(),      # [const, bx, by, bz]
+            "p_value_F_test_vs_intercept_only": float(p_trend),
+            "F_stat": float(f_stat),
+            "r2": float(model_full.rsquared),
+        },
+        "cv_predictability_knn": {
+            "r2_cv": float(r2_cv_obs),
+            "p_value_permutation": float(p_cv),                 # one-sided: better than random
+            "null_mean": float(np.mean(r2_cv_perm)),
+            "null_std": float(np.std(r2_cv_perm, ddof=1)),
+        },
+    }
+
+    if return_null:
+        out["cv_predictability_knn"]["r2_null_distribution"] = r2_cv_perm.tolist()
+
+    return out
+
+
+def welch_shift_P_vs_U(
+    x_all,
+    is_known_P,
+    *,
+    alternative="two-sided",   # "two-sided", "greater", "less"
+    permutations=20000,
+    seed=0,
+    n_boot=5000,
+):
+    """
+    More powerful distribution-shift test for continuous, roughly normal data:
+      Known P vs unlabeled U using Welch's t-test (unequal variances),
+      plus a label-permutation p-value and effect size.
+
+    Returns a dict with stats and uncertainty.
+    """
+    rng = np.random.default_rng(seed)
+
+    x = np.asarray(x_all, float)
+    mP = np.asarray(is_known_P, dtype=bool)
+
+    # filter NaNs
+    ok = np.isfinite(x) & np.isfinite(mP.astype(float))
+    x = x[ok]
+    mP = mP[ok]
+
+    xP = x[mP]
+    xU = x[~mP]
+    nP, nU = len(xP), len(xU)
+
+    if nP < 2 or nU < 2:
+        raise ValueError(f"Need at least 2 samples in each group. Got nP={nP}, nU={nU}.")
+
+    # --- observed Welch t-test ---
+    t_obs, p_asym = ttest_ind(xP, xU, equal_var=False, alternative=alternative)
+
+    # effect size: Cohen's d (using pooled SD; for unequal variances, this is still a useful standardized diff)
+    sP = np.var(xP, ddof=1)
+    sU = np.var(xU, ddof=1)
+    s_pooled = np.sqrt(((nP - 1) * sP + (nU - 1) * sU) / (nP + nU - 2))
+    cohen_d = (np.mean(xP) - np.mean(xU)) / (s_pooled + 1e-12)
+
+    # --- permutation p-value (label shuffle; keeps group sizes fixed) ---
+    x_all_clean = np.concatenate([xP, xU])
+    n = len(x_all_clean)
+    idx = np.arange(n)
+
+    t_perm = np.empty(permutations, float)
+    for i in range(permutations):
+        rng.shuffle(idx)
+        p_idx = idx[:nP]
+        u_idx = idx[nP:]
+        # Welch t statistic on permuted labels
+        t_perm[i] = ttest_ind(
+            x_all_clean[p_idx],
+            x_all_clean[u_idx],
+            equal_var=False,
+            alternative="two-sided",   # compute symmetric t; handle alternative below
+        ).statistic
+
+    # convert perm stats to p-value matching the requested alternative
+    if alternative == "two-sided":
+        p_perm = (np.sum(np.abs(t_perm) >= np.abs(t_obs)) + 1) / (permutations + 1)
+    elif alternative == "greater":
+        # t is larger when mean(P) > mean(U)
+        p_perm = (np.sum(t_perm >= t_obs) + 1) / (permutations + 1)
+    elif alternative == "less":
+        p_perm = (np.sum(t_perm <= t_obs) + 1) / (permutations + 1)
+    else:
+        raise ValueError("alternative must be 'two-sided', 'greater', or 'less'.")
+
+    # --- bootstrap CI for mean difference (P - U) ---
+    # (Useful and interpretable for firing rate)
+    boot = np.empty(n_boot, float)
+    for i in range(n_boot):
+        bp = rng.choice(xP, size=nP, replace=True)
+        bu = rng.choice(xU, size=nU, replace=True)
+        boot[i] = np.mean(bp) - np.mean(bu)
+    ci_low, ci_high = np.quantile(boot, [0.025, 0.975])
+
+    return {
+        "n_total": int(n),
+        "n_P": int(nP),
+        "n_U": int(nU),
+        "test": "Welch t-test (P vs unlabeled U)",
+        "alternative": alternative,
+        "mean_P": float(np.mean(xP)),
+        "mean_U": float(np.mean(xU)),
+        "mean_diff_P_minus_U": float(np.mean(xP) - np.mean(xU)),
+        "mean_diff_bootstrap_CI95": [float(ci_low), float(ci_high)],
+        "t_stat": float(t_obs),
+        "p_value_asymptotic": float(p_asym),
+        "p_value_permutation": float(p_perm),
+        "cohens_d": float(cohen_d),
+    }
+
+
+def binary_shift_P_vs_U(
+    x_all,
+    is_known_P,
+    *,
+    alternative="two-sided",  # "two-sided", "larger", "smaller" (Fisher wording)
+    permutations=20000,
+    seed=0,
+):
+    """
+    Test whether binary values differ between known P and unlabeled U (mixture).
+
+    Returns:
+      - event rates
+      - odds ratio + Fisher exact p-value
+      - two-proportion z-test p-value
+      - permutation p-value (label shuffle)
+    """
+    rng = np.random.default_rng(seed)
+
+    x = np.asarray(x_all)
+    mP = np.asarray(is_known_P, dtype=bool)
+
+    # Keep only finite / valid entries; ensure binary
+    ok = np.isfinite(x.astype(float)) & np.isfinite(mP.astype(float))
+    x = x[ok].astype(int)
+    mP = mP[ok]
+    if not np.isin(x, [0, 1]).all():
+        raise ValueError("x_all must be binary (0/1).")
+
+    xP = x[mP]
+    xU = x[~mP]
+
+    nP, nU = len(xP), len(xU)
+    if nP < 1 or nU < 1:
+        raise ValueError(f"Need at least 1 sample in each group. Got nP={nP}, nU={nU}.")
+
+    # counts
+    a = int(xP.sum())           # P successes
+    b = int(nP - a)             # P failures
+    c = int(xU.sum())           # U successes
+    d = int(nU - c)             # U failures
+
+    rate_P = a / nP
+    rate_U = c / nU
+    risk_diff = rate_P - rate_U
+    risk_ratio = (rate_P / rate_U) if rate_U > 0 else np.inf
+
+    # 2x2 table for Fisher
+    table = np.array([[a, b],
+                      [c, d]], dtype=int)
+
+    # Fisher exact: alternative uses "larger"/"smaller"/"two-sided"
+    OR, p_fisher = fisher_exact(table, alternative=alternative)
+
+    # Two-proportion z-test (more powerful when counts are moderate)
+    # statsmodels uses alternative: 'two-sided', 'larger', 'smaller'
+    z_stat, p_z = proportions_ztest(
+        count=[a, c],
+        nobs=[nP, nU],
+        alternative=alternative
+    )
+
+    # Permutation test on risk difference (rate_P - rate_U)
+    x_all_clean = np.concatenate([xP, xU])
+    n = len(x_all_clean)
+    idx = np.arange(n)
+
+    perm_stats = np.empty(permutations, float)
+    for i in range(permutations):
+        rng.shuffle(idx)
+        p_idx = idx[:nP]
+        u_idx = idx[nP:]
+        perm_stats[i] = x_all_clean[p_idx].mean() - x_all_clean[u_idx].mean()
+
+    if alternative == "two-sided":
+        p_perm = (np.sum(np.abs(perm_stats) >= abs(risk_diff)) + 1) / (permutations + 1)
+    elif alternative == "larger":
+        p_perm = (np.sum(perm_stats >= risk_diff) + 1) / (permutations + 1)
+    else:  # "smaller"
+        p_perm = (np.sum(perm_stats <= risk_diff) + 1) / (permutations + 1)
+
+    return {
+        "n_P": int(nP),
+        "n_U": int(nU),
+        "count_P_1": int(a),
+        "count_U_1": int(c),
+        "rate_P": float(rate_P),
+        "rate_U": float(rate_U),
+        "risk_diff_P_minus_U": float(risk_diff),
+        "risk_ratio_P_over_U": float(risk_ratio),
+        "odds_ratio_fisher": float(OR),
+        "p_value_fisher": float(p_fisher),
+        "z_stat": float(z_stat),
+        "p_value_ztest": float(p_z),
+        "p_value_permutation": float(p_perm),
+    }
+
+# Example:
+# res = welch_shift_P_vs_U(x_all, is_known_P, alternative="two-sided", permutations=20000, seed=0)
+# print(res)
