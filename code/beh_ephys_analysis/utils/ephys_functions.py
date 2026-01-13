@@ -404,13 +404,18 @@ def load_drift(session, unit_id, data_type='curated'):
         else:
             return None
 
-def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, stepSize):
+def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, stepSize, avoid_overlap = False, avoid_win = [0, 1.5]):
     bin_times = np.arange(pre_event, post_event, stepSize) - 0.5*stepSize
     spike_matrix = np.zeros((len(align_time), len(bin_times)))
     for i, t in enumerate(align_time):
         for j, b in enumerate(bin_times):
-            spike_matrix[i, j] = np.sum((spike_times >= t + b - 0.5*binSize) & (spike_times < t + b + 0.5*binSize))
-    spike_matrix = spike_matrix / binSize
+            start = t + b - 0.5*binSize
+            end = t + b + 0.5*binSize
+            spike_matrix[i, j] = np.sum((spike_times >= start) & (spike_times < end))
+            # if this window contains any other events
+            if avoid_overlap:
+                if any(((align_time+avoid_win[1]) >= start) & (align_time+avoid_win[0] < end) & (align_time != t)):
+                    spike_matrix[i, j] = np.nan
     return spike_matrix, bin_times
 
 def plot_filled_sem(time, y_mat, color, ax, label):
