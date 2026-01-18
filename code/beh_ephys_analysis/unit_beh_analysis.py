@@ -1001,7 +1001,7 @@ if __name__ == '__main__':
     model_name = 'stan_qLearning_5params'
     data_type = 'curated'
     curate_time = True
-    align_name = 'go_cue'
+    align_name = 'response'
     formula = 'spikes ~ 1 + outcome + choice + Qchosen'
     
     def process_session(session):
@@ -1026,7 +1026,7 @@ if __name__ == '__main__':
         #                         units=None)
         print('----------------------------------')
         print(f'Finished plotting behavior alignment for session {session}')
-    session = 'behavior_784806_2025-06-20_13-39-16'
+    session = 'behavior_751004_2024-12-21_13-28-28'
     # session = 'behavior_763590_2025-05-02_11-07-09' 
     plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
                         model_name = model_name, formula=formula,

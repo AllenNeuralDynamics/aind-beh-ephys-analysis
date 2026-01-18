@@ -404,7 +404,10 @@ def load_drift(session, unit_id, data_type='curated'):
         else:
             return None
 
-def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, stepSize, avoid_overlap = False, avoid_win = [0, 1.5]):
+def get_spike_matrix(spike_times, align_time, pre_event=-2, post_event=2, binSize=0.2, stepSize=0.1, avoid_overlap = False, avoid_win = [0, 1.5], kernel = False, tau_rise = None, tau_decay = None):
+    if kernel:
+        spike_matrix, bin_times = get_spike_matrix_filter(spike_times, align_time, pre_event, post_event, tau_decay = tau_decay, tau_rise= tau_rise, step_size=stepSize, avoid_overlap = avoid_overlap, avoid_win = avoid_win)
+        return spike_matrix, bin_times
     bin_times = np.arange(pre_event, post_event, stepSize) - 0.5*stepSize
     spike_matrix = np.zeros((len(align_time), len(bin_times)))
     for i, t in enumerate(align_time):
@@ -416,7 +419,32 @@ def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, st
             if avoid_overlap:
                 if any(((align_time+avoid_win[1]) >= start) & (align_time+avoid_win[0] < end) & (align_time != t)):
                     spike_matrix[i, j] = np.nan
-    return spike_matrix, bin_times
+    return spike_matrix/binSize, bin_times
+
+def psp_filter(x, tau_rise=0.001, tau_decay=0.02):
+    myPSP = (1 - np.exp(-x/tau_rise)) * np.exp(-x/tau_decay)
+    return myPSP
+
+def get_spike_matrix_filter(spike_times, align_time, tb, tf, tau_decay = 0.020, tau_rise= 0.001, step_size=0.05, avoid_overlap = False, avoid_win = [0, 1.5]):
+    tb_bin = 10*tau_decay
+    time_bins = np.arange(tb, tf, step_size)
+    fr_mat = np.zeros((len(align_time), len(time_bins)))
+    for event_ind, event_time in enumerate(align_time):
+        spike_times_aligned = spike_times - event_time
+        for bin_ind in range(len(time_bins)):
+            curr_t = time_bins[bin_ind]
+            t_start = curr_t - tb_bin
+            curr_spikes = spike_times_aligned[(spike_times_aligned >= t_start) & (spike_times_aligned < curr_t)]
+            if len(curr_spikes) > 0:
+                fr_mat[event_ind, bin_ind] = np.sum(psp_filter(curr_t - curr_spikes, tau_rise=tau_rise, tau_decay=tau_decay))
+            if avoid_overlap:
+                if any(((align_time+avoid_win[1]) >= (curr_t + event_time - tb_bin)) & (align_time+avoid_win[0] < (curr_t + event_time)) & (align_time != event_time)):
+                    fr_mat[event_ind, bin_ind] = np.nan
+    filter_int = (tau_decay*tau_decay)/(tau_decay + tau_rise)
+    fr_mat = fr_mat / filter_int
+    return fr_mat, time_bins
+
+
 
 def plot_filled_sem(time, y_mat, color, ax, label):
     ax.plot(time, np.nanmean(y_mat, 0), c = color, label = label)
@@ -435,6 +463,11 @@ def plot_raster_rate(
     tb=-2,
     tf=3,
     time_bin = 0.1,
+    step_size = 0.1,
+    kernel = False,
+    tau_rise = 0.001,
+    tau_decay = 0.04,
+    avoid_overlap = True
 ):
     n_colors = len(bins)-1
     color_list = [colormap(i / (n_colors - 1)) for i in range(n_colors)]
@@ -442,7 +475,8 @@ def plot_raster_rate(
     # get spike matrix
     currArray, slide_times = get_spike_matrix(spike_times, align_events, 
                                             pre_event=tb, post_event=tf, 
-                                            binSize=time_bin, stepSize=0.25*time_bin)
+                                            binSize=time_bin, stepSize=step_size, kernel=kernel,
+                                            tau_rise=tau_rise, tau_decay=tau_decay, avoid_overlap=avoid_overlap)
 
     """Plot raster and rate aligned to events"""
     nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, height_ratios= [3, 1], subplot_spec=subplot_spec)
