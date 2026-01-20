@@ -1282,9 +1282,26 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
             if '_model' in column:
                 session_df.drop(column, axis=1, inplace=True)
         if 'Q_r' in session_df.columns:
-            Qchosen = session_df['Q_l'].values
-            Qchosen[np.where(session_df['choice']>0)] = session_df.loc[session_df['choice']>0, 'Q_r']
+            Qchosen = session_df['Q_l'].values.copy()
+            Qchosen[np.where(session_df['choice']>0)] = session_df.loc[session_df['choice']>0, 'Q_r'].values.copy()
             session_df['Qchosen'] = Qchosen
+        # policy update 
+        p_choice = session_df['pChoice'].values
+        p_choice_L = p_choice.copy()
+        p_choice_L[session_df['choice'].values == 1] = 1-p_choice_L[session_df['choice'].values == 1]
+        p_choice_R = p_choice.copy()
+        p_choice_R[session_df['choice'].values == 0] = 1-p_choice_R[session_df['choice'].values == 0]
+        policy_pre = session_df['pChoice'].values.copy()
+        policy_post = np.full(len(policy_pre), np.nan)
+        for t in range(len(policy_pre)-1):
+            if session_df['choice'].values[t] == 1:
+                policy_post[t] = p_choice_R[t+1]
+            else:
+                policy_post[t] = p_choice_L[t+1]
+        session_df['policy_pre'] = policy_pre
+        session_df['policy_post'] = policy_post
+        session_df['policy_change'] = session_df['policy_post'] - session_df['policy_pre']
+        session_df['policy_change_log_odd'] = np.log(policy_post / (1-policy_post) ) - np.log(policy_pre / (1-policy_pre))
         trialData = session_df.copy()
     
     if cut_interruptions:

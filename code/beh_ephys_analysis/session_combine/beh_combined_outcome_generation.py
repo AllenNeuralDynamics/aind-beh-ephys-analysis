@@ -283,6 +283,9 @@ t_regressors_l = t_regressors_e.copy()
 t_regressors_l_mc = t_regressors_e.copy()
 t_regressors_com = t_regressors_e.copy()
 t_regressors_com_mc = t_regressors_e.copy()
+t_regressors_indi = t_regressors_e.copy()
+t_regressors_indi_mc = t_regressors_e.copy()
+
 
 p_regressors_e = t_regressors_e.copy()
 p_regressors_e_mc = t_regressors_e.copy()
@@ -290,6 +293,8 @@ p_regressors_l = t_regressors_e.copy()
 p_regressors_l_mc = t_regressors_e.copy()
 p_regressors_com = t_regressors_e.copy()
 p_regressors_com_mc = t_regressors_e.copy()
+p_regressors_indi = t_regressors_e.copy()
+p_regressors_indi_mc = t_regressors_e.copy()
 
 coeff_regressors_e = t_regressors_e.copy()
 coeff_regressors_e_mc = t_regressors_e.copy()
@@ -297,6 +302,8 @@ coeff_regressors_l = t_regressors_e.copy()
 coeff_regressors_l_mc = t_regressors_e.copy()
 coeff_regressors_com = t_regressors_e.copy()
 coeff_regressors_com_mc = t_regressors_e.copy()
+coeff_regressors_indi = t_regressors_e.copy()
+coeff_regressors_indi_mc = t_regressors_e.copy()
 
 all_coefs = []
 all_T = []
@@ -330,10 +337,20 @@ for ind, row in combined_tagged_units_filtered.iterrows():
         # load window from file
         if session_dir['aniID'].startswith('ZS'):
             window_file = '/root/capsule/code/beh_ephys_analysis/session_combine/metrics/beh_all_TT/auc_windows.json'
+            indi_window_file = '/root/capsule/code/beh_ephys_analysis/session_combine/metrics/beh_all_TT/auc_max_lag_indi.csv'
         else:
             window_file = '/root/capsule/code/beh_ephys_analysis/session_combine/metrics/beh_all_NP/auc_windows.json'
+            indi_window_file = '/root/capsule/code/beh_ephys_analysis/session_combine/metrics/beh_all_NP/auc_max_lag_indi.csv'
         with open(window_file, "r") as f:
             window_dict = json.load(f)
+        indi_window_df = pd.read_csv(indi_window_file)
+    # individualize window based on indi_window_df
+    indi_time = indi_window_df[(indi_window_df['session'] == session) & (indi_window_df['unit'] == unit_id)]['max_auc_lag']
+    if len(indi_time) == 0:
+        indi_time = 1.0
+        print(f'No individual window found for session {session}, unit {unit_id}, using default 1.0s')
+    else:
+        indi_time = indi_time.values[0]
     unit_drift = load_drift(session, unit_id, data_type=data_type)
     spike_times = unit_tbl.query('unit_id == @unit_id')['spike_times'].values[0]
     session_df_curr = session_df.copy()
@@ -406,6 +423,15 @@ for ind, row in combined_tagged_units_filtered.iterrows():
         max_time.append(window_dict['late'])
         max_T.append(model_ori_l.tvalues['outcome'])
 
+    # individual window
+    align_time_max = indi_time
+    spike_df = align.to_events(spike_times_curr, align_time + align_time_max, [-0.5*binSize, 0.5*binSize], return_df=True)
+    counts = spike_df.groupby('event_index').size()
+    counts = [counts.get(i, 0) for i in range(len(session_df_curr))]
+    spike_matrix_LM = np.reshape(np.array([counts]), (-1, 1))
+    spike_matrix_LM = zscore(spike_matrix_LM, axis=0)
+    model_ori_ind, model_final_ind, included_regressors_ind , R2_final_curr_ind, R2_forced_curr_ind = stepwise_glm(session_df_curr, spike_matrix_LM.flatten(), regressors_focus, regressors_sup, verbose=False, criterion='bic')
+
     all_outcome_l.append(model_ori_l.params['outcome'])
     all_outcome_e.append(model_ori_e.params['outcome'])
     all_outcome_T_l.append(model_ori_l.tvalues['outcome'])
@@ -423,6 +449,8 @@ for ind, row in combined_tagged_units_filtered.iterrows():
         t_regressors_l_mc.loc[ind, regressor] = model_final_l.tvalues[regressor]
         t_regressors_com.loc[ind, regressor] = model_ori.tvalues[regressor]
         t_regressors_com_mc.loc[ind, regressor] = model_final.tvalues[regressor]
+        t_regressors_indi.loc[ind, regressor] = model_ori_ind.tvalues[regressor]
+        t_regressors_indi_mc.loc[ind, regressor] = model_final_ind.tvalues[regressor]
 
 
         p_regressors_e.loc[ind, regressor] = model_ori_e.pvalues[regressor]
@@ -431,6 +459,9 @@ for ind, row in combined_tagged_units_filtered.iterrows():
         p_regressors_l_mc.loc[ind, regressor] = model_final_l.pvalues[regressor]
         p_regressors_com.loc[ind, regressor] = model_ori.pvalues[regressor]
         p_regressors_com_mc.loc[ind, regressor] = model_final.pvalues[regressor]
+        p_regressors_indi.loc[ind, regressor] = model_ori_ind.pvalues[regressor]
+        p_regressors_indi_mc.loc[ind, regressor] = model_final_ind.pvalues[regressor]
+
 
         coeff_regressors_e.loc[ind, regressor] = model_ori_e.params[regressor]
         coeff_regressors_e_mc.loc[ind, regressor] = model_final_e.params[regressor]
@@ -438,6 +469,8 @@ for ind, row in combined_tagged_units_filtered.iterrows():
         coeff_regressors_l_mc.loc[ind, regressor] = model_final_l.params[regressor]
         coeff_regressors_com.loc[ind, regressor] = model_ori.params[regressor]
         coeff_regressors_com_mc.loc[ind, regressor] = model_final.params[regressor]
+        coeff_regressors_indi.loc[ind, regressor] = model_ori_ind.params[regressor]
+        coeff_regressors_indi_mc.loc[ind, regressor] = model_final_ind.params[regressor]
 
 
 # %%
@@ -572,14 +605,14 @@ fig.savefig(os.path.join(beh_folder, f'Tvalue_comparison_motion_{criteria_name}.
 
 # %%
 # without motion correction
-all_t_regressors_ori = merge_df_with_suffix([t_regressors_e.copy(), t_regressors_l.copy(), t_regressors_com.copy()], suffixes=('e', 'l', 'com'), on_list=['session', 'unit_id'])
-all_coeff_regressors_ori = merge_df_with_suffix([coeff_regressors_e.copy(), coeff_regressors_l.copy(), coeff_regressors_com.copy()], suffixes=('e', 'l', 'com'), on_list=['session', 'unit_id'])
-all_p_regressors_ori = merge_df_with_suffix([p_regressors_e.copy(), p_regressors_l.copy(), p_regressors_com.copy()], suffixes=('e', 'l', 'com'), on_list=['session', 'unit_id'])
+all_t_regressors_ori = merge_df_with_suffix([t_regressors_e.copy(), t_regressors_l.copy(), t_regressors_com.copy(), t_regressors_indi.copy()], suffixes=('e', 'l', 'com', 'indi'), on_list=['session', 'unit_id'])
+all_coeff_regressors_ori = merge_df_with_suffix([coeff_regressors_e.copy(), coeff_regressors_l.copy(), coeff_regressors_com.copy(), coeff_regressors_indi.copy()], suffixes=('e', 'l', 'com', 'indi'), on_list=['session', 'unit_id'])
+all_p_regressors_ori = merge_df_with_suffix([p_regressors_e.copy(), p_regressors_l.copy(), p_regressors_com.copy(), p_regressors_indi.copy()], suffixes=('e', 'l', 'com', 'indi'), on_list=['session', 'unit_id'])
 
 # with motion correction
-all_t_regressors_mc = merge_df_with_suffix([t_regressors_e_mc.copy(), t_regressors_l_mc.copy(), t_regressors_com_mc.copy()], suffixes=('e', 'l', 'com'), on_list=['session', 'unit_id'])
-all_coeff_regressors_mc = merge_df_with_suffix([coeff_regressors_e_mc.copy(), coeff_regressors_l_mc.copy(), coeff_regressors_com_mc.copy()], suffixes=('e', 'l', 'com'), on_list=['session', 'unit_id'])
-all_p_regressors_mc = merge_df_with_suffix([p_regressors_e_mc.copy(), p_regressors_l_mc.copy(), p_regressors_com_mc.copy()], suffixes=('e', 'l', 'com'), on_list=['session', 'unit_id'])
+all_t_regressors_mc = merge_df_with_suffix([t_regressors_e_mc.copy(), t_regressors_l_mc.copy(), t_regressors_com_mc.copy(), t_regressors_indi_mc.copy()], suffixes=('e', 'l', 'com', 'indi'), on_list=['session', 'unit_id'])
+all_coeff_regressors_mc = merge_df_with_suffix([coeff_regressors_e_mc.copy(), coeff_regressors_l_mc.copy(), coeff_regressors_com_mc.copy(), coeff_regressors_indi_mc.copy()], suffixes=('e', 'l', 'com', 'indi'), on_list=['session', 'unit_id'])
+all_p_regressors_mc = merge_df_with_suffix([p_regressors_e_mc.copy(), p_regressors_l_mc.copy(), p_regressors_com_mc.copy(), p_regressors_indi_mc.copy()], suffixes=('e', 'l', 'com', 'indi'), on_list=['session', 'unit_id'])
 # combine all
 all_t_regressors = merge_df_with_suffix([all_t_regressors_ori.copy(), all_t_regressors_mc.copy()], suffixes=('ori', 'mc'), on_list=['session', 'unit_id'])
 all_coeff_regressors = merge_df_with_suffix([all_coeff_regressors_ori.copy(), all_coeff_regressors_mc.copy()], suffixes=('ori', 'mc'), on_list=['session', 'unit_id'])
@@ -676,3 +709,4 @@ model_combined['t_outcome|(|t_outcome| + |t_Q|)'] = model_combined['T_outcome_co
 
 # %%
 model_combined.to_csv(os.path.join(beh_folder, f'model_combined_{criteria_name}.csv'), index=True)
+print(f'Combined model saved to {os.path.join(beh_folder, f"model_combined_{criteria_name}.csv")}')
