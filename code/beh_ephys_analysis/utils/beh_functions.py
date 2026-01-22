@@ -1200,7 +1200,8 @@ def delete_files_without_name(folder_path, name):
                 # Delete the file
                 os.remove(file_path)
 
-def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptions = False):
+def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptions = False, load_glm = False):
+    session_dir = session_dirs(session)
     tblTrials = get_session_tbl(session)
 
     if model_name is not None:
@@ -1274,6 +1275,40 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
     choice_tbl = tblTrials.loc[tblTrials['animal_response']!=2].copy()
     choice_tbl.reset_index(inplace=True)
     trialData = pd.concat([trialData, choice_tbl], axis=1)
+    if model_name is not None and load_glm:
+        # load glm results if exist 
+        if os.path.exists(os.path.join(f"/root/capsule/scratch/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl')):
+            with open(os.path.join(f"/root/capsule/scratch/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl'), 'rb') as f:
+                glm_results = pickle.load(f)
+            p_choice = glm_results['choice_prob_by_session'][session]
+            session_interruptions = trialData['auto_manual_trial'] | trialData['extra_reward']
+            longest_start, longest_end, longest_len = longest_zero_chunk(session_interruptions.tolist())
+            trialData['pChoice_glm'] = np.nan
+            trialData.loc[longest_start:longest_end, 'pChoice_glm'] = p_choice
+
+            p_left_glm = p_choice.copy()
+            p_right_glm = p_choice.copy()
+            choice_cut = trialData['choice'].values.copy()[longest_start:longest_end+1]
+            p_left_glm[choice_cut == 1] = 1 - p_left_glm[choice_cut == 1]
+            p_right_glm[choice_cut == 0] = 1 - p_right_glm[choice_cut == 0]
+            p_choice_updated = np.full(len(p_choice), np.nan)
+            for t in range(len(p_choice)-1):
+                if choice_cut[t] == 1:
+                    p_choice_updated[t] = p_right_glm[t+1]
+                else:
+                    p_choice_updated[t] = p_left_glm[t+1]
+            trialData['policy_glm_change'] = np.nan
+            trialData.loc[longest_start:longest_end, 'policy_glm_change'] = p_choice_updated - p_choice
+            trialData['policy_glm_change_log_odd'] = np.nan
+            trialData.loc[longest_start:longest_end, 'policy_glm_change_log_odd'] = np.log(p_choice_updated / (1-p_choice_updated) ) - np.log(p_choice / (1-p_choice))
+            svs_cut = trialData['svs'].values.copy()[longest_start:longest_end+1]
+            policy_update_mean = (np.concatenate([
+                                        1 - svs_cut[1:],
+                                        [np.nan]
+                                    ])
+                                    - p_choice)
+            trialData['policy_glm_update_mean'] = np.nan
+            trialData.loc[longest_start:longest_end, 'policy_glm_update_mean'] = policy_update_mean
 
     if model_name is not None and model_dv is not None:
         session_df = pd.merge(trialData, model_dv, left_index=True, right_index=True, suffixes=('', '_model'))
@@ -1302,6 +1337,14 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
         session_df['policy_post'] = policy_post
         session_df['policy_change'] = session_df['policy_post'] - session_df['policy_pre']
         session_df['policy_change_log_odd'] = np.log(policy_post / (1-policy_post) ) - np.log(policy_pre / (1-policy_pre))
+        policy_update_mean = (
+                                np.concatenate([
+                                    1 - session_df['svs'].values[1:],
+                                    [np.nan]
+                                ])
+                                - session_df['pChoice'].values
+                            )
+        session_df['policy_update_mean'] = policy_update_mean
         trialData = session_df.copy()
     
     if cut_interruptions:
@@ -1663,3 +1706,152 @@ def transfer_nwb(session_id):
     shutil.rmtree(out_path, ignore_errors=True)
     with NWBZarrIO(out_path, mode="w") as out_io:
         out_io.write(new_nwb)
+
+
+# concatenate all session data for the certain list of sessions
+def fit_glm_session_list(session_list, max_lag=5, plot=False):
+    max_lag = 5
+    all_reward_side_hist_mat = []
+    all_noreward_side_hist_mat = []
+    all_choice_hist_mat = []
+    all_choices = []
+    session_lens = []
+    session_list_valid = []
+    for sess in session_list:
+        if get_session_tbl(sess) is not None:
+            sess_df = makeSessionDF(sess, cut_interruptions=True, model_name='stan_qLearning_5params')
+            choice = 2*(sess_df['choice'].values.copy() - 0.5)
+            all_choices.append(sess_df['choice'].values)
+            outcome = sess_df['outcome'].values
+            reward_side = choice * outcome
+            noreward_side = choice * (1 - outcome)
+            reward_side_hist_mat = np.full((len(choice), max_lag), np.nan)
+            noreward_side_hist_mat = np.full((len(choice), max_lag), np.nan)
+            choice_hist_mat = np.full((len(choice), max_lag), np.nan)
+
+            for lag in range(1, max_lag+1):
+                reward_side_hist_mat[lag:, lag-1] = reward_side[:-lag]
+                noreward_side_hist_mat[lag:, lag-1] = noreward_side[:-lag]
+                choice_hist_mat[lag:, lag-1] = choice[:-lag]
+
+            all_reward_side_hist_mat.append(reward_side_hist_mat)
+            all_noreward_side_hist_mat.append(noreward_side_hist_mat)
+            all_choice_hist_mat.append(choice_hist_mat)
+            session_lens.append(len(choice))
+            session_list_valid.append(sess)
+    if len(all_choices) == 0:
+        raise ValueError("No valid sessions found in the provided session list.")
+        return None, None
+    all_reward_side_hist_mat = np.vstack(all_reward_side_hist_mat)
+    all_noreward_side_hist_mat = np.vstack(all_noreward_side_hist_mat)
+    all_choice_hist_mat = np.vstack(all_choice_hist_mat)
+    all_choices = np.hstack(all_choices)
+    # fit logistic regression model
+    # reward side and choice history as predictors
+    X = np.hstack([all_reward_side_hist_mat, all_choice_hist_mat])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices, X, missing='drop')
+    result_rwd_choice = model.fit()
+
+    # reward side and no-reward side history as predictors
+    X = np.hstack([all_reward_side_hist_mat, all_noreward_side_hist_mat])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices, X, missing='drop')
+    result_rwd_norwd = model.fit()
+
+    # make predictions of choice probability using the first model
+    X_pred = np.hstack([all_reward_side_hist_mat, all_choice_hist_mat])
+    X_pred = sm.add_constant(X_pred, has_constant='add')
+    choice_prob = result_rwd_choice.predict(X_pred)
+    # flip choice probability for left choices
+    left_choices = all_choices == 0
+    choice_prob[left_choices] = 1 - choice_prob[left_choices]
+
+    # create a dictionary to hold results
+    # cut choice_prob into sessions
+    choice_prob_sess = []
+    start_idx = 0
+    for sess_len in session_lens:
+        choice_prob_sess.append(choice_prob[start_idx:start_idx+sess_len])
+        start_idx += sess_len
+    results = {
+        'reward_side_and_choice_history_model': result_rwd_choice,
+        'reward_side_and_noreward_side_history_model': result_rwd_norwd,
+        'choice_prob_by_session': {session: choice_prob_sess[idx] for idx, session in enumerate(session_list_valid)}
+    }
+
+    # plot
+    if plot:
+        fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+        ax = axes[0, 0]
+
+        coef = result_rwd_choice.params[1:max_lag+1]
+        err = result_rwd_choice.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Rewarded Side History Coefficients')
+
+        ax = axes[0, 1]
+        coef = result_rwd_choice.params[max_lag+1:]
+        err = result_rwd_choice.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Choice History Coefficients')
+
+        ax = axes[1, 0]
+        coef = result_rwd_norwd.params[1:max_lag+1]
+        err = result_rwd_norwd.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Rewarded Side History Coefficients')
+        ax = axes[1, 1]
+        coef = result_rwd_norwd.params[max_lag+1:]
+        err = result_rwd_norwd.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+
+        ax.set_ylabel('Coefficient')
+        ax.set_title('No-Rewarded Side History Coefficients')
+        plt.tight_layout()
+    else:
+        fig = None
+    return results, fig
+
+def fit_glm_animal(ani_focus, max_lag=5, plot=False):
+    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
+            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')]
+    df = pd.concat(dfs)
+    session_list = df['session_id'].values.tolist()
+    ani_list = [str(session).split('_')[1] for session in session_list if str(session).startswith('behavior')]
+    session_list = [session for session in session_list if str(session).startswith('behavior')]
+    ani_session_df = pd.DataFrame({'animal': ani_list, 'session_id': session_list})
+
+    ani_session_list = ani_session_df[ani_session_df['animal'] == ani_focus]['session_id'].values.tolist()
+    results, fig = fit_glm_session_list(ani_session_list, max_lag=max_lag, plot=plot)
+    if results is None:
+        return None, None
+    save_file = os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', 'glm_choice_history_model_results.pkl')
+    with open(save_file, 'wb') as f:
+        pickle.dump(results, f)
+    if plot:
+        fig.savefig(fname=os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', f'{ani_focus}_glm_choice_history_model_results.pdf'))
+    return results, fig
