@@ -29,7 +29,7 @@ from scipy.stats import fisher_exact
 from statsmodels.stats.proportion import proportions_ztest
 from scipy.stats import ttest_ind
 
-def apply_qc(combined_tagged_units, constraints):
+def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True):
     # start with a mask of all True
     mask = pd.Series(True, index=combined_tagged_units.index)
     mask_no_opto = pd.Series(True, index=combined_tagged_units.index)
@@ -145,8 +145,8 @@ def apply_qc(combined_tagged_units, constraints):
     combined_tagged_units_filtered = combined_tagged_units[mask_all].reset_index(drop=True)
     combined_tagged_units['selected'] = mask_all
     combined_tagged_units['selected_no_opto'] = mask_no_opto
-    print(f'Number of opto units after filtering: {len(combined_tagged_units_filtered)}')
-    print(f'Number of non-opto units after filtering: {len(combined_tagged_units[mask_no_opto])}')
+    print(f'Number of opto rows after filtering: {len(combined_tagged_units_filtered)}')
+    print(f'Number of non-opto rows after filtering: {len(combined_tagged_units[mask_no_opto])}')
 
     # plot
     valid_constraints = {col: cfg for col, cfg in constraints.items() if col in combined_tagged_units.columns}
@@ -190,16 +190,20 @@ def apply_qc(combined_tagged_units, constraints):
                     bins = np.linspace(0, 50, 50)
                 case 'peak_raw':
                     bins = np.linspace(-500, 300, 50)
-            ax.hist(full_data, bins=bins, color='gray', edgecolor=None, alpha=0.5, label='All units', density=True)
-            ax.hist(filtered_data, bins=bins, color='orange', edgecolor=None, alpha=0.5, label='Filtered units', density=True)
-            ax.hist(half_filtered_data, bins=bins, color='green', edgecolor=None, alpha=0.5, label='Non-opto units', density=True)
+            ax.hist(full_data, bins=bins, color='gray', edgecolor=None, alpha=0.5, label='All', density=density)
+            ax.hist(filtered_data, bins=bins, color='orange', edgecolor=None, alpha=0.5, label='Opto-Filtered', density=density)
+            if plot_all:
+                ax.hist(half_filtered_data, bins=bins, color='green', edgecolor=None, alpha=0.5, label='Filtered', density=density)
             
                 
 
             if "bounds" in cfg:
                 ax.set_title(f'{col}\nBounds: [{lb}, {ub}]')
             ax.set_xlabel(col)
-            ax.set_ylabel('Density')
+            if density:
+                ax.set_ylabel('Probability Density')
+            else:
+                ax.set_ylabel('Count')
 
             if "bounds" in cfg:
                 if not np.isnan(lb) and lb > full_data.min():
@@ -242,7 +246,7 @@ def apply_qc(combined_tagged_units, constraints):
 
     plt.tight_layout()
     # plt.savefig(os.path.join(wf_folder, f'Pass_histo_{criteria_name}.pdf'))
-    plt.show()
+    # plt.show()
 
     return combined_tagged_units_filtered, combined_tagged_units, fig
 
