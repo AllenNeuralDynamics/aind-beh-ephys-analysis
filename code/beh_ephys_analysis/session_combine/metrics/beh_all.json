@@ -3,7 +3,7 @@
     "conditional": [
       {
         "if": { "tier_2": ["==", true] },
-        "bounds": [0, 0.21]
+        "bounds": [0, 0.20]
       },
       {
         "else": true,
