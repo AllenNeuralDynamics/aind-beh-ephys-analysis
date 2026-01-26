@@ -303,6 +303,95 @@ def merge_df_with_suffix(dfs, on_list, prefixes = None, suffixes = None, how = '
     return merge_df
 
 
+# def spatial_dependence_summary(
+#     coords,
+#     values,
+#     *,
+#     k_neighbors=15,
+#     n_splits=5,
+#     permutations=5000,
+#     seed=0,
+#     return_null=False,
+# ):
+#     """
+#     Combines:
+#       (1) Linear trend test: value ~ x + y + z (F-test vs intercept-only)
+#       (2) 5-fold CV predictability with kNN (distance-weighted) + permutation p-value
+
+#     Returns a dictionary of results.
+#     """
+#     rng = np.random.default_rng(seed)
+
+#     X = np.asarray(coords, float)
+#     y = np.asarray(values, float)
+
+#     # drop NaNs / infs
+#     ok = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
+#     X = X[ok]
+#     y = y[ok]
+#     n = y.size
+#     if n < 10:
+#         raise ValueError(f"Too few valid points after filtering (n={n}).")
+
+#     # -------------------------
+#     # (1) Linear regression trend
+#     # -------------------------
+#     X_const = sm.add_constant(X)  # [1, x, y, z]
+#     model_full = sm.OLS(y, X_const).fit()
+#     model_null = sm.OLS(y, np.ones((n, 1))).fit()
+#     f_stat, p_trend, _ = model_full.compare_f_test(model_null)
+
+#     # -------------------------
+#     # (2) CV predictability (kNN) + permutation test
+#     # -------------------------
+#     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
+
+#     def cv_r2(y_target):
+#         preds = np.zeros_like(y_target)
+#         for tr, te in kf.split(X):
+#             model = KNeighborsRegressor(
+#                 n_neighbors=min(k_neighbors, len(tr)),
+#                 weights="distance",
+#             )
+#             model.fit(X[tr], y_target[tr])
+#             preds[te] = model.predict(X[te])
+#         return r2_score(y_target, preds)
+
+#     r2_cv_obs = cv_r2(y)
+
+#     r2_cv_perm = np.empty(permutations, float)
+#     for i in range(permutations):
+#         r2_cv_perm[i] = cv_r2(rng.permutation(y))
+
+#     p_cv = (np.sum(r2_cv_perm >= r2_cv_obs) + 1) / (permutations + 1)
+
+#     out = {
+#         "n_used": int(n),
+#         "inputs": {
+#             "k_neighbors": int(k_neighbors),
+#             "n_splits": int(n_splits),
+#             "permutations": int(permutations),
+#             "seed": int(seed),
+#         },
+#         "linear_trend": {
+#             "coef_const_x_y_z": model_full.params.tolist(),      # [const, bx, by, bz]
+#             "p_value_F_test_vs_intercept_only": float(p_trend),
+#             "F_stat": float(f_stat),
+#             "r2": float(model_full.rsquared),
+#         },
+#         "cv_predictability_knn": {
+#             "r2_cv": float(r2_cv_obs),
+#             "p_value_permutation": float(p_cv),                 # one-sided: better than random
+#             "null_mean": float(np.mean(r2_cv_perm)),
+#             "null_std": float(np.std(r2_cv_perm, ddof=1)),
+#         },
+#     }
+
+#     if return_null:
+#         out["cv_predictability_knn"]["r2_null_distribution"] = r2_cv_perm.tolist()
+
+#     return out
+
 def spatial_dependence_summary(
     coords,
     values,
@@ -320,6 +409,12 @@ def spatial_dependence_summary(
 
     Returns a dictionary of results.
     """
+    import numpy as np
+    import statsmodels.api as sm
+    from sklearn.model_selection import KFold
+    from sklearn.neighbors import KNeighborsRegressor
+    from sklearn.metrics import r2_score
+
     rng = np.random.default_rng(seed)
 
     X = np.asarray(coords, float)
@@ -342,7 +437,7 @@ def spatial_dependence_summary(
     f_stat, p_trend, _ = model_full.compare_f_test(model_null)
 
     # -------------------------
-    # (2) CV predictability (kNN) + permutation test
+    # (2) CV predictability (kNN) + permutation test (parallel)
     # -------------------------
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
 
@@ -359,9 +454,30 @@ def spatial_dependence_summary(
 
     r2_cv_obs = cv_r2(y)
 
-    r2_cv_perm = np.empty(permutations, float)
-    for i in range(permutations):
-        r2_cv_perm[i] = cv_r2(rng.permutation(y))
+    # --- parallel permutation null ---
+    # Make deterministic per-permutation seeds
+    perm_seeds = np.random.SeedSequence(seed).spawn(permutations)
+    perm_seeds_uint = np.array([s.generate_state(1, dtype=np.uint32)[0] for s in perm_seeds], dtype=np.uint32)
+
+    def _one_perm_r2(s_uint):
+        r = np.random.default_rng(int(s_uint))
+        return cv_r2(r.permutation(y))
+
+    r2_cv_perm = None
+    try:
+        from joblib import Parallel, delayed
+
+        r2_cv_perm = np.asarray(
+            Parallel(n_jobs=-1, prefer="processes")(
+                delayed(_one_perm_r2)(s_uint) for s_uint in perm_seeds_uint
+            ),
+            dtype=float,
+        )
+    except Exception:
+        # Fallback to sequential if joblib isn't available or parallel fails
+        r2_cv_perm = np.empty(permutations, float)
+        for i, s_uint in enumerate(perm_seeds_uint):
+            r2_cv_perm[i] = _one_perm_r2(s_uint)
 
     p_cv = (np.sum(r2_cv_perm >= r2_cv_obs) + 1) / (permutations + 1)
 
@@ -374,14 +490,14 @@ def spatial_dependence_summary(
             "seed": int(seed),
         },
         "linear_trend": {
-            "coef_const_x_y_z": model_full.params.tolist(),      # [const, bx, by, bz]
+            "coef_const_x_y_z": model_full.params.tolist(),  # [const, bx, by, bz]
             "p_value_F_test_vs_intercept_only": float(p_trend),
             "F_stat": float(f_stat),
             "r2": float(model_full.rsquared),
         },
         "cv_predictability_knn": {
             "r2_cv": float(r2_cv_obs),
-            "p_value_permutation": float(p_cv),                 # one-sided: better than random
+            "p_value_permutation": float(p_cv),  # one-sided: better than random
             "null_mean": float(np.mean(r2_cv_perm)),
             "null_std": float(np.std(r2_cv_perm, ddof=1)),
         },
@@ -391,6 +507,7 @@ def spatial_dependence_summary(
         out["cv_predictability_knn"]["r2_null_distribution"] = r2_cv_perm.tolist()
 
     return out
+
 
 
 def welch_shift_P_vs_U(

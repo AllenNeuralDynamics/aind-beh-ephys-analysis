@@ -57,10 +57,14 @@ def sync_directory(local_dir, destination, if_copy=False, if_dry_run=True):
 if __name__ == "__main__":
     s3_bucket_dest = "s3://aind-scratch-data/sue_su/LC_beh_physiology/"
     local_dir = "/root/capsule/scratch/"
-    combine_only = True
+    combine_only = False
+    manuscript = True
     if combine_only:
         s3_bucket_dest += "combined/"
         local_dir += "combined/"
+    elif manuscript:
+        s3_bucket_dest += "manuscript/"
+        local_dir += "manuscript/"
 
     out = sync_directory(local_dir, s3_bucket_dest, if_copy=False, if_dry_run=False)
     print(out)
