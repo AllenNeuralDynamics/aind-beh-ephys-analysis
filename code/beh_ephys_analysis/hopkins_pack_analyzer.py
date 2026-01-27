@@ -10,9 +10,9 @@ import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
 import spikeinterface.widgets as sw
 from utils.hdf5_extractor import read_hdf5
-from utils.beh_functions import session_dirs, parseSessionID
+from utils.beh_functions import session_dirs, parseSessionID, get_unit_tbl
 # import h5py 
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 
 # %%
@@ -123,38 +123,106 @@ def make_sorting_analyzer(session):
     # save
     analyzer_saved_zarr = analyzer.save_as(format='zarr', folder = waveform_zarr_folder)
 
+# append raw waveform to opto tag summary
+def append_raw_wf(session, clip_win=(-2,3)):
+    session_dir = session_dirs(session)
+    sorting_analyzer_file = os.path.join(session_dir['ephys_dir_curated'], 'analyzer.zarr')
+    if os.path.exists(sorting_analyzer_file):
+        analyzer = si.load(sorting_analyzer_file)
+    else:
+        print("Analyzer file not found!")
+        return
+    templates = analyzer.load_extension(extension_name="templates")
+    unit_tbl = get_unit_tbl(session, data_type='curated')
+    peak_waveform_raw_fake_aligned = []
+    peak_raw_fake = []
+    for unit_id in unit_tbl.unit_id.values:
+        curr_template_raw = templates.get_unit_template(unit_id)
+        peak_chan_id = np.argmax(np.ptp(curr_template_raw, axis=0))
+        if curr_template_raw[96, peak_chan_id] < 0:
+            sign = -1
+        else:
+            sign = 1
+        curr_temp = np.full((clip_win[1]-clip_win[0])*32, np.nan)
+        if sign == 1:
+            peak_sample = np.argmax(curr_template_raw[:, peak_chan_id])
+        else:
+            peak_sample = np.argmin(curr_template_raw[:, peak_chan_id])
+        peak_raw_fake.append(curr_template_raw[peak_sample, peak_chan_id])
+        # pre_peak
+        pre_samples = min(peak_sample, 32*np.abs(clip_win[0]))
+        curr_temp[32*(np.abs(clip_win[0])) - pre_samples:32*(np.abs(clip_win[0]))] = curr_template_raw[peak_sample - pre_samples:peak_sample, peak_chan_id]
+        # post_peak
+        post_samples = min(curr_template_raw.shape[0]-peak_sample, 32*clip_win[1])
+        curr_temp[32*(np.abs(clip_win[0])):32*(np.abs(clip_win[0])) + post_samples] = curr_template_raw[peak_sample:peak_sample + post_samples, peak_chan_id]
+
+        peak_waveform_raw_fake_aligned.append(curr_temp)
+    unit_tbl['peak_waveform_raw_fake_aligned'] = peak_waveform_raw_fake_aligned
+    unit_tbl['peak_raw_fake'] = peak_raw_fake
+
+    # save back to pkl
+    file = os.path.join(session_dir['opto_dir_curated'], f'{session}_curated_soma_opto_tagging_summary_raw_wf.pkl')
+    with open(file, 'wb') as f:
+        import pickle
+        pickle.dump(unit_tbl, f)
+    print(f'{session} saved to {file}')
+
+    # plot
+    n_rows = int(np.ceil(len(unit_tbl)/4))
+    fig, axes = plt.subplots(nrows=n_rows, ncols=4, figsize=(4*4,4*n_rows))
+    raw_time = np.arange(clip_win[0], clip_win[1], 1/32)
+    filtered_time = (np.arange(0, len(unit_tbl['peak_wf_aligned'].values[0])) - 100)/32
+    for i, unit_id in enumerate(unit_tbl['unit_id'].values):
+        ax = axes.flatten()[i]
+        # template_raw
+        curr_template_raw = unit_tbl.loc[unit_tbl['unit_id']==unit_id, 'peak_waveform_raw_fake_aligned'].values[0]
+        ax.plot(raw_time, curr_template_raw, color='gray', label='raw wf')
+        ax.axhline(y=0, color='black', linestyle='--')
+        ax.axhline(unit_tbl.loc[unit_tbl['unit_id']==unit_id, 'peak_raw_fake'].values[0], color='red', linestyle='--')
+
+        # template_filtered
+        curr_template_filtered = unit_tbl.loc[unit_tbl['unit_id']==unit_id, 'peak_wf_aligned'].values[0]
+        ax.plot(filtered_time, curr_template_filtered, color='blue', label='filtered wf')
+
+        # template_denoised
+        if i==0:
+            ax.legend()
+        ax.set_title(f'{unit_id}')
+    plt.tight_layout()
+    plt.savefig(os.path.join(session_dir['ephys_dir_curated'], 'waveforms_re_filtered.pdf'))
 
 if __name__ == "__main__":
     import pandas as pd
     session_list = pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')
     session_list = session_list['session_id'].tolist()
-    make_sorting_analyzer('behavior_ZS059_2021-03-27_16-03-00')
-    # for session in session_list:
-    #     session_dir = session_dirs(session)
-    #     waveform_zarr_folder = f'{session_dir[f"ephys_dir_curated"]}/analyzer.zarr'
-    #     # check is already processed
-    #     if os.path.exists(waveform_zarr_folder):
-    #         print(f"Zarr folder already exists for session {session}, skipping.")
-    #         continue
-    #     # check if nwb units exist
-    #     if session_dir['nwb_dir_raw'] is None:
-    #         print(f"NWB file not found for session {session}, skipping.")
-    #         continue
-    #     else:
-    #         nwb=load_nwb_from_filename(session_dir['nwb_dir_raw'])
-    #         if nwb.units is None:
-    #             print(f"No units found in NWB for session {session}, skipping.")
-    #             continue
-    #     # check if raw recording exists
-    #     if session_dir['raw_rec'] is None:
-    #         print(f"Raw recording file not found for session {session}, skipping.")
-    #         continue
+    # make_sorting_analyzer('behavior_ZS059_2021-03-27_16-03-00')
+    for session in session_list:
+        session_dir = session_dirs(session)
+        # waveform_zarr_folder = f'{session_dir[f"ephys_dir_curated"]}/analyzer.zarr'
+        # # check is already processed
+        # if os.path.exists(waveform_zarr_folder):
+        #     print(f"Zarr folder already exists for session {session}, skipping.")
+        #     continue
+        # check if nwb units exist
+        if session_dir['nwb_dir_raw'] is None:
+            print(f"NWB file not found for session {session}, skipping.")
+            continue
+        else:
+            nwb=load_nwb_from_filename(session_dir['nwb_dir_raw'])
+            if nwb.units is None:
+                print(f"No units found in NWB for session {session}, skipping.")
+                continue
+        # check if raw recording exists
+        if session_dir['raw_rec'] is None:
+            print(f"Raw recording file not found for session {session}, skipping.")
+            continue
 
-    #     print(f"Processing session {session}")
-    #     try:
-    #         make_sorting_analyzer(session)
-    #     except Exception as e:
-    #         print(f"Error processing session {session}: {e}")
+        print(f"Processing session {session}")
+        try:
+            # make_sorting_analyzer(session)
+            append_raw_wf(session, clip_win=(-2,4))
+        except Exception as e:
+            print(f"Error processing session {session}: {e}")
 
 
 
