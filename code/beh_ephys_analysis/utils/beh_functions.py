@@ -1589,6 +1589,8 @@ def get_session_tbl(session, cut_interruptions = False):
 def get_unit_tbl(session, data_type, summary = True):
     session_dir = session_dirs(session)
     unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
+    if 'ZS' in session:
+        unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary_raw_wf.pkl')
     unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
     ccf_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'],'ccf_unit_locations.csv')
     if summary: 
