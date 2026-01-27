@@ -40,7 +40,7 @@
       true
     ]
   },
-  "peak":{
+  "peak_raw":{
     "bounds": [
       "NaN",
       -50
