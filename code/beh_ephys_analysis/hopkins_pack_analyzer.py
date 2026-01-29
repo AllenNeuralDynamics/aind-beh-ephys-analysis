@@ -216,6 +216,27 @@ if __name__ == "__main__":
         if session_dir['raw_rec'] is None:
             print(f"Raw recording file not found for session {session}, skipping.")
             continue
+    # make_sorting_analyzer('behavior_ZS059_2021-03-27_16-03-00')
+    for session in session_list:
+        session_dir = session_dirs(session)
+        # waveform_zarr_folder = f'{session_dir[f"ephys_dir_curated"]}/analyzer.zarr'
+        # # check is already processed
+        # if os.path.exists(waveform_zarr_folder):
+        #     print(f"Zarr folder already exists for session {session}, skipping.")
+        #     continue
+        # check if nwb units exist
+        if session_dir['nwb_dir_raw'] is None:
+            print(f"NWB file not found for session {session}, skipping.")
+            continue
+        else:
+            nwb=load_nwb_from_filename(session_dir['nwb_dir_raw'])
+            if nwb.units is None:
+                print(f"No units found in NWB for session {session}, skipping.")
+                continue
+        # check if raw recording exists
+        if session_dir['raw_rec'] is None:
+            print(f"Raw recording file not found for session {session}, skipping.")
+            continue
 
         print(f"Processing session {session}")
         try:
