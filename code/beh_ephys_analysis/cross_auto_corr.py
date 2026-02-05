@@ -291,7 +291,7 @@ if __name__ == '__main__':
     # for session, probe in zip(session_list, probe_list):
     #     process(session, data_type, probe)
     #     plt.close('all')
-    cross_auto_corr('ecephys_687697_2023-09-15_12-36-06', data_type)
+    cross_auto_corr('behavior_751004_2024-12-21_13-28-28', data_type)
 
 
 

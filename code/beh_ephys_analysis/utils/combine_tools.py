@@ -29,7 +29,7 @@ from scipy.stats import fisher_exact
 from statsmodels.stats.proportion import proportions_ztest
 from scipy.stats import ttest_ind
 
-def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True):
+def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True, plot_half = True):
     # start with a mask of all True
     mask = pd.Series(True, index=combined_tagged_units.index)
     mask_no_opto = pd.Series(True, index=combined_tagged_units.index)
@@ -175,7 +175,7 @@ def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True
             bins = np.linspace(np.nanmin(full_data), np.nanmax(full_data), 50)
             match col:
                 case 'isi_violations':
-                    bins =  np.linspace(0, 1, 50)
+                    bins = np.logspace(np.log10(1e-5), np.log10(np.nanmax(full_data)), 50)
                 case 'eu':
                     bins =  np.linspace(0, 1, 50)
                 case 'corr':
@@ -190,11 +190,15 @@ def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True
                     bins = np.linspace(0, 50, 50)
                 case 'peak_raw':
                     bins = np.linspace(-500, 300, 50)
-            ax.hist(full_data, bins=bins, color='gray', edgecolor=None, alpha=0.5, label='All', density=density)
-            ax.hist(filtered_data, bins=bins, color='orange', edgecolor=None, alpha=0.5, label='Opto-Filtered', density=density)
             if plot_all:
+                ax.hist(full_data, bins=bins, color='gray', edgecolor=None, alpha=0.5, label='All', density=density)
+            ax.hist(filtered_data, bins=bins, color='orange', edgecolor=None, alpha=0.5, label='Opto-Filtered', density=density)
+            if plot_half:
                 ax.hist(half_filtered_data, bins=bins, color='green', edgecolor=None, alpha=0.5, label='Filtered', density=density)
-            
+            if 'isi' in col:
+                ax.set_xscale('log')
+                ax.axvline(x=0.1, color='red', linestyle='--')
+                ax.axvline(x=0.2, color='blue', linestyle='--')
                 
 
             if "bounds" in cfg:
@@ -211,6 +215,7 @@ def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True
                 if not np.isnan(ub) and ub < full_data.max():
                     ax.axvline(ub, color='green', linestyle='--', label='Upper bound')
             ax.legend()
+            ax.set_yscale('log')
 
         elif "items" in cfg:
             full_counts = combined_tagged_units[col].dropna().astype(str).value_counts()
@@ -236,6 +241,7 @@ def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True
             ax.set_title(f'{col}\nItems: {cfg["items"]}') 
             ax.set_xlabel(col)
             ax.set_ylabel('Count')
+            ax.set_yscale('log')
             ax.legend()
 
     # Remove unused subplots
@@ -248,7 +254,7 @@ def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True
     # plt.savefig(os.path.join(wf_folder, f'Pass_histo_{criteria_name}.pdf'))
     # plt.show()
 
-    return combined_tagged_units_filtered, combined_tagged_units, fig
+    return combined_tagged_units_filtered, combined_tagged_units, fig, axes
 
 def to_str_intlike(x):
     """
