@@ -177,19 +177,37 @@ def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True
                 case 'isi_violations':
                     bins = np.logspace(np.log10(1e-5), np.log10(np.nanmax(full_data)), 50)
                 case 'eu':
-                    bins =  np.linspace(0, 1, 50)
+                    linear_bins = np.arange(0, 2.1, 0.1)
+
+                    # ----- log bins above 2 -----
+                    ymax = np.nanmax(half_filtered_data)
+
+                    log_edges = np.linspace(
+                        np.log10(2),
+                        np.log10(ymax),
+                        20
+                    )
+
+                    # Convert edges BACK to linear space
+                    log_bins = 10 ** log_edges
+
+                    # Remove duplicate 2
+                    log_bins = log_bins[log_bins > 2]
+
+                    bins = np.concatenate([linear_bins, log_bins])
+                    # bins =  np.linspace(0, np.nanmax(half_filtered_data), 500)
                 case 'corr':
-                    bins =  np.linspace(0.7, 1, 30)
+                    bins =  np.linspace(np.nanmin(full_data), 1, 30)
                 case 'p_max':
-                    bins =  np.linspace(0, 1, 50)
+                    bins =  np.linspace(-0.6, 1, 50)
                 case 'lat_max_p':
-                    bins =  np.linspace(0, 0.025, 50)
+                    bins =  np.linspace(0, np.nanmax(full_data), 50)
                 case 'peak':
-                    bins = np.linspace(-500, 300, 50)
+                    bins = np.linspace(-800, 500, 50)
                 case 'snr':
                     bins = np.linspace(0, 50, 50)
                 case 'peak_raw':
-                    bins = np.linspace(-500, 300, 50)
+                    bins = np.linspace(-800, 500, 50)
             if plot_all:
                 ax.hist(full_data, bins=bins, color='gray', edgecolor=None, alpha=0.5, label='All', density=density)
             ax.hist(filtered_data, bins=bins, color='orange', edgecolor=None, alpha=0.5, label='Opto-Filtered', density=density)
@@ -410,7 +428,7 @@ def spatial_dependence_summary(
 ):
     """
     Combines:
-      (1) Linear trend test: value ~ x + y + z (F-test vs intercept-only)
+      (1) Linear trend test: value ~ x + y + z (PERMUTATION test; permute values, keep coords fixed)
       (2) 5-fold CV predictability with kNN (distance-weighted) + permutation p-value
 
     Returns a dictionary of results.
@@ -426,8 +444,7 @@ def spatial_dependence_summary(
     X = np.asarray(coords, float)
     y = np.asarray(values, float)
 
-    # drop NaNs / infs
-    # reshape X to N by number of dimensions
+    # drop NaNs / infs; reshape X to N x D
     X = X.reshape(X.shape[0], -1)
     ok = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
     X = X[ok]
@@ -437,12 +454,51 @@ def spatial_dependence_summary(
         raise ValueError(f"Too few valid points after filtering (n={n}).")
 
     # -------------------------
-    # (1) Linear regression trend
+    # (1) Linear regression trend (PERMUTATION p-value)
     # -------------------------
-    X_const = sm.add_constant(X)  # [1, x, y, z]
+    X_const = sm.add_constant(X)  # [1, x, y, z] (or [1, ...D dims])
+
     model_full = sm.OLS(y, X_const).fit()
-    model_null = sm.OLS(y, np.ones((n, 1))).fit()
-    f_stat, p_trend, _ = model_full.compare_f_test(model_null)
+    r2_obs = float(model_full.rsquared)
+
+    # Deterministic per-permutation seeds (same pattern you used below)
+    perm_seeds = np.random.SeedSequence(seed + 12345).spawn(permutations)
+    perm_seeds_uint = np.array(
+        [s.generate_state(1, dtype=np.uint32)[0] for s in perm_seeds],
+        dtype=np.uint32
+    )
+
+    def _one_perm_r2_linear(s_uint):
+        r = np.random.default_rng(int(s_uint))
+        y_perm = r.permutation(y)
+        return sm.OLS(y_perm, X_const).fit().rsquared
+
+    # compute permutation null (parallel if possible)
+    try:
+        from joblib import Parallel, delayed
+        r2_perm = np.asarray(
+            Parallel(n_jobs=-1, prefer="processes")(
+                delayed(_one_perm_r2_linear)(s_uint) for s_uint in perm_seeds_uint
+            ),
+            dtype=float,
+        )
+    except Exception:
+        r2_perm = np.empty(permutations, float)
+        for i, s_uint in enumerate(perm_seeds_uint):
+            r2_perm[i] = _one_perm_r2_linear(s_uint)
+
+    # one-sided permutation p-value (greater-than)
+    p_trend_perm = (np.sum(r2_perm >= r2_obs) + 1) / (permutations + 1)
+
+    # (Optional) also report the classic F-stat if you still want it (no p-value)
+    # This is just for interpretability; p-value comes from permutations.
+    # F = ( (SSE_null - SSE_full)/df1 ) / ( SSE_full/df2 )
+    y_mean = y.mean()
+    sse_null = np.sum((y - y_mean) ** 2)
+    sse_full = np.sum(model_full.resid ** 2)
+    df1 = X_const.shape[1] - 1
+    df2 = n - X_const.shape[1]
+    f_stat = ((sse_null - sse_full) / df1) / (sse_full / df2) if df2 > 0 else np.nan
 
     # -------------------------
     # (2) CV predictability (kNN) + permutation test (parallel)
@@ -462,30 +518,25 @@ def spatial_dependence_summary(
 
     r2_cv_obs = cv_r2(y)
 
-    # --- parallel permutation null ---
-    # Make deterministic per-permutation seeds
     perm_seeds = np.random.SeedSequence(seed).spawn(permutations)
     perm_seeds_uint = np.array([s.generate_state(1, dtype=np.uint32)[0] for s in perm_seeds], dtype=np.uint32)
 
-    def _one_perm_r2(s_uint):
+    def _one_perm_r2_knn(s_uint):
         r = np.random.default_rng(int(s_uint))
         return cv_r2(r.permutation(y))
 
-    r2_cv_perm = None
     try:
         from joblib import Parallel, delayed
-
         r2_cv_perm = np.asarray(
             Parallel(n_jobs=-1, prefer="processes")(
-                delayed(_one_perm_r2)(s_uint) for s_uint in perm_seeds_uint
+                delayed(_one_perm_r2_knn)(s_uint) for s_uint in perm_seeds_uint
             ),
             dtype=float,
         )
     except Exception:
-        # Fallback to sequential if joblib isn't available or parallel fails
         r2_cv_perm = np.empty(permutations, float)
         for i, s_uint in enumerate(perm_seeds_uint):
-            r2_cv_perm[i] = _one_perm_r2(s_uint)
+            r2_cv_perm[i] = _one_perm_r2_knn(s_uint)
 
     p_cv = (np.sum(r2_cv_perm >= r2_cv_obs) + 1) / (permutations + 1)
 
@@ -498,23 +549,27 @@ def spatial_dependence_summary(
             "seed": int(seed),
         },
         "linear_trend": {
-            "coef_const_x_y_z": model_full.params.tolist(),  # [const, bx, by, bz]
-            "p_value_F_test_vs_intercept_only": float(p_trend),
+            "coef_const_x_y_z": model_full.params.tolist(),  # [const, b1..bD]
+            "r2": float(r2_obs),
             "F_stat": float(f_stat),
-            "r2": float(model_full.rsquared),
+            "p_value_permutation_r2": float(p_trend_perm),
+            "null_mean_r2": float(np.mean(r2_perm)),
+            "null_std_r2": float(np.std(r2_perm, ddof=1)),
         },
         "cv_predictability_knn": {
             "r2_cv": float(r2_cv_obs),
-            "p_value_permutation": float(p_cv),  # one-sided: better than random
+            "p_value_permutation": float(p_cv),
             "null_mean": float(np.mean(r2_cv_perm)),
             "null_std": float(np.std(r2_cv_perm, ddof=1)),
         },
     }
 
     if return_null:
+        out["linear_trend"]["r2_null_distribution"] = r2_perm.tolist()
         out["cv_predictability_knn"]["r2_null_distribution"] = r2_cv_perm.tolist()
 
     return out
+
 
 
 

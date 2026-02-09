@@ -36,7 +36,6 @@ import spikeinterface.preprocessing as spre
 import spikeinterface.postprocessing as spost
 from tqdm import tqdm
 import shutil
-%matplotlib inline
 
 # %%
 def recompute_wf(session, data_type, plot = True, save = False):
