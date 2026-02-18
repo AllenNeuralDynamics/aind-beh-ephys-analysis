@@ -2,7 +2,7 @@
   "isi_violations": {
     "conditional": [
       {
-        "if": { "tier_2": ["==", true] },
+        "if": { "tier_1": ["==", true] },
         "bounds": [0, 0.20]
       },
       {
