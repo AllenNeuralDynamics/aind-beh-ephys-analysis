@@ -242,6 +242,12 @@ def plot_licks_from_video(session):
                 'total_distance': [0, 300],
                 'dis_center_start': [0, 100],
                 'peak_velocity': [0, session_licks[session_licks['has_lick']]['peak_velocity'].quantile(0.99)]}
+    thresholds = {'mean_speed': [0, 5000],
+                'dis_center_max': [0, 550],
+                'duration': [0.006, 4],
+                'total_distance': [0, 2000],
+                'dis_center_start': [0, 1000],
+                'peak_velocity': [0, session_licks[session_licks['has_lick']]['peak_velocity'].quantile(0.9999999)]}
     filter = np.full(len(session_licks), True)
     for feature, (lower, upper) in thresholds.items():
         filter &= (session_licks[feature] >= lower) & (session_licks[feature] <= upper)
@@ -349,7 +355,8 @@ if __name__ == "__main__":
     df = pd.concat(dfs)
     session_list = df['session_id'].values.tolist()
     session_list = [session for session in session_list if str(session).startswith('behavior') and 'ZS' not in session]
-    for session in session_list:
-        print(f"Processing session {session}...")
-        plot_licks_from_video(session)
+    # for session in session_list:
+    #     print(f"Processing session {session}...")
+    #     plot_licks_from_video(session)
+    plot_licks_from_video('behavior_751769_2025-01-17_11-37-39')
 
