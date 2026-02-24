@@ -767,6 +767,190 @@ def binary_shift_P_vs_U(
         "p_value_permutation": float(p_perm),
     }
 
+import numpy as np
+from scipy.stats import ttest_ind, fisher_exact
+from statsmodels.stats.proportion import proportions_ztest
+
+
+def welch_shift_X_vs_Y(
+    x,
+    y,
+    *,
+    alternative="two-sided",   # "two-sided", "greater", "less"
+    permutations=20000,
+    seed=0,
+    n_boot=5000,
+):
+    """
+    Distribution shift test for continuous, roughly normal data:
+      X vs Y using Welch's t-test (unequal variances),
+      plus a label-permutation p-value and effect size,
+      and bootstrap CI for mean difference (X - Y).
+    """
+    rng = np.random.default_rng(seed)
+
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+
+    # filter NaNs
+    x = x[np.isfinite(x)]
+    y = y[np.isfinite(y)]
+
+    nX, nY = len(x), len(y)
+    if nX < 2 or nY < 2:
+        raise ValueError(f"Need at least 2 samples in each group. Got nX={nX}, nY={nY}.")
+
+    # --- observed Welch t-test ---
+    t_obs, p_asym = ttest_ind(x, y, equal_var=False, alternative=alternative)
+
+    # effect size: Cohen's d (pooled SD; still useful standardized diff)
+    sX = np.var(x, ddof=1)
+    sY = np.var(y, ddof=1)
+    s_pooled = np.sqrt(((nX - 1) * sX + (nY - 1) * sY) / (nX + nY - 2))
+    cohen_d = (np.mean(x) - np.mean(y)) / (s_pooled + 1e-12)
+
+    # --- permutation p-value (shuffle labels; keep group sizes fixed) ---
+    all_clean = np.concatenate([x, y])
+    n = len(all_clean)
+    idx = np.arange(n)
+
+    t_perm = np.empty(permutations, float)
+    for i in range(permutations):
+        rng.shuffle(idx)
+        x_idx = idx[:nX]
+        y_idx = idx[nX:]
+        t_perm[i] = ttest_ind(
+            all_clean[x_idx],
+            all_clean[y_idx],
+            equal_var=False,
+            alternative="two-sided",  # symmetric; apply alternative below
+        ).statistic
+
+    if alternative == "two-sided":
+        p_perm = (np.sum(np.abs(t_perm) >= np.abs(t_obs)) + 1) / (permutations + 1)
+    elif alternative == "greater":
+        # t larger when mean(X) > mean(Y)
+        p_perm = (np.sum(t_perm >= t_obs) + 1) / (permutations + 1)
+    elif alternative == "less":
+        p_perm = (np.sum(t_perm <= t_obs) + 1) / (permutations + 1)
+    else:
+        raise ValueError("alternative must be 'two-sided', 'greater', or 'less'.")
+
+    # --- bootstrap CI for mean difference (X - Y) ---
+    boot = np.empty(n_boot, float)
+    for i in range(n_boot):
+        bx = rng.choice(x, size=nX, replace=True)
+        by = rng.choice(y, size=nY, replace=True)
+        boot[i] = np.mean(bx) - np.mean(by)
+    ci_low, ci_high = np.quantile(boot, [0.025, 0.975])
+
+    return {
+        "n_X": int(nX),
+        "n_Y": int(nY),
+        "test": "Welch t-test (X vs Y)",
+        "alternative": alternative,
+        "mean_X": float(np.mean(x)),
+        "mean_Y": float(np.mean(y)),
+        "mean_diff_X_minus_Y": float(np.mean(x) - np.mean(y)),
+        "mean_diff_bootstrap_CI95": [float(ci_low), float(ci_high)],
+        "t_stat": float(t_obs),
+        "p_value_asymptotic": float(p_asym),
+        "p_value_permutation": float(p_perm),
+        "cohens_d": float(cohen_d),
+    }
+
+
+def binary_shift_X_vs_Y(
+    x,
+    y,
+    *,
+    alternative="two-sided",  # "two-sided", "larger", "smaller" (Fisher wording)
+    permutations=20000,
+    seed=0,
+):
+    """
+    Test whether binary values differ between group X and group Y.
+
+    Returns:
+      - event rates
+      - odds ratio + Fisher exact p-value
+      - two-proportion z-test p-value
+      - permutation p-value (label shuffle) on risk difference (rate_X - rate_Y)
+    """
+    rng = np.random.default_rng(seed)
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # filter to finite, ensure binary
+    x = x[np.isfinite(x.astype(float))].astype(int)
+    y = y[np.isfinite(y.astype(float))].astype(int)
+
+    if not np.isin(x, [0, 1]).all() or not np.isin(y, [0, 1]).all():
+        raise ValueError("x and y must be binary (0/1).")
+
+    nX, nY = len(x), len(y)
+    if nX < 1 or nY < 1:
+        raise ValueError(f"Need at least 1 sample in each group. Got nX={nX}, nY={nY}.")
+
+    # counts
+    a = int(x.sum())         # X successes
+    b = int(nX - a)          # X failures
+    c = int(y.sum())         # Y successes
+    d = int(nY - c)          # Y failures
+
+    rate_X = a / nX
+    rate_Y = c / nY
+    risk_diff = rate_X - rate_Y
+    risk_ratio = (rate_X / rate_Y) if rate_Y > 0 else np.inf
+
+    table = np.array([[a, b],
+                      [c, d]], dtype=int)
+
+    OR, p_fisher = fisher_exact(table, alternative=alternative)
+
+    # statsmodels uses alternative: 'two-sided', 'larger', 'smaller'
+    z_stat, p_z = proportions_ztest(
+        count=[a, c],
+        nobs=[nX, nY],
+        alternative=alternative
+    )
+
+    # permutation test on risk difference
+    all_clean = np.concatenate([x, y])
+    n = len(all_clean)
+    idx = np.arange(n)
+
+    perm_stats = np.empty(permutations, float)
+    for i in range(permutations):
+        rng.shuffle(idx)
+        x_idx = idx[:nX]
+        y_idx = idx[nX:]
+        perm_stats[i] = all_clean[x_idx].mean() - all_clean[y_idx].mean()
+
+    if alternative == "two-sided":
+        p_perm = (np.sum(np.abs(perm_stats) >= abs(risk_diff)) + 1) / (permutations + 1)
+    elif alternative == "larger":
+        p_perm = (np.sum(perm_stats >= risk_diff) + 1) / (permutations + 1)
+    else:  # "smaller"
+        p_perm = (np.sum(perm_stats <= risk_diff) + 1) / (permutations + 1)
+
+    return {
+        "n_X": int(nX),
+        "n_Y": int(nY),
+        "count_X_1": int(a),
+        "count_Y_1": int(c),
+        "rate_X": float(rate_X),
+        "rate_Y": float(rate_Y),
+        "risk_diff_X_minus_Y": float(risk_diff),
+        "risk_ratio_X_over_Y": float(risk_ratio),
+        "odds_ratio_fisher": float(OR),
+        "p_value_fisher": float(p_fisher),
+        "z_stat": float(z_stat),
+        "p_value_ztest": float(p_z),
+        "p_value_permutation": float(p_perm),
+    }
+    
 # Example:
 # res = welch_shift_P_vs_U(x_all, is_known_P, alternative="two-sided", permutations=20000, seed=0)
 # print(res)
