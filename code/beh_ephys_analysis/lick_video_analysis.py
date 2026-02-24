@@ -165,7 +165,7 @@ def pairplot_color_code(start, max_point, color_code, feature_name, fig, subplot
 
 
 
-def plot_licks_from_video(session):
+def plot_licks_from_video(session, plot=True, cutoff_percentile=0.95):
     video_data_file = '/root/capsule/data/all_tongue_movements_04022026/all_tongue_movements_04022026.parquet'
     all_lick_df = pd.read_parquet(video_data_file)
     session_video_list = all_lick_df['session'].unique().tolist()
@@ -241,111 +241,115 @@ def plot_licks_from_video(session):
                 'duration': [0.006, 0.3],
                 'total_distance': [0, 300],
                 'dis_center_start': [0, 100],
-                'peak_velocity': [0, session_licks[session_licks['has_lick']]['peak_velocity'].quantile(0.99)]}
-    thresholds = {'mean_speed': [0, 5000],
-                'dis_center_max': [0, 550],
-                'duration': [0.006, 4],
-                'total_distance': [0, 2000],
-                'dis_center_start': [0, 1000],
-                'peak_velocity': [0, session_licks[session_licks['has_lick']]['peak_velocity'].quantile(0.9999999)]}
+                'peak_velocity': [0, session_licks[session_licks['has_lick']]['peak_velocity'].quantile(cutoff_percentile)]}
+    thresholds = {'mean_speed': [0, session_licks[session_licks['has_lick']]['mean_speed'].quantile(cutoff_percentile)],
+                'dis_center_max': [0, session_licks[session_licks['has_lick']]['dis_center_max'].quantile(cutoff_percentile)],
+                'duration': [0.005, session_licks[session_licks['has_lick']]['duration'].quantile(cutoff_percentile)],
+                'total_distance': [0, session_licks[session_licks['has_lick']]['total_distance'].quantile(cutoff_percentile)],
+                'dis_center_start': [0, session_licks[session_licks['has_lick']]['dis_center_start'].quantile(cutoff_percentile)],
+                'peak_velocity': [0, session_licks[session_licks['has_lick']]['peak_velocity'].quantile(cutoff_percentile)]}
     filter = np.full(len(session_licks), True)
     for feature, (lower, upper) in thresholds.items():
         filter &= (session_licks[feature] >= lower) & (session_licks[feature] <= upper)
     session_licks['filter'] = filter
+    # save the filtered data
+    filtered_licks = session_licks[session_licks['filter']]
+    save_file_filtered = os.path.join(session_dir['beh_fig_dir'], f"{session}_filtered_video_licks.csv")
     # plot selection
-    g = sns.pairplot(
-        data=session_licks[['duration', 'total_distance', 'mean_speed',
-                            'dis_center_max', 'dis_center_start',
-                            'peak_velocity', 'filter']],
-        hue='filter',
-        diag_kind='hist',
-        diag_kws={'alpha': 0.5},
-        plot_kws={'alpha': 0.3},
-    )
+    if plot:
+        g = sns.pairplot(
+            data=session_licks[['duration', 'total_distance', 'mean_speed',
+                                'dis_center_max', 'dis_center_start',
+                                'peak_velocity', 'filter']],
+            hue='filter',
+            diag_kind='hist',
+            diag_kws={'alpha': 0.5},
+            plot_kws={'alpha': 0.3},
+        )
 
-    # Set diagonal y-axis to log
-    for ax in g.diag_axes:
-        ax.set_yscale('log')
+        # Set diagonal y-axis to log
+        for ax in g.diag_axes:
+            ax.set_yscale('log')
 
-    save_file_selection = os.path.join(session_dir['beh_fig_dir'], f"{session}_lick_feature_relationships.png")
-    g.fig.savefig(save_file_selection, dpi=300)
-    plt.close(g.fig)
-    # plot lick raster
-    fig = plt.figure(figsize=(18, 5))
-    gs = gridspec.GridSpec(1, 5)
-    color_map = LinearSegmentedColormap.from_list('custom_colormap', ['blue', 'gray', 'red'])
-    bin_num = 3
-    edges = np.linspace(0, len(session_df), bin_num)
-    _, ax, _ = plot_raster_rate(licks_L_cleaned, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[0])
-    ax.set_title('Left Licks')
-    _, ax, _ = plot_raster_rate(licks_R_cleaned, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[1])
-    ax.set_title('Right Licks')
+        save_file_selection = os.path.join(session_dir['beh_fig_dir'], f"{session}_lick_feature_relationships.png")
+        g.fig.savefig(save_file_selection, dpi=300)
+        plt.close(g.fig)
+        # plot lick raster
+        fig = plt.figure(figsize=(18, 5))
+        gs = gridspec.GridSpec(1, 5)
+        color_map = LinearSegmentedColormap.from_list('custom_colormap', ['blue', 'gray', 'red'])
+        bin_num = 3
+        edges = np.linspace(0, len(session_df), bin_num)
+        _, ax, _ = plot_raster_rate(licks_L_cleaned, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[0])
+        ax.set_title('Left Licks')
+        _, ax, _ = plot_raster_rate(licks_R_cleaned, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[1])
+        ax.set_title('Right Licks')
 
-    all_licks = np.sort(np.concatenate([licks_L_cleaned, licks_R_cleaned]))
-    _, ax, _ = plot_raster_rate(all_licks, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[2])
-    ax.set_title('All Licks')
+        all_licks = np.sort(np.concatenate([licks_L_cleaned, licks_R_cleaned]))
+        _, ax, _ = plot_raster_rate(all_licks, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[2])
+        ax.set_title('All Licks')
 
-    _, ax, _ = plot_raster_rate(session_licks[session_licks['has_lick_side']!=0]['start_time_session'].values, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[3])
-    ax.set_title('Detected video Licks')
-    _, ax, _ = plot_raster_rate(session_licks['start_time_session'].values, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[4])
-    ax.set_title('Video Licks')
+        _, ax, _ = plot_raster_rate(session_licks[session_licks['has_lick_side']!=0]['start_time_session'].values, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[3])
+        ax.set_title('Detected video Licks')
+        _, ax, _ = plot_raster_rate(session_licks['start_time_session'].values, session_df['goCue_start_time'].values, np.arange(len(session_df)), edges, ['early', 'late'], color_map, fig, gs[4])
+        ax.set_title('Video Licks')
 
-    plt.tight_layout()
+        plt.tight_layout()
 
-    save_file_raster = os.path.join(session_dir['beh_fig_dir'], f"{session}_lick_raster_comparison.png")
-    fig.savefig(save_file_raster, dpi=300)
-    plt.close(fig)
+        save_file_raster = os.path.join(session_dir['beh_fig_dir'], f"{session}_lick_raster_comparison.png")
+        fig.savefig(save_file_raster, dpi=300)
+        plt.close(fig)
 
-    # plot feature in space
-    fig = plt.figure(figsize=(24, 24))
-    subplot_gs = gridspec.GridSpec(2, 2, hspace=0.2, wspace=0.2)
-    start = np.array([session_licks['startpoint_y'].values,
-                    session_licks['startpoint_x'].values])[:, session_licks['filter'].values]
+        # plot feature in space
+        fig = plt.figure(figsize=(24, 24))
+        subplot_gs = gridspec.GridSpec(2, 2, hspace=0.2, wspace=0.2)
+        start = np.array([session_licks['startpoint_y'].values,
+                        session_licks['startpoint_x'].values])[:, session_licks['filter'].values]
 
-    max_point = np.array([session_licks['max_y_from_jaw'].values,
-                        session_licks['max_y_from_jaw_x'].values])[:, session_licks['filter'].values]
-    center_xys = np.array([[center_y, center_x], 
-                        [center_y_start, center_x_start]])
+        max_point = np.array([session_licks['max_y_from_jaw'].values,
+                            session_licks['max_y_from_jaw_x'].values])[:, session_licks['filter'].values]
+        center_xys = np.array([[center_y, center_x], 
+                            [center_y_start, center_x_start]])
 
-    color_code = session_licks['has_lick_side'].values[session_licks['filter'].values]
-    sort_ind = np.argsort(color_code)
-    curr_ax, ax_main, ax_xhist, ax_yhist, ax_hist_color = pairplot_color_code(start[:, sort_ind], max_point[:, sort_ind], color_code[sort_ind], 'Lick_side', fig, subplot_gs[0], center_xys=center_xys)
+        color_code = session_licks['has_lick_side'].values[session_licks['filter'].values]
+        sort_ind = np.argsort(color_code)
+        curr_ax, ax_main, ax_xhist, ax_yhist, ax_hist_color = pairplot_color_code(start[:, sort_ind], max_point[:, sort_ind], color_code[sort_ind], 'Lick_side', fig, subplot_gs[0], center_xys=center_xys)
 
-    feature = 'duration'
-    color_code = session_licks[feature].values[session_licks['filter'].values]
-    sort_ind = np.argsort(color_code)
-    curr_ax, ax_main, ax_xhist, ax_yhist, ax_hist_color = pairplot_color_code(start[:, sort_ind], max_point[:, sort_ind], color_code[sort_ind], feature, fig, subplot_gs[1], center_xys=center_xys)
+        feature = 'duration'
+        color_code = session_licks[feature].values[session_licks['filter'].values]
+        sort_ind = np.argsort(color_code)
+        curr_ax, ax_main, ax_xhist, ax_yhist, ax_hist_color = pairplot_color_code(start[:, sort_ind], max_point[:, sort_ind], color_code[sort_ind], feature, fig, subplot_gs[1], center_xys=center_xys)
 
-    feature = 'peak_velocity'
-    color_code = session_licks[feature].values[session_licks['filter'].values]
-    sort_ind = np.argsort(color_code)
-    curr_ax, ax_main, ax_xhist, ax_yhist, ax_hist_color = pairplot_color_code(start[:, sort_ind], max_point[:, sort_ind], color_code[sort_ind], feature, fig, subplot_gs[2], center_xys=center_xys)
+        feature = 'peak_velocity'
+        color_code = session_licks[feature].values[session_licks['filter'].values]
+        sort_ind = np.argsort(color_code)
+        curr_ax, ax_main, ax_xhist, ax_yhist, ax_hist_color = pairplot_color_code(start[:, sort_ind], max_point[:, sort_ind], color_code[sort_ind], feature, fig, subplot_gs[2], center_xys=center_xys)
 
-    feature = 'mean_speed'
-    color_code = session_licks[feature].values[session_licks['filter'].values]
-    sort_ind = np.argsort(color_code)
-    curr_ax, ax_main, ax_xhist, ax_yhist, ax_hist_color = pairplot_color_code(start[:, sort_ind], max_point[:, sort_ind], color_code[sort_ind], feature, fig, subplot_gs[3], center_xys=center_xys)
+        feature = 'mean_speed'
+        color_code = session_licks[feature].values[session_licks['filter'].values]
+        sort_ind = np.argsort(color_code)
+        curr_ax, ax_main, ax_xhist, ax_yhist, ax_hist_color = pairplot_color_code(start[:, sort_ind], max_point[:, sort_ind], color_code[sort_ind], feature, fig, subplot_gs[3], center_xys=center_xys)
 
-    plt.suptitle(session)
+        plt.suptitle(session)
 
-    plt.tight_layout()
+        plt.tight_layout()
 
-    save_file_space = os.path.join(session_dir['beh_fig_dir'], f'{session}_lick_feature_space.png')
-    fig.savefig(save_file_space, dpi=300)
-    # close fig
-    plt.close(fig)
+        save_file_space = os.path.join(session_dir['beh_fig_dir'], f'{session}_lick_feature_space.png')
+        fig.savefig(save_file_space, dpi=300)
+        # close fig
+        plt.close(fig)
 
-    # combine all pdfs into one
-    png_files = [save_file_selection, save_file_raster, save_file_space]
-    output_pdf = os.path.join(session_dir['beh_fig_dir'], f'{session}_lick_video_analysis_combined.pdf')
-    images = [Image.open(f).convert("RGB") for f in png_files]
+        # combine all pdfs into one
+        png_files = [save_file_selection, save_file_raster, save_file_space]
+        output_pdf = os.path.join(session_dir['beh_fig_dir'], f'{session}_lick_video_analysis_combined.pdf')
+        images = [Image.open(f).convert("RGB") for f in png_files]
 
-    images[0].save(
-        output_pdf,
-        save_all=True,
-        append_images=images[1:]
-    )
-    plt.close('all')
+        images[0].save(
+            output_pdf,
+            save_all=True,
+            append_images=images[1:]
+        )
+        plt.close('all')
 
 
 
@@ -358,5 +362,5 @@ if __name__ == "__main__":
     # for session in session_list:
     #     print(f"Processing session {session}...")
     #     plot_licks_from_video(session)
-    plot_licks_from_video('behavior_751769_2025-01-17_11-37-39')
+    plot_licks_from_video('behavior_791691_2025-06-25_14-06-10')
 

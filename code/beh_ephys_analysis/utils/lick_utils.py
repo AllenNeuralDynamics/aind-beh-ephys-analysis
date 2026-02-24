@@ -107,7 +107,7 @@ def clean_up_licks(licksL, licksR, crosstalk_thresh=100, rebound_thresh=50, plot
 
     return licksL_cleaned, licksR_cleaned, fig
 
-def parse_lick_trains(licks, window_size = 1000, height = 2, min_dist = 2000, inter_train_interval = 500, inter_lick_interval = 800, plot = False, unit = 'seconds'):
+def parse_lick_trains(licks, window_size = 1000, height = 1, min_dist = 2000, inter_train_interval = 500, inter_lick_interval = 800, plot = False, unit = 'seconds'):
     """
     """
     licks = np.array(licks)
@@ -127,13 +127,13 @@ def parse_lick_trains(licks, window_size = 1000, height = 2, min_dist = 2000, in
     # lick train detection
     inter_lick_interval_mask = np.diff(licks)
     inter_train_mask = inter_lick_interval_mask > inter_train_interval
-    within_train_mask = inter_lick_interval_mask < inter_lick_interval
+    within_train_mask = inter_lick_interval_mask < inter_train_interval
     pre_it_mask = np.concatenate([[True], inter_train_mask])
     post_it_mask = np.concatenate([inter_train_mask, [True]])
     pre_wt_mask = np.concatenate([[False], within_train_mask])
     post_wt_mask = np.concatenate([within_train_mask, [False]])
-    train_starts_tmp = licks[pre_it_mask & post_wt_mask]
-    train_ends_tmp = licks[pre_wt_mask & post_it_mask]
+    train_starts_tmp = licks[pre_it_mask]
+    train_ends_tmp = licks[post_it_mask]
     # if len(train_starts_tmp) > len(train_ends_tmp):
     #     train_starts_tmp = train_starts_tmp[:-1]
     train_starts = []
@@ -143,7 +143,7 @@ def parse_lick_trains(licks, window_size = 1000, height = 2, min_dist = 2000, in
     for train_start in train_starts_tmp:
         if (train_ends_tmp > train_start).any():
             train_end = train_ends_tmp[train_ends_tmp > train_start][0]
-            if train_end - train_start < 3500 and ((lick_peak_times > train_start) & (lick_peak_times < train_end)).any():
+            if train_end - train_start < 3500 and ((lick_peak_times >= train_start) & (lick_peak_times <= train_end)).any():
                 train_starts.append(train_start)
                 train_ends.append(train_end)
                 train_amps.append(np.mean(lick_peak_amplitudes[(lick_peak_times > train_start) & (lick_peak_times < train_end)]))
