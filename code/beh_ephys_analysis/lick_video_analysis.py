@@ -468,6 +468,16 @@ def plot_licks_from_video(session, plot=True, cutoff_percentile=0.95):
             diag_kws={'alpha': 0.5},
             plot_kws={'alpha': 0.3},
         )
+    if plot:
+        g = sns.pairplot(
+            data=session_licks[['duration', 'total_distance', 'mean_speed',
+                                'dis_center_max', 'dis_center_start',
+                                'peak_velocity', 'filter']],
+            hue='filter',
+            diag_kind='hist',
+            diag_kws={'alpha': 0.5},
+            plot_kws={'alpha': 0.3},
+        )
 
         for ax in g.diag_axes:
             ax.set_yscale('log')
@@ -536,6 +546,11 @@ def plot_licks_from_video(session, plot=True, cutoff_percentile=0.95):
         subplot_gs = gridspec.GridSpec(2, 2, hspace=0.2, wspace=0.2)
         start = np.array([session_licks['startpoint_y'].values,
                         session_licks['startpoint_x'].values])[:, session_licks['filter'].values]
+        # plot feature in space
+        fig = plt.figure(figsize=(24, 24))
+        subplot_gs = gridspec.GridSpec(2, 2, hspace=0.2, wspace=0.2)
+        start = np.array([session_licks['startpoint_y'].values,
+                        session_licks['startpoint_x'].values])[:, session_licks['filter'].values]
 
         max_point = np.array([session_licks['max_y_from_jaw'].values,
                             session_licks['max_y_from_jaw_x'].values])[:, session_licks['filter'].values]
@@ -565,24 +580,22 @@ def plot_licks_from_video(session, plot=True, cutoff_percentile=0.95):
 
         plt.tight_layout()
 
-        save_file_space = os.path.join(session_dir['beh_fig_dir'], f'{session}_lick_feature_space.png')
-        fig.savefig(save_file_space, dpi=300)
-        # close fig
-        plt.close(fig)
+    save_file_space = os.path.join(session_dir['beh_fig_dir'], f'{session}_lick_feature_space.png')
+    fig.savefig(save_file_space, dpi=300)
+    # close fig
+    plt.close(fig)
 
+    # combine all pdfs into one
+    png_files = [save_file_selection, save_file_has_lick, save_file_raster, save_file_space, save_file_gmm]
+    output_pdf = os.path.join(session_dir['beh_fig_dir'], f'{session}_lick_video_analysis_combined.pdf')
+    images = [Image.open(f).convert("RGB") for f in png_files]
 
-
-        # combine all pdfs into one
-        png_files = [save_file_selection, save_file_has_lick, save_file_raster, save_file_space, save_file_gmm]
-        output_pdf = os.path.join(session_dir['beh_fig_dir'], f'{session}_lick_video_analysis_combined.pdf')
-        images = [Image.open(f).convert("RGB") for f in png_files]
-
-        images[0].save(
-            output_pdf,
-            save_all=True,
-            append_images=images[1:]
-        )
-        plt.close('all')
+    images[0].save(
+        output_pdf,
+        save_all=True,
+        append_images=images[1:]
+    )
+    plt.close('all')
 
 
 
@@ -594,12 +607,6 @@ if __name__ == "__main__":
     session_list = [session for session in session_list if str(session).startswith('behavior') and 'ZS' not in session]
     # for session in session_list:
     #     print(f"Processing session {session}...")
-    #     plot_licks_from_video(session, plot=True, cutoff_percentile=0.95)
-    # plot_licks_from_video('behavior_791691_2025-06-25_14-06-10')
-    # parallel processing
-    num_cores = 4
-    Parallel(n_jobs=num_cores)(
-        delayed(plot_licks_from_video)(session, plot=True, cutoff_percentile=0.95)
-        for session in session_list
-    )
+    #     plot_licks_from_video(session)
+    plot_licks_from_video('behavior_751769_2025-01-17_11-37-39')
 
