@@ -107,7 +107,11 @@ def clean_up_licks(licksL, licksR, crosstalk_thresh=100, rebound_thresh=50, plot
 
     return licksL_cleaned, licksR_cleaned, fig
 
+<<<<<<< HEAD
 def parse_lick_trains(licks, window_size = 1000, height = 2, min_dist = 2000, inter_train_interval = 500, inter_lick_interval = 800, plot = False, unit = 'seconds', licks_end = None, xlim = None):
+=======
+def parse_lick_trains(licks, window_size = 1000, height = 2, min_dist = 2000, inter_train_interval = 500, inter_lick_interval = 800, plot = False, unit = 'seconds'):
+>>>>>>> 05e35399e979e523cc941e55f4ae0966bf290e75
     """
     """
     licks = np.array(licks)
