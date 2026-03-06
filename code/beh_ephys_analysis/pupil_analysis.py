@@ -623,14 +623,15 @@ def plot_unit_pupil_correlation(session, bin_size = 5, step_size = 0.1, opto_onl
             ax.legend()
             # scatter baseline spikes and pupil
             ax = fig.add_subplot(gs[2,2])
-            ax.scatter(baseline, pupil_baseline, facecolors='none', edgecolors='black')
+            baseline_jitter = baseline + np.random.normal(0, 0.1, size=baseline.shape)
+            ax.scatter(baseline_jitter, pupil_baseline, facecolors='none', edgecolors='black')
             ax.set_title(f'Bl correlation: {corr_baseline:.2f} (p={p_sig:.2f})')
             ax.set_xlabel('Baseline spike rate')
             ax.set_ylabel('Baseline pupil diameter (z-scored)')
 
             # scatter dilation and baseline spikes
             ax = fig.add_subplot(gs[2,3])
-            ax.scatter(baseline, dilation, facecolors='none', edgecolors='black')
+            ax.scatter(baseline_jitter, dilation, facecolors='none', edgecolors='black')
             ax.set_title(f'Dila vs unit bl: {corr_dilation:.2f} (p={p_sig_dilation:.2f})')
             ax.set_xlabel('Baseline spike rate')
             ax.set_ylabel('Pupil dilation')
@@ -713,9 +714,9 @@ def safe_plot(session):
     #     print(f'Success {session}')
     # except Exception as e:
     #     print(f'Error processing session {session}: {e}')
-Parallel(n_jobs=-1)(delayed(safe_plot)(session) for session in sessions)
+# Parallel(n_jobs=-1)(delayed(safe_plot)(session) for session in sessions)
 # pupil_analysis_session('behavior_ZS060_2021-03-29_16-21-37', plot_licks=False, plot=True)
-# plot_unit_pupil_correlation('behavior_ZS061_2021-03-20_18-03-26')
+plot_unit_pupil_correlation('behavior_ZS061_2021-03-31_17-15-48') 
 # plot_unit_pupil_correlation('behavior_ZS060_2021-03-29_16-21-37', bin_size=5, step_size=0.1, win_length=20, plot=True)
 # for session in sessions:
 #     print(f'Processing session {session}')
