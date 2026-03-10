@@ -58,7 +58,7 @@ if __name__ == "__main__":
     s3_bucket_dest = "s3://aind-scratch-data/sue_su/LC_beh_physiology/"
     local_dir = "/root/capsule/scratch/"
     combine_only = False
-    manuscript = False
+    manuscript = True
     if combine_only:
         s3_bucket_dest += "combined/"
         local_dir += "combined/"

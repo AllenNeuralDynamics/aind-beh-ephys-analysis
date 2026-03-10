@@ -33,6 +33,9 @@ for curr_col in col_to_attach:
 #%%
 # all_ids = all_ids + ['f908dd4d-d7ed-4d52-97cf-ccd0e167c659']
 # all_mounts = all_mounts + ['all_behavior']
+all_ids = all_ids + ['c1a35fd0-c3aa-47a8-ba40-288b1e39a86a', 'ac7c7961-9178-4bf9-9d66-0a426cf3cc24']
+all_mounts = all_mounts + ['alignment_fix', 'dorsal_edges']
+
 
 # Generate the list of DataAssetAttachParams objects
 all_mounts_new = []
@@ -47,15 +50,15 @@ for id, mount in zip(all_ids, all_mounts):
         
 all_mounts = all_mounts_new
 data_assets = [DataAssetAttachParams(id, mount) for id, mount in zip(all_ids, all_mounts)]
-data_assets_id = all_ids
 
 # %%
-# Attach the generated list
-results = client.capsules.attach_data_assets(
-    capsule_id=os.getenv("CO_CAPSULE_ID"),
-    attach_params=data_assets,
+computation_id = os.getenv("CO_COMPUTATION_ID")
+results = client.computations.attach_data_assets(
+    computation_id=computation_id,
+    attach_params = data_assets,
 )
-print(f'Attached {len(data_assets_id)} data assets.')
+
+print(f'Attached {len(all_ids)} data assets.')
 
 for data_asset in results:
     print(f'{data_asset.id} mounted as {data_asset.mount}')

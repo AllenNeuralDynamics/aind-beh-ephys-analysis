@@ -227,7 +227,7 @@ def pupil_analysis_session(session, plot_licks=False, plot=True,
         plt.suptitle(
             f"{session} pupil analysis "
             f"{pupil_data['error_prop']*100:.1f}% error, "
-            f"mean conf {np.mean(pupil_data['dia_conf_trial'][pupil_data['dia_conf_trial']>dia_conf_threshold]):.2f}"
+            f"mean conf {np.mean(pupil_data['dia_conf_trial'][pupil_data['dia_conf_trial']>dia_conf_threshold]):.3e}"
         )
 
         plt.tight_layout()
@@ -625,21 +625,21 @@ def plot_unit_pupil_correlation(session, bin_size = 5, step_size = 0.1, opto_onl
             ax = fig.add_subplot(gs[2,2])
             baseline_jitter = baseline + np.random.normal(0, 0.1, size=baseline.shape)
             ax.scatter(baseline_jitter, pupil_baseline, facecolors='none', edgecolors='black')
-            ax.set_title(f'Bl correlation: {corr_baseline:.2f} (p={p_sig:.2f})')
+            ax.set_title(f'Bl correlation: {corr_baseline:.3e} (p={p_sig:.3e})')
             ax.set_xlabel('Baseline spike rate')
             ax.set_ylabel('Baseline pupil diameter (z-scored)')
 
             # scatter dilation and baseline spikes
             ax = fig.add_subplot(gs[2,3])
             ax.scatter(baseline_jitter, dilation, facecolors='none', edgecolors='black')
-            ax.set_title(f'Dila vs unit bl: {corr_dilation:.2f} (p={p_sig_dilation:.2f})')
+            ax.set_title(f'Dila vs unit bl: {corr_dilation:.3e} (p={p_sig_dilation:.3e})')
             ax.set_xlabel('Baseline spike rate')
             ax.set_ylabel('Pupil dilation')
 
             # scatter dilation and response spikes
             ax = fig.add_subplot(gs[2,4])
             ax.scatter(response_spike_rate, dilation, facecolors='none', edgecolors='black')
-            ax.set_title(f'Dila vs unit resp: {corr_response:.2f} p:{p_sig_response:.2f})')
+            ax.set_title(f'Dila vs unit resp: {corr_response:.3e} p:{p_sig_response:.3e})')
             ax.set_xlabel('Response spike rate')
             ax.set_ylabel('Pupil dilation')
 
@@ -716,7 +716,7 @@ def safe_plot(session):
     #     print(f'Error processing session {session}: {e}')
 # Parallel(n_jobs=-1)(delayed(safe_plot)(session) for session in sessions)
 # pupil_analysis_session('behavior_ZS060_2021-03-29_16-21-37', plot_licks=False, plot=True)
-plot_unit_pupil_correlation('behavior_ZS061_2021-03-31_17-15-48') 
+plot_unit_pupil_correlation('behavior_ZS061_2021-03-31_17-15-48', bin_size=5, step_size=0.1, win_length=20, plot=True) 
 # plot_unit_pupil_correlation('behavior_ZS060_2021-03-29_16-21-37', bin_size=5, step_size=0.1, win_length=20, plot=True)
 # for session in sessions:
 #     print(f'Processing session {session}')
