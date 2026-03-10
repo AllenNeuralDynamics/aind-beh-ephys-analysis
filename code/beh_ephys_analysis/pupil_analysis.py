@@ -716,7 +716,7 @@ def safe_plot(session):
     #     print(f'Error processing session {session}: {e}')
 # Parallel(n_jobs=-1)(delayed(safe_plot)(session) for session in sessions)
 # pupil_analysis_session('behavior_ZS060_2021-03-29_16-21-37', plot_licks=False, plot=True)
-plot_unit_pupil_correlation('behavior_ZS061_2021-03-31_17-15-48') 
+plot_unit_pupil_correlation('behavior_ZS061_2021-03-31_17-15-48', bin_size=5, step_size=0.1, win_length=20, plot=True) 
 # plot_unit_pupil_correlation('behavior_ZS060_2021-03-29_16-21-37', bin_size=5, step_size=0.1, win_length=20, plot=True)
 # for session in sessions:
 #     print(f'Processing session {session}')

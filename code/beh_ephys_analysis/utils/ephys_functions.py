@@ -905,7 +905,12 @@ class load_cross_corr():
                 unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long_nogo'] = np.array(unit_cross_corr_data['cross_corr_long_nogo'].values[0])
                 unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short_nogo'] = np.array(unit_cross_corr_data['cross_corr_short_nogo'].values[0])
             else:
-                raise ValueError(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
+                print(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
+                unit_cross_corr_data = unit_cross_corr_data.iloc[[0]].copy()
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long'] = np.array(unit_cross_corr_data['cross_corr_long'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short'] = np.array(unit_cross_corr_data['cross_corr_short'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long_nogo'] = np.array(unit_cross_corr_data['cross_corr_long_nogo'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short_nogo'] = np.array(unit_cross_corr_data['cross_corr_short_nogo'].values[0])
         return unit_cross_corr_data.to_dict(orient='records')[0] if unit_cross_corr_data is not None else None
     
     def plot_units(self, unit_1, unit_2):
