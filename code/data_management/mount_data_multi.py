@@ -33,8 +33,8 @@ for curr_col in col_to_attach:
 #%%
 # all_ids = all_ids + ['f908dd4d-d7ed-4d52-97cf-ccd0e167c659']
 # all_mounts = all_mounts + ['all_behavior']
-all_ids = all_ids + ['c1a35fd0-c3aa-47a8-ba40-288b1e39a86a', 'ac7c7961-9178-4bf9-9d66-0a426cf3cc24']
-all_mounts = all_mounts + ['alignment_fix', 'dorsal_edges']
+all_ids = all_ids + ['c1a35fd0-c3aa-47a8-ba40-288b1e39a86a', 'ac7c7961-9178-4bf9-9d66-0a426cf3cc24', '1a8bede7-bdc1-4b41-8290-bc0bdafdf019', 'c712751d-f744-4fe8-9657-93a7084eab22']
+all_mounts = all_mounts + ['alignment_fix', 'dorsal_edges', 'merfish_data', 'LC_percentile_meshes']
 
 
 # Generate the list of DataAssetAttachParams objects

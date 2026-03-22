@@ -1717,6 +1717,7 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
     all_noreward_side_hist_mat = []
     all_choice_hist_mat = []
     all_choices = []
+    all_choices_prev = []
     session_lens = []
     session_list_valid = []
     for sess in session_list:
@@ -1724,6 +1725,7 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
             sess_df = makeSessionDF(sess, cut_interruptions=True, model_name='stan_qLearning_5params')
             choice = 2*(sess_df['choice'].values.copy() - 0.5)
             all_choices.append(sess_df['choice'].values)
+            all_choices_prev.append(sess_df['choices_prev'].values)
             outcome = sess_df['outcome'].values
             reward_side = choice * outcome
             noreward_side = choice * (1 - outcome)
@@ -1748,6 +1750,7 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
     all_noreward_side_hist_mat = np.vstack(all_noreward_side_hist_mat)
     all_choice_hist_mat = np.vstack(all_choice_hist_mat)
     all_choices = np.hstack(all_choices)
+    all_choices_prev = np.hstack(all_choices_prev)
     # fit logistic regression model
     # reward side and choice history as predictors
     X = np.hstack([all_reward_side_hist_mat, all_choice_hist_mat])
@@ -1761,6 +1764,42 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
     model = sm.Logit(all_choices, X, missing='drop')
     result_rwd_norwd = model.fit()
 
+    # predict switch and stay probability, all regressors become interaction with previousl choice
+    # reward side and no reward side history as predictors
+    all_reward_side_hist_mat_inter = all_reward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_noreward_side_hist_mat_inter = all_noreward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choices_switch = (all_choices != all_choices_prev).astype(float)
+    # filter out where all_choices_prev is nan
+    valid_idx = ~np.isnan(all_choices_prev)
+    X = np.hstack([all_reward_side_hist_mat_inter[valid_idx], all_noreward_side_hist_mat_inter[valid_idx]])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices_switch[valid_idx], X, missing='drop')
+    result_switch_rwd_norwd = model.fit()
+
+    # predict switch and stay probability, all regressors become interaction with previousl choice, with no reward side and choice history as predictors
+    # all_reward_side_hist_mat_inter = all_reward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_noreward_side_hist_mat_inter = all_noreward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choice_hist_mat_inter = all_choice_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choices_switch = (all_choices != all_choices_prev).astype(float)
+    # filter out where all_choices_prev is nan
+    valid_idx = ~np.isnan(all_choices_prev)
+    X = np.hstack([all_noreward_side_hist_mat_inter[valid_idx], all_choice_hist_mat_inter[valid_idx]])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices_switch[valid_idx], X, missing='drop')
+    result_switch_norwd_choice = model.fit()
+
+    # predict switch probability, all regressors become interaction with previousl choice, with reward side and choice history as predictors
+    all_reward_side_hist_mat_inter = all_reward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choice_hist_mat_inter = all_choice_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choices_switch = (all_choices != all_choices_prev).astype(float)
+    # filter out where all_choices_prev is nan
+    valid_idx = ~np.isnan(all_choices_prev)
+    X = np.hstack([all_reward_side_hist_mat_inter[valid_idx], all_choice_hist_mat_inter[valid_idx]])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices_switch[valid_idx], X, missing='drop')
+    result_switch_rwd_choice = model.fit()
+
+
     # make predictions of choice probability using the first model
     X_pred = np.hstack([all_reward_side_hist_mat, all_choice_hist_mat])
     X_pred = sm.add_constant(X_pred, has_constant='add')
@@ -1769,17 +1808,35 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
     left_choices = all_choices == 0
     choice_prob[left_choices] = 1 - choice_prob[left_choices]
 
+    # make prediction of switch probability using the switch model
+    valid_idx = ~np.isnan(all_choices_prev)
+    X_pred_switch = np.hstack([all_noreward_side_hist_mat_inter[valid_idx], all_choice_hist_mat_inter[valid_idx]])
+    X_pred_switch = sm.add_constant(X_pred_switch, has_constant='add')
+    switch_prob = result_switch_norwd_choice.predict(X_pred_switch)
+    # fill back the switch probability into the original array
+    switch_prob_full = np.full(len(all_choices), np.nan)
+    switch_prob_full[valid_idx] = switch_prob
+    switch_prob = switch_prob_full
+
+
     # create a dictionary to hold results
     # cut choice_prob into sessions
     choice_prob_sess = []
+    switch_prob_sess = []
     start_idx = 0
     for sess_len in session_lens:
         choice_prob_sess.append(choice_prob[start_idx:start_idx+sess_len])
+        switch_prob_sess.append(switch_prob[start_idx:start_idx+sess_len])
         start_idx += sess_len
+
     results = {
         'reward_side_and_choice_history_model': result_rwd_choice,
         'reward_side_and_noreward_side_history_model': result_rwd_norwd,
-        'choice_prob_by_session': {session: choice_prob_sess[idx] for idx, session in enumerate(session_list_valid)}
+        'switch_model_reward_noreward': result_switch_rwd_norwd,
+        'switch_model_noreward_choice': result_switch_norwd_choice,
+        'sitch_model_reward_choice': result_switch_rwd_choice,
+        'choice_prob_by_session': {session: choice_prob_sess[idx] for idx, session in enumerate(session_list_valid)},
+        'switch_prob_by_session': {session: switch_prob_sess[idx] for idx, session in enumerate(session_list_valid)}
     }
 
     # plot
@@ -1834,9 +1891,85 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
         ax.set_ylabel('Coefficient')
         ax.set_title('No-Rewarded Side History Coefficients')
         plt.tight_layout()
+
+        fig, axes = plt.subplots(3, 2, figsize=(10, 5))
+        # first row: switch model with reward and no reward side history as predictors
+        ax = axes[0, 0]
+        coef = result_switch_rwd_norwd.params[1:max_lag+1]
+        err = result_switch_rwd_norwd.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - Reward Side History Coefficients')
+
+        ax = axes[0, 1]
+        coef = result_switch_rwd_norwd.params[max_lag+1:]
+        err = result_switch_rwd_norwd.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - No-Reward Side History Coefficients')
+
+        # second row: switch model with no reward side history and choice history as predictors
+        ax = axes[1, 0]
+        coef = result_switch_norwd_choice.params[1:max_lag+1]
+        err = result_switch_norwd_choice.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - No-Reward Side History Coefficients')
+
+        ax = axes[1, 1]
+        coef = result_switch_norwd_choice.params[max_lag+1:]
+        err = result_switch_norwd_choice.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - Choice History Coefficients')
+        # third row: switch model with reward side history and choice history as predictors
+        ax = axes[2, 0]
+        coef = result_switch_rwd_choice.params[1:max_lag+1]
+        err = result_switch_rwd_choice.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - Reward Side History Coefficients')
+        ax = axes[2, 1]
+        coef = result_switch_rwd_choice.params[max_lag+1:]
+        err = result_switch_rwd_choice.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - Choice History Coefficients')
+        plt.tight_layout()
+
     else:
-        fig = None
-    return results, fig
+        fig, fig_switch = None, None
+    return results, fig, fig_switch
 
 def fit_glm_animal(ani_focus, max_lag=5, plot=False):
     dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
