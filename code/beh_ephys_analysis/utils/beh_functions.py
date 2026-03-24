@@ -25,7 +25,7 @@ from hdmf_zarr import NWBZarrIO
 from scipy.io import loadmat
 import pickle
 import shutil
-from open_ephys.analysis import Session
+
 import itertools
 
 import matplotlib.pyplot as plt
@@ -607,7 +607,7 @@ def get_stream_info(directory):
         A DataFrame with information about the streams
 
     """
-
+    from open_ephys.analysis import Session
     session = Session(directory)
 
     stream_info = {
@@ -643,10 +643,10 @@ def get_stream_info(directory):
 
     return pd.DataFrame(data=stream_info)
 
-def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
+def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch', hopkins = False):
     # parse session_id 
     aniID, date_obj, raw_id = parseSessionID(session_id)
-    if aniID.startswith('ZS'):
+    if aniID.startswith('ZS') or hopkins:
         # print('Old data, using hopkins formats')
         return session_dirs_hopkins(session_id, model_name, data_dir, scratch_dir)
     # raw dirs
@@ -941,24 +941,30 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     session_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'session')
     session_dir_raw = session_dir
     mat_dir = os.path.join(raw_dir, 'ecephys', 'sorted', 'session')
-    beh_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_behav.mat')]
-    if len(beh_mat) > 0:
-        beh_mat = os.path.join(mat_dir, beh_mat[0])
+    if not os.path.exists(session_dir):
+        mat_dir = os.path.join(raw_dir, 'fib', 'sorted', 'session')
+    if os.path.exists(mat_dir):
+        beh_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_behav.mat')]
+        if len(beh_mat) > 0:
+            beh_mat = os.path.join(mat_dir, beh_mat[0])
+        else:
+            beh_mat = None
+        ephys_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_nL.mat')]
+        if len(ephys_mat) > 0:
+            ephys_mat = os.path.join(mat_dir, ephys_mat[0])
+        else:
+            ephys_mat = None
     else:
         beh_mat = None
-    ephys_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_nL.mat')]
-    if len(ephys_mat) > 0:
-        ephys_mat = os.path.join(mat_dir, ephys_mat[0])
-    else:
         ephys_mat = None
+    
+
     if not os.path.exists(session_dir):
         session_dir = None
         session_dir_raw = None
     sorted_dir = os.path.join(raw_dir, 'ecephys', 'sorted')
     sorted_raw_dir = os.path.join(raw_dir, 'ecephys', 'sorted')
     # nwb files
-    nwb_dir_raw = None
-    nwb_dir_curated = None
     # find raw recording
     if session_dir is not None:
         raw_recording_dir = os.path.join(session_dir, 'raw_data.hdf5')
@@ -1618,8 +1624,8 @@ def get_unit_tbl(session, data_type, summary = True):
         print(f'No unit table found for {session} in {data_type} data.')
         return None
 
-def transfer_nwb(session_id):
-    session_dir = session_dirs(session_id)
+def transfer_nwb(session_id, hopkins=False):
+    session_dir = session_dirs(session_id, hopkins=hopkins)
     src_path = session_dir['nwb_dir_raw']
     with NWBZarrIO(src_path, mode="r") as io:
         src_nwb = io.read()
