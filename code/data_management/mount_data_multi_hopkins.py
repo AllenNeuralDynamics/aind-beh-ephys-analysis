@@ -36,19 +36,29 @@ for curr_col in col_to_attach:
 #%%
 # all_ids = all_ids + ['f908dd4d-d7ed-4d52-97cf-ccd0e167c659']
 # all_mounts = all_mounts + ['all_behavior']
+model_csv = os.path.join(script_dir, 'hopkins_model_assets.csv')
+data_df = pd.read_csv(model_csv)
+col_to_attach = ['model_stan']
+for curr_col in col_to_attach:
+    valid_inds = [True if isinstance(s, str) and 30 < len(s) < 40 else False for s in data_df[curr_col].to_list()]
+    animal_ids = list(data_df[valid_inds]['animal_id'].values)
+    curr_ids = list(data_df[valid_inds][curr_col].values)
+    curr_mount = [str(animal_curr) + '_' + curr_col for animal_curr in animal_ids]
+    all_ids.extend(curr_ids)
+    all_mounts.extend(curr_mount)
 
-# Generate the list of DataAssetAttachParams objects
-all_mounts_new = []
-for id, mount in zip(all_ids, all_mounts):
-    curr_mount = mount
-    if 'stan' in mount:
-        lists = mount.split('_model_stan')
-        aniID, dateObj, raw_id = parseSessionID(lists[0])
+# # Generate the list of DataAssetAttachParams objects
+# all_mounts_new = []
+# for id, mount in zip(all_ids, all_mounts):
+#     curr_mount = mount
+#     if 'stan' in mount:
+#         lists = mount.split('_model_stan')
+#         aniID, dateObj, raw_id = parseSessionID(lists[0])
         
-        curr_mount = f'{aniID}_model_stan'
-    all_mounts_new.append(curr_mount)   
+#         curr_mount = f'{aniID}_model_stan'
+#     all_mounts_new.append(curr_mount)   
         
-all_mounts = all_mounts_new
+# all_mounts = all_mounts_new
 data_assets = [DataAssetAttachParams(id, mount) for id, mount in zip(all_ids, all_mounts)]
 
 # %%

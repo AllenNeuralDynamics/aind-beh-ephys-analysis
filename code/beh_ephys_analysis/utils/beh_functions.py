@@ -933,7 +933,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'surface_rec': surface_recording_dir,
                 'surface_rec_id_all': all_rec_count_surface,
                 'photometry_data_dir': fp_dir,
-                'photometry_nwb_dir': photo_nwb_dir}
+                'fp_nwb_dir': photo_nwb_dir}
 
     # make directories
     makedirs(dir_dict)
@@ -1091,7 +1091,8 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     # if os.path.exists(opto_csv_dir):
     #     temp_files = os.listdir(opto_csv_dir)
     #     opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
-
+    # photometry dir
+    photometry_data_dir = os.path.join(raw_dir, 'fib')
     # processed dirs
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
     alignment_dir = os.path.join(processed_dir, 'alignment')
@@ -1113,7 +1114,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     beh_nwb_dir = os.path.join(processed_dir, 'behavior', f'{session_id}.nwb')
 
     # photometry nwb
-    photometry_nwb_files = [f for f in os.listdir(raw_dir) if f.endswith('photometry.nwb')]
+    photometry_nwb_files = [f for f in os.listdir(raw_dir) if f.endswith('nwb.zarr')]
+    if len(photometry_nwb_files) > 0:
+        photometry_nwb_dir = os.path.join(raw_dir, photometry_nwb_files[0])
+    else:
+        photometry_nwb_dir = None
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
@@ -1154,7 +1159,9 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
                 'seg_id': 1,
                 'rec_id_all': 0,
                 'beh_mat': beh_mat,
-                'ephys_mat': ephys_mat}
+                'ephys_mat': ephys_mat,
+                'fp_nwb_dir': photometry_nwb_dir,
+                'photometry_data_dir': photometry_data_dir}
 
     # make directories
     makedirs(dir_dict)

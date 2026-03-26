@@ -13,10 +13,11 @@ from utils.beh_functions import session_dirs, get_session_tbl, makeSessionDF
 from utils.ephys_functions import plot_rate
 import platform
 import shutil
-from utils.basics.data_org import curr_computer, move_subfolders
+
+# from utils.basics.data_org import curr_computer, move_subfolders
 from pathlib import Path
-from utils.behavior.session_utils import load_session_df, parse_session_string
-from utils.behavior.lick_analysis import clean_up_licks, parse_lick_trains
+# from utils.behavior.session_utils import load_session_df, parse_session_string
+# from utils.behavior.lick_analysis import clean_up_licks, parse_lick_trains
 from scipy.io import loadmat
 from itertools import chain
 from IPython.display import display
@@ -29,8 +30,10 @@ from scipy.optimize import curve_fit
 from sklearn.linear_model import LinearRegression
 from scipy.stats import zscore
 import pickle
-from aind_fip_dff.utils.preprocess import batch_processing, tc_triexpfit
 from matplotlib.gridspec import GridSpec
+from pynwb import NWBHDF5IO, NWBFile, TimeSeries
+from pynwb.file import Subject
+from hdmf_zarr import NWBZarrIO
 
 def bin_timeseries_around_align(
     ts,
@@ -126,33 +129,50 @@ def load_session_FP(session, label, plot=False):
         return signal_region
 
 
-def get_FP_data(session, label = None, save=True):
-    session_dir = parse_session_string(session)
-    if os.path.exists(os.path.join(session_dir['sortedFolder'], f'{session}_combined.pkl')) and os.path.exists(os.path.join(session_dir['sortedFolder'], f'{session}_combined_params.pkl')):
-        with open(os.path.join(session_dir['sortedFolder'], f'{session}_combined.pkl'), 'rb') as f:
-            signal_region_prep_updated = pickle.load(f)
-        # open from .pkl
-        with open(os.path.join(session_dir['sortedFolder'], f'{session}_combined_params.pkl'), 'rb') as f:
-            params = pickle.load(f)
-        print(f'Loaded {session}_combined.pkl and {session}_combined_params.pkl')
-    elif os.path.exists(os.path.join(session_dir['sortedFolder'], f'{session}_FP_{label}.pkl')):
-        with open(os.path.join(session_dir['sortedFolder'], f'{session}_FP_{label}.pkl'), 'rb') as f:
-            signal_region_prep = pickle.load(f)
-        print(f'Loaded {session}_FP_{label}.pkl')
-        signal_region_prep_CO, params, _ = preprocess_signal_CO(session, label, plot=True, xtol=1e-6)
-        signal_region_prep_updated = append_FP_data(session, label, signal_region_prep_CO, params)
-        print(f'Appended CO version to {session}_combined.pkl')
-    else:
-        signal_region_raw, _ = load_session_FP_raw(session, label, channels = ['G', 'Iso'], plot = True)
-        signal_region_prep = preprocess_signal(session, label, plot=False, xtol = 1e-6, deep = False)
-        if save:
-            save_FP(signal_region_prep, session, tag = label)
-            print(f'Created {session}_FP_{label}.pkl')
-        signal_region_prep_CO, params, _ = preprocess_signal_CO(session, label, plot=True, xtol=1e-6)
-        # plot_FP_results(session, signal_region_prep_CO, params, methods = ['exp', 'bright', 'tri-exp'])
-        signal_region_prep_updated = append_FP_data(session, label, signal_region_prep_CO, params)
-        print(f'Appended CO version to {session}_combined.pkl')
-    return signal_region_prep_updated, params
+def get_FP_data(session, tar_channels = [('PL', 'G_tri-exp_mc'), ('PL', 'Iso_tri-exp_mc')]):
+    session_dir = session_dirs(session)
+    # load zarr nwb
+    zarr_path = session_dir['fp_nwb_dir']
+    if not os.path.exists(zarr_path):
+        return None
+
+    with NWBZarrIO(zarr_path, mode="r") as io:
+        fp_nwb = io.read()
+    fp_dir = os.path.join(session_dir['raw_dir'], 'fib')
+    meta_data_jsons = [f for f in os.listdir(fp_dir) if f.endswith('.json')]
+    if len(meta_data_jsons) == 0:
+        return None
+    elif len(meta_data_jsons) > 1:
+        print(f"Multiple JSON metadata files found in {fp_dir}. Using the first one: {meta_data_jsons[0]}")
+    meta_data_json = os.path.join(fp_dir, meta_data_jsons[0])
+    with open(meta_data_json, 'r') as f:
+        meta_data = json.load(f)
+    # change field value to 'PL' if is equals 'mPFC'
+    for key in meta_data.keys():
+        if meta_data[key] == 'mPFC':
+            meta_data[key] = 'PL'
+    
+    # load acquisition
+    channels = fp_nwb.acquisition.keys()
+    channels = [ch for ch in channels if ch.startswith('G') or ch.startswith('Iso')]
+
+    channels_names, region_nums, methods = [curr_key.split('_')[0] for curr_key in channels], [curr_key.split('_')[1] for curr_key in channels], ['_'.join(curr_key.split('_')[2:]) for curr_key in channels]
+    channels_names_full = [channels_names[i] + '_' + methods[i] if len(methods[i])>0 else channels_names[i] for i in range(len(channels))]
+    signal = {'time_in_beh': fp_nwb.acquisition['FIP_rising_time'].timestamps[:]}
+    for channel_name_full, region_num, channel in zip(channels_names_full, region_nums, channels):
+        region_name = meta_data[str(region_num)]
+        # print(f"Found channel {channel_name_full} for region {region_name}")
+        # check if (region_name, channel_name_full) is in tar_channels, if not, skip
+        if tar_channels is not None:
+            if (region_name, channel_name_full) not in tar_channels:
+                # print(region_name, channel_name_full, "not in target channels, skipping")
+                continue
+        # print(f"Loading signal for region {region_name} from channel {channel_name_full}")
+        if channel_name_full not in signal:
+            signal[channel_name_full] = {}
+        signal[channel_name_full][region_name] = fp_nwb.acquisition[channel].data[:]
+    
+    return signal
 
 def peak_detect_FP(session, plot = False):
     session_dir = parse_session_string(session)
@@ -236,7 +256,7 @@ def smooth_exp(y, fs, tau_s=0.2):
     return out
 
 
-def align_signal_to_events(signal, signal_time, event_times, kernel = False, avoid_other_events = True, tau = 0.2, pre_event_time=1000, post_event_time=2000, window_size=100, step_size=10, ax = None, legend = 'signal', color = 'b', plot_error = True):
+def align_signal_to_events(signal, signal_time, event_times, kernel = False, avoid_other_events = True, tau = 0.2, pre_event_time=1, post_event_time=2, window_size=0.1, step_size=10, ax = None, legend = 'signal', color = 'b', plot_error = True):
     """
     Aligns the signal to event times and generates a matrix and PSTH using a moving average.
 
@@ -258,17 +278,17 @@ def align_signal_to_events(signal, signal_time, event_times, kernel = False, avo
     
     # time_bins = np.arange(-pre_event_time, post_event_time - window_size + step_size, step_size)
     avoid_pre = 0
-    avoid_post = 3000
+    avoid_post = 3
     # filter signal with exponential kernel
     if kernel:
         signal = smooth_exp(signal, fs=20, tau_s=tau)
         signal[~np.isnan(signal)] = zscore(signal[~np.isnan(signal)])
-        num_steps = (pre_event_time + post_event_time) // step_size + 1
+        num_steps = int((pre_event_time + post_event_time) // step_size) + 1
         time_bins = -pre_event_time + np.array(range(num_steps)) * step_size
         aligned_matrix = np.zeros((len(event_times), num_steps))
     else:
         signal[~np.isnan(signal)] = zscore(signal[~np.isnan(signal)])
-        num_steps = (pre_event_time + post_event_time - window_size) // step_size + 1
+        num_steps = int((pre_event_time + post_event_time - window_size) // step_size) + 1
         time_bins = -pre_event_time + np.array(range(num_steps)) * step_size + window_size / 2
         aligned_matrix = np.zeros((len(event_times), num_steps))
     if not kernel:
