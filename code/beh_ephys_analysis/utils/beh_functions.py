@@ -646,7 +646,8 @@ def get_stream_info(directory):
 def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch', hopkins = False):
     # parse session_id 
     aniID, date_obj, raw_id = parseSessionID(session_id)
-    if aniID.startswith('ZS') or hopkins:
+    hopkins_list = ['672850', '669492', '669489', '754898', '754896', '754895', '749624', '749472', '701707', '699472', '699461', '699462']
+    if aniID.startswith('ZS') or aniID in hopkins_list:
         # print('Old data, using hopkins formats')
         return session_dirs_hopkins(session_id, model_name, data_dir, scratch_dir)
     # raw dirs
@@ -864,6 +865,10 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         temp_files = os.listdir(opto_csv_dir)
         opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
 
+    # FP dir
+    fp_dir = os.path.join(raw_dir, 'fib')
+    photo_nwb_dir = None
+
     # processed dirs
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
     alignment_dir = os.path.join(processed_dir, 'alignment')
@@ -926,7 +931,9 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'surface_exp_id': surface_exp_id,
                 'surface_seg_id': surface_seg_id,
                 'surface_rec': surface_recording_dir,
-                'surface_rec_id_all': all_rec_count_surface}
+                'surface_rec_id_all': all_rec_count_surface,
+                'photometry_data_dir': fp_dir,
+                'photometry_nwb_dir': photo_nwb_dir}
 
     # make directories
     makedirs(dir_dict)
@@ -1104,6 +1111,9 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     # pro   
     
     beh_nwb_dir = os.path.join(processed_dir, 'behavior', f'{session_id}.nwb')
+
+    # photometry nwb
+    photometry_nwb_files = [f for f in os.listdir(raw_dir) if f.endswith('photometry.nwb')]
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
