@@ -647,6 +647,7 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     # parse session_id 
     aniID, date_obj, raw_id = parseSessionID(session_id)
     hopkins_list = ['672850', '669492', '669489', '754898', '754896', '754895', '749624', '749472', '701707', '699472', '699461', '699462']
+    # print(f"Parsing session_id: {session_id}, aniID: {aniID}")
     if aniID.startswith('ZS') or aniID in hopkins_list:
         # print('Old data, using hopkins formats')
         return session_dirs_hopkins(session_id, model_name, data_dir, scratch_dir)

@@ -144,9 +144,9 @@ def process_session(session, region, channel='G_tri-exp_mc', formula='spikes ~ 1
                                                             beh_session_data[align].values, 
                                                             pre_event_time=pre_time, post_event_time=post_time,
                                                             step_size=step_size, window_size=window_size);
-                regressors, TvCurrU, PvCurrU, EvCurrU, _ = fitSpikeModelG(beh_session_data, aligned_matrix, formula, matIso = aligned_matrix_iso)
+                regressors, TvCurrU, PvCurrU, EvCurrU, _, _ = fitSpikeModelG(beh_session_data, aligned_matrix, formula, matIso = aligned_matrix_iso)
             else:
-                regressors, TvCurrU, PvCurrU, EvCurrU, _ = fitSpikeModelG(beh_session_data, aligned_matrix, formula)
+                regressors, TvCurrU, PvCurrU, EvCurrU, _, _ = fitSpikeModelG(beh_session_data, aligned_matrix, formula)
         else:
             regressors, TvCurrU, PvCurrU, EvCurrU = None, None, None, None
     return regressors, TvCurrU, PvCurrU, EvCurrU, session
@@ -222,7 +222,7 @@ def process_session_ani(session_list, region, channel='G_tri-exp_mc', formula='s
                                                         beh_session_data['goCue_start_time'].values, 
                                                         pre_event_time=1, post_event_time=1, window_size=0.2, step_size=0.1
                                                         );
-            go_resp_G = np.max(mean_psth[time>=0.1]) - np.mean(mean_psth[time<-0.1])
+            go_resp_G = np.mean(mean_psth[time>=0.1]) - np.mean(mean_psth[time<-0.1])
             curr_signal_iso = zscore(signal['Iso_tri-exp_mc'][region])
             _, mean_psth, time, _ = align_signal_to_events(
                                                         curr_signal_iso, 
@@ -262,9 +262,9 @@ def process_session_ani(session_list, region, channel='G_tri-exp_mc', formula='s
         aligned_matrix_iso = combined_mean_psth_iso
         
     if 'iso' in formula:
-        regressors, TvCurrU, PvCurrU, EvCurrU, conf_int = fitSpikeModelG(trial_data, aligned_matrix, formula, matIso = aligned_matrix_iso)
+        regressors, TvCurrU, PvCurrU, EvCurrU, conf_int, _ = fitSpikeModelG(trial_data, aligned_matrix, formula, matIso = aligned_matrix_iso)
     else:
-        regressors, TvCurrU, PvCurrU, EvCurrU, conf_int = fitSpikeModelG(trial_data, aligned_matrix, formula)
+        regressors, TvCurrU, PvCurrU, EvCurrU, conf_int, _ = fitSpikeModelG(trial_data, aligned_matrix, formula)
     return regressors, TvCurrU, PvCurrU, EvCurrU, conf_int, session_dir["aniID"]
 
 def population_GLM(
@@ -372,12 +372,25 @@ def population_GLM_ani(
     ) for ani in unique_ani)
 
     # results = []
-    # for session in session_list:
-    #     regressors, TvCurrU, PvCurrU, EvCurrU = process_session(
-    #         session, region, channel, formula, align,
-    #         window_size=window_size, thresh=thresh, pre_time=pre_time, post_time=post_time, step_size=step_size
+    # for ani in unique_ani:
+    #     curr_sessions = [
+    #         session for session in session_list
+    #         if session_dirs(session)['aniID'] == ani
+    #     ]
+        
+    #     result = process_session_ani(
+    #         curr_sessions,
+    #         region,
+    #         channel,
+    #         formula,
+    #         align,
+    #         window_size=window_size,
+    #         thresh=thresh,
+    #         pre_time=pre_time,
+    #         post_time=post_time,
+    #         step_size=step_size,
     #     )
-    #     results.append((regressors, TvCurrU, PvCurrU, EvCurrU))
+    #     results.append(result)
 
     regressors, all_T, all_P, all_E, all_conf_int, processed_anis = zip(*results)
         # Filter out None results
@@ -448,7 +461,9 @@ def population_GLM_ani(
     fig.suptitle(title)
     fig.tight_layout()
 
-    return {'tstats': all_T, 'pvals': all_P, 'coefs': all_E, 'conf_int': all_conf_int, 'regressors': regressors, 'time_bins': time_bins, 'sig_prop_P': sig_prop_P, 'sig_prop_N': sig_prop_N, 'ani_list': filtered_anis, 'fig': fig}
+    return {'tstats': all_T, 'pvals': all_P, 'coefs': all_E, 'conf_int': all_conf_int, 
+            'regressors': regressors, 'time_bins': time_bins, 
+            'sig_prop_P': sig_prop_P, 'sig_prop_N': sig_prop_N, 'ani_list': filtered_anis, 'fig': fig}
 
 def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-exp_mc', align='CSon', pre_time=-5, post_time=2.5, num_bins=5, thresh=0.5, quantiles=True):
     model = 'stan_qLearning_5params'
