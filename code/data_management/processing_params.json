@@ -35,5 +35,9 @@
         "version": "fix", 
         "save_to_session": true, 
         "plot_3D": true
+    },
+    "fit_glm":
+    {
+        "max_lag": 5
     }
 }
