@@ -1,0 +1,39 @@
+{
+    "neuron_drift_curation": 
+    {
+           "data_type": "curated",
+            "update_cut": true,
+            "update_csv": true
+    },
+    "trial_wise_drift_computation": 
+    {
+        "data_type": "curated",
+        "opto_only": true, 
+        "save": true
+    },
+    "antidromic_tagging":
+    {
+        "data_type": "curated",
+        "plot": true,
+        "tier_cat": false
+    },
+    "opto_tagging":
+    {
+        "data_type": "curated",
+        "target": "soma",
+        "resp_thresh": 0.3, 
+        "lat_thresh": 0.02, 
+        "plot": true, 
+        "target_unit_ids": "none", 
+        "ephys_cut": false, 
+        "save": false, 
+        "drift_cut": true
+    },
+    "compute_neuron_locations":
+    {        
+        "data_type": "curated",
+        "version": "fix", 
+        "save_to_session": true, 
+        "plot_3D": true
+    }
+}
