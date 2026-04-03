@@ -12,10 +12,8 @@ else:
     sys.path.remove(curr_path)
     sys.path.insert(0, curr_path)
 
-from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
-from open_ephys.analysis import Session
+# from open_ephys.analysis import Session
 import datetime
-from aind_ephys_rig_qc.temporal_alignment import search_harp_line
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -27,7 +25,7 @@ from scipy.stats import zscore
 import ast
 from utils.plot_utils import combine_pdf_big
 
-from open_ephys.analysis import Session
+# from open_ephys.analysis import Session
 from pathlib import Path
 import glob
 

@@ -1,10 +1,9 @@
 # %%
 from codeocean.data_asset import DataAssetParams, DataAssetSearchParams,DataAssetAttachParams, Source, AWSS3Source
 import pandas as pd
-import os
-os.sys.path.append('/root/capsule/code/beh_ephys_analysis')
-from utils.beh_functions import parseSessionID
 import os, sys
+os.sys.path.append('/root/capsule/aind-beh-ephys-analysis/code/beh_ephys_analysis')
+from utils.beh_functions import parseSessionID
 from codeocean import CodeOcean
 client = CodeOcean(domain="https://codeocean.allenneuraldynamics.org", token=os.getenv("API_SECRET"))
 

@@ -7,7 +7,7 @@ import pandas as pd
 import os
 import sys
 from matplotlib.colors import LinearSegmentedColormap
-sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
+sys.path.append('/root/capsule/aind-beh-ephys-analysis/code/beh_ephys_analysis/utils')
 # from beh_functions import session_dirs
 from matplotlib import gridspec
 import matplotlib.pyplot as plt
