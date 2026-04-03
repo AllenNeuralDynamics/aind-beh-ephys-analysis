@@ -1992,12 +1992,13 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
         plt.tight_layout()
 
     else:
-        fig, fig_switch = None, None
-    return results, fig, fig_switch
+        fig = None
+    return results, fig
 
 def fit_glm_animal(ani_focus, max_lag=5, plot=False):
     dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
-            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')]
+            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv'),
+            pd.read_csv('/root/capsule/code/data_management/hopkins_FP_session_assets.csv')]
     df = pd.concat(dfs)
     session_list = df['session_id'].values.tolist()
     ani_list = [str(session).split('_')[1] for session in session_list if str(session).startswith('behavior')]
@@ -2008,6 +2009,9 @@ def fit_glm_animal(ani_focus, max_lag=5, plot=False):
     results, fig = fit_glm_session_list(ani_session_list, max_lag=max_lag, plot=plot)
     if results is None:
         return None, None
+    save_dir = f'/root/capsule/scratch/{ani_focus}/ani_combinded'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     save_file = os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', 'glm_choice_history_model_results.pkl')
     with open(save_file, 'wb') as f:
         pickle.dump(results, f)
