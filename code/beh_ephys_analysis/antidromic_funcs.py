@@ -1,3 +1,4 @@
+from json import load
 from scipy.stats import wilcoxon
 # Scientific libraries
 import numpy as np
@@ -9,6 +10,17 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as patches
+
+from utils.beh_functions import session_dirs, get_unit_tbl
+from utils.ephys_functions import load_drift
+import os
+from utils.beh_functions import get_unit_tbl
+from utils.plot_utils import combine_pdf_big
+from scipy.stats import mannwhitneyu
+
+from scipy.stats import fisher_exact
+from scipy.stats import binomtest as binom_test
+
 
 
 def remove_spikes_during_laser_pulse(int_event_locked_timestamps, duration):    
@@ -64,13 +76,13 @@ def antidromic_latency_jitter(int_event_locked_timestamps):
     return antidromic_latency, antidromic_jitter
 
 
-def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
+def plot_opto_responses(unit_tbl, event_ids):
     """
     Find antidromic units based on opto stimulation data.
     """
     # Filter for opto tagged units
-    opto_criteria = (unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)
-    opto_units = unit_tbl[opto_criteria]["unit_id"].to_list()
+    # opto_criteria = (unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)
+    opto_units = unit_tbl["unit_id"].to_list()
     print(f"Number of opto units: {len(opto_units)}")
 
     
@@ -86,15 +98,14 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
     num_units = len(opto_units)
 
     # Create one figure for all units × sites (3 rows per unit: raster + PSTH + antidromic raster)
-    fig_height_per_unit = 6
-    fig = plt.figure(figsize=(num_sites * 4, num_units * fig_height_per_unit))
-    fig.suptitle(f'{session_id} # units: {num_units}')    
-    gs = gridspec.GridSpec(4 * num_units, num_sites, height_ratios=[3, 6, 2, 0.5] * num_units, hspace=0.8)
+    fig_height_per_unit = 10
+    fig = plt.figure(figsize=(num_sites * 4, num_units * fig_height_per_unit))   
+    gs = gridspec.GridSpec(6 * num_units, num_sites, height_ratios=[3, 6, 2, 0.5, 1, 1] * num_units, hspace=0.8)
 
     # Loop through units
     for u_idx, unit_id in enumerate(opto_units):
         # if unit_id == 244:
-        unit_spike_times = spiketimes[unit_id]
+        unit_spike_times = unit_tbl[unit_tbl['unit_id'] == unit_id]['spike_times'].values[0]
 
         for i, site in enumerate(sites):
             if site == 'surface_LC':
@@ -109,6 +120,9 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
 
             # Filter trials
             tag_trials = event_ids.query('site == @site and pre_post == @prepost')
+            if tag_trials.empty:
+                prepost = 'pre'
+                tag_trials = event_ids.query('site == "surface_LC" and pre_post == @prepost')
             max_power = tag_trials.power.max()
             tag_trials = tag_trials.query('power == @max_power')
             if tag_trials.empty:
@@ -139,7 +153,7 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
 
             int_event_locked_timestamps = remove_spikes_during_laser_pulse(int_event_locked_timestamps, duration)
             # Raster plot
-            ax_raster = fig.add_subplot(gs[4 * u_idx, i])
+            ax_raster = fig.add_subplot(gs[5 * u_idx, i])
             pf.raster_plot(int_event_locked_timestamps, time_range_raster, cond_each_trial=pulse_nums, ms=100, ax=ax_raster)
             p_val = opto_tagging_response(int_event_locked_timestamps, base_window, roi_window)
 
@@ -170,7 +184,7 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
 
             # Add laser pulse aligned but sorted by spike times
             # Antidromic raster plot
-            ax_antidromic = fig.add_subplot(gs[4 * u_idx + 1, i], sharex=ax_raster)
+            ax_antidromic = fig.add_subplot(gs[5 * u_idx + 1, i], sharex=ax_raster)
             sorted_data = sorted(int_event_locked_timestamps, key=lambda x: (len(x) == 0, x[0] if len(x) > 0 else np.inf))
             pf.raster_plot(sorted_data, time_range_raster)
             # pf.raster_plot(sorted_data, time_range_raster, ax=ax_antidromic)
@@ -191,9 +205,11 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
                 ax_antidromic.set_yticklabels([])
 
             # PSTH plot
-            ax_psth = fig.add_subplot(gs[4 * u_idx + 2, i], sharex=ax_raster)
+            ax_psth = fig.add_subplot(gs[5 * u_idx + 2, i], sharex=ax_raster)
             psth, _, bins = pf.psth(int_event_locked_timestamps, time_range_raster, bin_size=0.003, smooth_window_size=3)
             antidromic_latency, antidromic_jitter = antidromic_latency_jitter(int_event_locked_timestamps)
+            if antidromic_jitter > antidromic_latency:
+                antidromic_jitter = antidromic_latency
             ax_psth.plot(bins, psth, color='k')
             if i == 0:
                 ax_psth.set_ylabel('PSTH')
@@ -210,15 +226,166 @@ def plot_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
                 # ax_psth.legend()
             # Add title to PSTH
             # ax_psth.set_title(f'PSTH for {site}, {max_power} mW\nAntidromic latency: {antidromic_latency:.3f} s, Jitter: {antidromic_jitter:.3f} s')
+            # Add p(resp)-first spike latency
+            spike_time_range = (20, 50)
+            bin_num=100
+            # Convert spike time range to seconds
+            spike_time_range_sec = (spike_time_range[0] / 1000, spike_time_range[1] / 1000)
+            first_post_stim_spike_times = []
+            
+            for spike_times in sorted_data:
+                if spike_times.size > 0 and np.any(spike_times > 0):
+                    first_spike = spike_times[spike_times > 0][0]
+                    first_post_stim_spike_times.append(first_spike)
+                    
+                # Check if first spikes fall within the antidromic window
+                is_antidromic_spike = (spike_times >= spike_time_range_sec[0]/1000) & \
+                                (spike_times <= spike_time_range_sec[1]/1000)
+            
+            if not first_post_stim_spike_times:
+                continue
+            first_post_stim_spike_times = np.array(first_post_stim_spike_times)
+            # Calculate antidromic spike probability
+            antidromic_spike_prob = np.sum(is_antidromic_spike) / len(first_post_stim_spike_times)
+            # Find peak latency (for information only)
+            hist, bin_edges = np.histogram(first_post_stim_spike_times, bins=bin_num)
+            peak_x = bin_edges[np.argmax(hist)]
+            antidromic_latency = peak_x
+            ax_latency = fig.add_subplot(gs[5 * u_idx + 3, i])
+            ax_latency.plot(bin_edges[:-1], hist, color='k')
+            ax_latency.axvline(antidromic_latency, color='r', linestyle='--', label=f'Peak: {antidromic_latency:.3f} s')
+            ax_latency.set_xlabel('First post-stimulus spike time (s)')
+            ax_latency.set_ylabel('Count')
+            ax_latency.set_title(f'Prob: {antidromic_spike_prob:.2f}; Lat: {antidromic_latency*1000:.1f} ms')
+            # antidromic test
+            num_trials = len(sorted_data)
+            last_ortho_spike_times = np.full(num_trials, np.nan)
+            collision_flags = np.ones(num_trials, dtype=int)
+            for spike_i, spike_times in enumerate(sorted_data):
+                if spike_times.size == 0:
+                    continue
+                
+                ortho_mask = spike_times <= (antidromic_latency - antidromic_jitter)
+                anti_mask = (antidromic_latency - antidromic_jitter < spike_times) & (spike_times < antidromic_latency + antidromic_jitter)
+                
+                ortho_spikes = spike_times[ortho_mask]
+                anti_spikes = spike_times[anti_mask]
+                
+                if ortho_spikes.size > 0:
+                    last_ortho_spike_times[spike_i] = ortho_spikes[-1]  # Only keep the last orthodromic spike
+                
+                if anti_spikes.size > 0:
+                    collision_flags[spike_i] = 0  # If antidromic spike exists, collision = 0 (no collision)
+            antidromic_df = pd.DataFrame({
+                'trial_num': np.arange(num_trials),
+                'last_orthodromic_spike_time': last_ortho_spike_times,
+                'collision': collision_flags
+            })
 
+            # Step 4: ROI selection and plot
+            roi_df = antidromic_df.dropna(subset=['last_orthodromic_spike_time'])  # Keep only trials with orthodromic spikes
+            x = (roi_df['last_orthodromic_spike_time'].values - antidromic_latency) * 1000  # in ms
+            y = 1 - roi_df['collision'].values  # 1 = successful antidromic spike, 0 = collision
+            
+            # Define windows (you can adjust these)
+            early_window = (-100, -70)  # in ms
+            near_latency_window = (-30, 0)
 
+            # Select data in each window
+            early_indices = (x >= early_window[0]) & (x < early_window[1])
+            near_latency_indices = (x >= near_latency_window[0]) & (x <= near_latency_window[1])
+
+            early_probs = y[early_indices]
+            near_latency_probs = y[near_latency_indices]
+
+            # Perform Mann-Whitney U test
+            statistic, p_value = mannwhitneyu(early_probs, near_latency_probs, alternative='greater')
+            # Plot binned averages
+            result, edges = Avg_y_over_x(x, y, bin_size=10)
+            ax_compare = fig.add_subplot(gs[5 * u_idx + 4, i])
+            ax_compare.errorbar(result['x'], result['y'], yerr=result['sem'], fmt='o-', label='Average ± SEM')
+            ax_compare.set_xlabel('Time from antidromic latency (ms)')
+            ax_compare.set_ylabel('P(antidromic spike)')
+            ax_compare.set_title(f'Collision Test: p-value: {p_value:.2e}')  # <- use f-string
+            ax_compare.set_xlim([-100, 0])
+            ax_compare.set_ylim([-0.05, 1.05])
+            # plt.legend()
 
 
     # Final layout adjustments
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])    
+    fig.tight_layout()    
     # plt.show()
-
     return fig
+
+def compute_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
+    results = []
+
+    # Filter for opto tagged units
+    opto_criteria = (unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)
+    opto_units = unit_tbl[opto_criteria]["unit_id"].to_list()
+    print(f"Session {session_id}: {len(opto_units)} opto-tagged units")
+
+    
+    # Unique values
+    sites = list(np.unique(event_ids.emission_location))
+    powers = list(np.unique(event_ids.power))
+    trial_types = np.unique(event_ids.type)
+    
+    # Settings
+    prepost = 'post'
+    num_sites = len(sites)
+    num_units = len(opto_units)
+
+   
+    # Loop through units
+    for u_idx, unit_id in enumerate(opto_units):
+        # if unit_id == 244:
+        unit_spike_times = spiketimes[unit_id]
+
+        for i, site in enumerate(sites):
+            base_window = (-0.02, 0)
+            roi_window = (0, 0.02) if site == 'surface_LC' else (0.02, 0.06)
+
+
+            # Filter trials
+            tag_trials = event_ids.query('site == @site and pre_post == @prepost')
+            max_power = tag_trials.power.max()
+            tag_trials = tag_trials.query('power == @max_power')
+            if tag_trials.empty:
+                continue
+
+            # Stimulation parameters
+            duration = np.unique(tag_trials.duration)[0]
+            num_pulses = np.unique(tag_trials.num_pulses)[0]
+            pulse_interval = np.unique(tag_trials.pulse_interval)[0]
+
+            # Time window
+            time_range_raster = np.array([-100 / 1000, 70 / 1000])
+            this_event_timestamps = tag_trials.time.tolist()
+
+            int_event_locked_timestamps = []
+            pulse_nums = []
+
+            for pulse_num in range(num_pulses):
+                time_shift = pulse_num * (duration + pulse_interval) / 1000
+                this_time_range = time_range_raster + time_shift
+
+                this_locked = af.event_locked_timestamps(
+                    unit_spike_times, this_event_timestamps, this_time_range, time_shift=time_shift
+                )
+                int_event_locked_timestamps.extend(this_locked)
+                pulse_nums.extend([pulse_num + 1] * len(this_locked))
+
+            # Perform significance test
+            if len(int_event_locked_timestamps) != 0:
+                p_val = opto_tagging_response(int_event_locked_timestamps, base_window, roi_window)
+            if not np.isnan(p_val):
+                results.append({
+                    'unit_id': unit_id,
+                    'site': site,
+                    'p_value': round(p_val, 3)
+                })
+    return results
 
 def Avg_y_over_x(x, y, bin_size):
     """
@@ -254,33 +421,58 @@ def Avg_y_over_x(x, y, bin_size):
 
     return Avg, edges
 
-def analyze_antidromic_responses(opto_units, spiketimes, event_ids, plot=False):
+def analyze_antidromic_responses(session_id, data_type ='curated', plot=False, tier_cat = False):
     """
     Analyze antidromic responses for a given set of opto-tagged units.
 
     Parameters:
-        opto_units (list): List of unit IDs.
-        spiketimes (dict): Dictionary mapping unit_id -> np.array of spike times.
-        event_ids (pd.DataFrame): DataFrame containing stimulation event metadata.
+        session_id (str): session id
         plot (bool): Whether to plot collision raster for each unit and site.
 
     Returns:
         pd.DataFrame: DataFrame containing antidromic response metrics and tier categorization.
     """
-    
-    
+    session_dir = session_dirs(session_id)
+    opto_data_folder = session_dir[f'opto_dir_{data_type}']
+    unit_tbl = get_unit_tbl(session_id, data_type)
+    if unit_tbl is None:
+        return None
+    opto_units = unit_tbl.query("opto_pass == True & default_qc == True").copy()
+    del unit_tbl
+    print (f"opto units: {len(opto_units)}")
 
-    if not opto_units:
+    opto_event_file = os.path.join(opto_data_folder, f'{session_id}_opto_session.csv')
+    event_ids = pd.read_csv(opto_event_file) 
+
+    if len(opto_units)<1:
         print("No opto units found.")
         return pd.DataFrame()
 
     antidromic_results = []
-    time_range_raster = np.array([-0.1, 0.07])  # in seconds
+    time_range_raster = np.array([-0.15, 0.15])  # in seconds
+    for unit_ind, row in opto_units.iterrows():
+        unit_spike_times = row['spike_times']
+        unit_id = row['unit_id']
+        # print(unit_id)
+        unit_drift = load_drift(session_id, unit_id, data_type=data_type)
+        event_ids_curr = event_ids.copy()
+        if unit_drift is not None:
+            if unit_drift['ephys_cut'][0] is not None:
+                event_ids_curr = event_ids_curr[event_ids_curr['time']>=unit_drift['ephys_cut'][0]]
+            if unit_drift['ephys_cut'][1] is not None:
+                event_ids_curr = event_ids_curr[event_ids_curr['time']<=unit_drift['ephys_cut'][1]]
+        if len(event_ids_curr)==0:
+            print(f"No opto events for unit {unit_id} after applying drift cuts.")
+            continue
+        for site in event_ids_curr['site'].unique():    
+            if isinstance(site, str):
+                if 'Failed' in site:
+                    continue
 
-    for unit_id in opto_units:
-        unit_spike_times = spiketimes[unit_id]
-        
-        for site in event_ids['site'].unique():
+            # print(site)
+            
+            tag_trials = event_ids_curr.query('site == @site and pre_post == "post"')
+            
             if site == 'surface':
                 site = 'surface_LC'  # Treat 'surface' as 'surface_LC' for consistency
             
@@ -291,8 +483,7 @@ def analyze_antidromic_responses(opto_units, spiketimes, event_ids, plot=False):
             else:
                 base_window = (-0.02, 0)
                 roi_window = (0.02, 0.06)
-            
-            tag_trials = event_ids.query('site == @site and pre_post == "post"')
+                
             if tag_trials.empty:
                 continue
 
@@ -349,6 +540,35 @@ def analyze_antidromic_responses(opto_units, spiketimes, event_ids, plot=False):
                 collision_results = collision_test(
                     int_event_locked_timestamps, antidromic_latency, bin_size=10, antidromic_jitter=0.005, plot=False
                 )
+                # add regression analysis
+                int_event_locked_timestamps_sham = []
+                this_event_timestamps_sham = np.linspace(np.min(tag_trials.time.values)+1, np.max(tag_trials.time.values)-1, max(len(this_event_timestamps), 50))
+                for pulse_num in range(num_pulses):
+                    time_shift = pulse_num * (duration + pulse_interval) / 1000
+                    this_time_range = time_range_raster + time_shift
+                    this_locked = af.event_locked_timestamps(
+                        unit_spike_times, this_event_timestamps_sham, this_time_range, time_shift=time_shift
+                    )
+                    int_event_locked_timestamps_sham.extend(this_locked)
+                int_event_locked_timestamps_sham = remove_spikes_during_laser_pulse(int_event_locked_timestamps_sham, duration)
+                # if both lock timestamps are empty before 0, skip
+                if all(len(arr[arr<0])==0 for arr in int_event_locked_timestamps) and all(len(arr[arr<0])==0 for arr in int_event_locked_timestamps_sham):
+                    regression_dict = {
+                        'p_auto_inhi': np.nan,
+                        't_auto_inhi': np.nan,
+                        'p_collision': np.nan,
+                        't_collision': np.nan,
+                        'p_antidromic': np.nan,
+                        't_antidromic': np.nan
+                    }
+                else:
+                    regression_dict = antidromic_regression_analysis(
+                        int_event_locked_timestamps,
+                        int_event_locked_timestamps_sham,
+                        antidromic_latency,
+                        antidromic_jitter,
+                    )
+
                 result.update({
                     'collision_pvalue': collision_results['p_value'],
                     'collision_pbinom': collision_results['p_binom'],
@@ -361,18 +581,31 @@ def analyze_antidromic_responses(opto_units, spiketimes, event_ids, plot=False):
                     'edges': collision_results['edges'],
                     'last_orthodromic_spike_time': collision_results['last_orthodromic_spike_time']
                 })
+                result.update(regression_dict)
 
             antidromic_results.append(result)
 
     antidromic_df = pd.DataFrame(antidromic_results)
     if antidromic_df.empty:
-        print("No antidromic results found.")    
-
+        print("No antidromic results found.")   
+        return None 
     antidromic_pivot = antidromic_df.pivot(index='unit_id', columns='site').reset_index()
-    unit_tiers = antidromic_tier_categorization(antidromic_pivot)
-    print(unit_tiers)
-    unit_tiers_pivot = unit_tiers.pivot(index='unit_id', columns='site_for_tier', values='tier').reset_index()
-    merged_df = pd.merge(antidromic_pivot, unit_tiers_pivot, on='unit_id', how='outer')
+    if tier_cat:
+        if any(col in event_ids.columns for col in ['surface_PrL', 'surface_V1', 'surface_S1', 'surface_SC']):
+            unit_tiers = antidromic_tier_categorization(antidromic_pivot)
+            # print(unit_tiers)
+            unit_tiers_pivot = unit_tiers.pivot(index='unit_id', columns='site_for_tier', values='tier').reset_index()
+            merged_df = pd.merge(antidromic_pivot, unit_tiers_pivot, on='unit_id', how='outer')
+        else:
+            merged_df = antidromic_pivot
+            merged_df['tier'] = 0
+    else:
+        merged_df = antidromic_pivot
+    
+    # regression test 
+    
+    save_dir = session_dir[f'opto_dir_{data_type}']
+    merged_df.to_pickle(os.path.join(save_dir, f'{session_id}_antidromic_results.pkl'))
     return merged_df
 
 
@@ -429,11 +662,6 @@ def collision_test(int_event_locked_timestamps, antidromic_latency, bin_size=10,
     Returns:
         dict: Results including DataFrame, p-value, and odds ratio.
     """
-    import numpy as np
-    import pandas as pd
-    from scipy.stats import fisher_exact
-    from scipy.stats import binomtest as binom_test
-    import matplotlib.pyplot as plt
 
     data = []
     trial_num = 0
@@ -539,3 +767,154 @@ def collision_test(int_event_locked_timestamps, antidromic_latency, bin_size=10,
         'post_boundary_prob': post_prob,  # Probability of antidromic spike after collision boundary
         'last_orthodromic_spike_time':antidromic_df['last_orthodromic_spike_time'],
     }
+
+def antidromic_regression_analysis(int_event_locked_timestamps, int_event_locked_timestamps_sham, antidromic_latency, antidromic_jitter):
+    """
+    Perform regression analysis to assess the relationship between orthodromic spikes and antidromic spikes.
+    Parameters:
+        int_event_locked_timestamps (list of np.ndarray): Event-locked spike times for actual trials.
+        int_event_locked_timestamps_sham (list of np.ndarray): Event-locked spike times for sham trials.
+        antidromic_latency (float): Median first spike latency after light onset.
+        antidromic_jitter (float): Jitter window in seconds.
+    Returns:
+        tuple: p-values for auto-inhibition, collision, and antidromic effects.
+    """
+    # import logistic regression
+    from statsmodels.formula.api import logit
+    from statsmodels.tools import add_constant
+    # import linear regression
+    from statsmodels.formula.api import ols
+    data = []
+    trial_num_real = len(int_event_locked_timestamps)
+    trial_num_sham = len(int_event_locked_timestamps_sham)
+    trigger = np.array([1]*trial_num_real + [0]*trial_num_sham)
+    antidromic_jitter = 2* antidromic_jitter  # Double the jitter for both sides
+    if antidromic_jitter < 0.005:
+        antidromic_jitter = 0.005
+    if antidromic_jitter > antidromic_latency:
+        antidromic_jitter = antidromic_latency
+    spont_spike = []
+    spont_spike_count = []
+    laser_evoked_spike = []
+    laser_evoked_spike_count = []
+    for spike_times in int_event_locked_timestamps + int_event_locked_timestamps_sham:
+        # Orthodromic spikes
+        ortho_spike_times = spike_times[(spike_times <= antidromic_latency - antidromic_jitter) & (spike_times >= -antidromic_latency-antidromic_jitter)]
+        spont_spike.append(1 if ortho_spike_times.size > 0 else 0)
+        spont_spike_count.append(ortho_spike_times.size)
+        # Antidromic spikes
+        anti_spike_times = spike_times[
+            ((antidromic_latency - antidromic_jitter) < spike_times) &
+            (spike_times < (antidromic_latency + antidromic_jitter))
+        ]
+        laser_evoked_spike.append(1 if anti_spike_times.size > 0 else 0)
+        laser_evoked_spike_count.append(anti_spike_times.size)
+    spont_spike = np.array(spont_spike)
+    laser_evoked_spike = np.array(laser_evoked_spike)
+    df = pd.DataFrame({
+        'trigger': trigger,
+        'spont_spike': spont_spike,
+        'spont_spike_count': spont_spike_count,
+        'laser_evoked_spike': laser_evoked_spike,
+        'laser_evoked_spike_count': laser_evoked_spike_count
+    })
+    # Auto-inhibition + collision + antidromic model
+    # model_half = logit("laser_evoked_spike ~ trigger + spont_spike", data=df).fit(disp=0)
+    # linear regresssion
+    model_half = ols("laser_evoked_spike_count ~ trigger + spont_spike_count", data=df).fit()
+    if (model_half.pvalues['trigger']<0.1) and (model_half.tvalues['trigger']>0):
+        try:
+            # model_full = logit("laser_evoked_spike ~ trigger + spont_spike + trigger:spont_spike", data=df).fit(disp=0)
+            model_full = ols("laser_evoked_spike_count ~ trigger + spont_spike_count + trigger:spont_spike", data=df).fit()
+            p_auto_inhi = model_full.pvalues['spont_spike_count']
+            t_auto_inhi = model_full.tvalues['spont_spike_count']
+            p_collision = model_full.pvalues['trigger:spont_spike']
+            t_collision = model_full.tvalues['trigger:spont_spike']
+            p_antidromic = model_full.pvalues['trigger']
+            t_antidromic = model_full.tvalues['trigger']
+        except:
+            print("Interaction term caused perfect separation; skipping interaction term.")
+            p_auto_inhi = model_half.pvalues['spont_spike_count']
+            t_auto_inhi = model_half.tvalues['spont_spike_count']
+            p_collision = np.nan
+            t_collision = np.nan
+            p_antidromic = model_half.pvalues['trigger']
+            t_antidromic = model_half.tvalues['trigger']
+    else:
+        model_full = model_half
+        # get p-values
+        p_auto_inhi = model_full.pvalues['spont_spike_count']
+        t_auto_inhi = model_full.tvalues['spont_spike_count']
+        p_collision = np.nan
+        t_collision = np.nan
+        p_antidromic = model_full.pvalues['trigger']
+        t_antidromic = model_full.tvalues['trigger']
+    return {
+        'p_auto_inhi': p_auto_inhi,
+        't_auto_inhi': t_auto_inhi,
+        'p_collision': p_collision,
+        't_collision': t_collision,
+        'p_antidromic': p_antidromic,
+        't_antidromic': t_antidromic
+    }
+
+def plot_opto_responses_session(session, data_type='curated', opto_only=True):
+    session_dir = session_dirs(session)
+    unit_tbl = get_unit_tbl(session, data_type=data_type)
+    opto_csv_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv')
+    opto_save_dir = os.path.join(session_dir[f'opto_dir_fig_{data_type}'], 'antidromic')
+    if not os.path.exists(opto_save_dir):
+        os.makedirs(opto_save_dir)
+    if os.path.exists(opto_csv_file):
+        event_ids = pd.read_csv(opto_csv_file)
+    if opto_only:
+        unit_tbl = unit_tbl[unit_tbl['opto_pass'] & unit_tbl['default_qc'] & (unit_tbl['decoder_label']!='artifact')]
+
+    for i in range(len(unit_tbl)):
+        unit_df = unit_tbl.iloc[[i]]   # double brackets → keeps it as a DataFrame
+        unit_id = unit_tbl['unit_id'].values[i]
+        print(f'Plotting opto responses for unit {unit_id}')
+        unit_drift = load_drift(session, unit_id, data_type=data_type)
+        event_ids_curr = event_ids.copy()
+        
+        if unit_drift is not None:
+            if unit_drift['ephys_cut'][0] is not None:
+                event_ids_curr = event_ids_curr[event_ids_curr['time']>=unit_drift['ephys_cut'][0]]
+            if unit_drift['ephys_cut'][1] is not None:
+                event_ids_curr = event_ids_curr[event_ids_curr['time']<=unit_drift['ephys_cut'][1]]
+        if len(event_ids_curr) > 0:  
+            fig = plot_opto_responses(unit_df, event_ids_curr)
+            fig.suptitle(f'{session} unit {unit_tbl["unit_id"].values[i]}')
+            fig.savefig(fname=os.path.join(opto_save_dir, f'{session}_unit{unit_tbl["unit_id"].values[i]}_opto_responses.pdf'))
+            fig.savefig(fname=os.path.join(opto_save_dir, f'{session}_unit{unit_tbl["unit_id"].values[i]}_opto_responses.svg'))
+            plt.close(fig)
+        else:
+            print(f"No opto events found for session {session}, skipping unit {unit_id}.")
+        
+    combine_pdf_big(opto_save_dir, os.path.join(session_dir[f'opto_dir_fig_{data_type}'], f'{session}_antidromic_responses.pdf'))
+
+if __name__ == "__main__":
+
+
+    data_type = 'curated'  # 'raw' or 'curated'
+    session_df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    # remove opto sessions
+    session_list = session_df[session_df['probe'] == '2']['session_id'].to_list()
+    def process(session, data_type='curated'):
+        session_dir = session_dirs(session)
+        print(f"Processing session: {session}")
+        if session_dir[f'curated_dir_{data_type}'] is not None:
+            print(f"Processing session: {session}")
+            # try:
+            plot_opto_responses_session(session, data_type=data_type, opto_only=True)
+            # analyze_antidromic_responses(session)
+            # except:
+                # print(f"Failed to process session: {session}")
+            print(f"Finished session: {session}")
+        else:
+            print(f"No curated data for session: {session}, skipping.")
+    # from joblib import Parallel, delayed
+    # Parallel(n_jobs=3)(delayed(process)(session, data_type=data_type) for session in session_list)
+    process('behavior_752014_2025-03-26_11-18-57')
+    # for session in session_list:
+    #     process(session)

@@ -63,6 +63,7 @@ def opto_summary(session, data_type, target, save=True):
     pass_count = [] 
     # check if this session has a unit opto tagged at all by checking if resp_lat exists
     for unit_id in unit_ids:
+        print(f'Processing unit {unit_id}')
         curr_opto = opto_tag.load_unit(unit_id)
         # find ones with respond latencies
         sort_inds = np.argsort(curr_opto['resp_p_bl'].values)[::-1]
@@ -90,7 +91,7 @@ def opto_summary(session, data_type, target, save=True):
 
         lat_max_p.append(np.nanmin(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['resp_lat'].values))
         lat_mean.append(curr_opto['resp_lat'].mean(skipna=True))
-        if np.all(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['euclidean_norm'].values == None):
+        if np.all(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['euclidean_norm'].values == None) or np.all(np.isnan(curr_opto[curr_opto['resp_p_bl'] == curr_max_p]['euclidean_norm'].values)):
             euc_max_p.append(np.nan)
             corr_max_p.append(np.nan)
         else:
@@ -180,7 +181,7 @@ def opto_summary(session, data_type, target, save=True):
     w.ax.set_title('All units')
 
     ax = fig.add_subplot(gs_probe[1, 1])
-    unit_ids_filtered = pd.Series(unit_ids)[opto_tag_tbl['real_unit'] & (opto_tag_tbl['lat_mean']>=0.007) & (opto_tag_tbl['euc_max_p']<=0.3)].values.tolist()
+    unit_ids_filtered = pd.Series(unit_ids)[opto_tag_tbl['real_unit'] & (opto_tag_tbl['lat_mean']>=0.004) & (opto_tag_tbl['corr_max_p']>=0.85)].values.tolist()
     w = sw.plot_unit_locations(we, backend="matplotlib", unit_ids=unit_ids_filtered, unit_colors=color_dict, ax = ax)
     w.ax.set_ylim(-200, 2000)
     w.ax.set_title('Real units')
@@ -231,7 +232,7 @@ def opto_summary(session, data_type, target, save=True):
     w.ax.set_title('All units')
 
     ax = fig.add_subplot(gs_probe[1, 5])
-    unit_ids_filtered = pd.Series(unit_ids)[opto_tag_tbl['real_unit'] & (opto_tag_tbl['lat_mean']>=0.005) & (opto_tag_tbl['euc_max_p']<=0.5)].values.tolist()
+    unit_ids_filtered = pd.Series(unit_ids)[opto_tag_tbl['real_unit'] & (opto_tag_tbl['lat_mean']>=0.005) & (opto_tag_tbl['corr_max_p']>=0.85)].values.tolist()
     w = sw.plot_unit_locations(we, backend="matplotlib", unit_ids=unit_ids_filtered, unit_colors=color_dict, ax = ax)
     w.ax.set_ylim(-200, 2000)
     w.ax.set_title('Real units')
@@ -289,13 +290,13 @@ def opto_summary(session, data_type, target, save=True):
                 (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) &\
                 (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02) &\
                 (opto_tag_tbl['real_unit']) &\
-                (opto_tag_tbl['euc_max_p']<=0.3)
+                (opto_tag_tbl['corr_max_p']>=0.85)
     
     mask = (opto_tag_tbl['p_max']>0.2) & (opto_tag_tbl['pass_count'] >=1)&\
-            (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) &\
-            (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02) &\
+            (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>=0.005) &\
+            (opto_tag_tbl['bl_max_p']>0.3*0.02) * (opto_tag_tbl['bl_max_p']<30*0.02) &\
             (opto_tag_tbl['real_unit']) &\
-            (opto_tag_tbl['euc_max_p']<=0.3)
+            (opto_tag_tbl['corr_max_p']>=0.85)
                 
 
     LC_range = opto_tag_tbl[mask]['y_loc'].values
@@ -320,10 +321,10 @@ def opto_summary(session, data_type, target, save=True):
         bottom = np.max([bottom, center-500])
         unit_tag_loc = (opto_tag_tbl['p_max']>=low_thresh) & (opto_tag_tbl['p_mean']>0.1) & (opto_tag_tbl['pass_count'] >=2) & \
                     (opto_tag_tbl['y_loc']<=top) & (opto_tag_tbl['y_loc']>=bottom) & \
-                    (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>0.007) & \
-                    (opto_tag_tbl['bl_max_p']>0.5*0.02) * (opto_tag_tbl['bl_max_p']<20*0.02)& \
+                    (opto_tag_tbl['lat_max_p']<0.025) & (opto_tag_tbl['lat_max_p']>=0.005) & \
+                    (opto_tag_tbl['bl_max_p']>0.3*0.02) * (opto_tag_tbl['bl_max_p']<30*0.02)& \
                     (opto_tag_tbl['real_unit']) &\
-                    (opto_tag_tbl['euc_max_p']<=0.3)
+                    (opto_tag_tbl['corr_max_p']>=0.85)
 
         opto_tag_tbl_summary['tagged_loc'] = unit_tag_loc
         opto_tag_tbl_summary['tagged'] = unit_tag
@@ -376,7 +377,7 @@ def opto_summary(session, data_type, target, save=True):
 
 
 if __name__ == '__main__':
-    session = 'behavior_717121_2024-06-15_10-00-58'
+    session = 'behavior_784803_2025-07-01_13-58-26'
     data_type = 'curated'
     target = 'soma'
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -387,37 +388,38 @@ if __name__ == '__main__':
 
     warnings.filterwarnings("ignore")
     
-    data_type = 'raw'
+    data_type = 'curated'
     from joblib import Parallel, delayed
     def process(session):
         print(f'Starting {session}')
-        session_dir = session_dirs(session)
+        # session_dir = session_dirs(session)
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
-        if session_dir[f'curated_dir_{data_type}'] is not None:
-            if get_unit_tbl(session, data_type, summary=True) is None:
-                opto_summary(session, data_type, target, save=True)
-                print(f'Finished {session}')
-                return
-            else:
-                unit_tbl = get_unit_tbl(session, data_type, summary=True)
-                if 'p_max' not in unit_tbl.columns:
-                    opto_summary(session, data_type, target, save=True)
-                    print(f'Finished {session}')
-                    return
+        # if session_dir[f'curated_dir_{data_type}'] is not None:
+        #     if get_unit_tbl(session, data_type, summary=True) is None:
+        #         opto_summary(session, data_type, target, save=True)
+        #         print(f'Finished {session}')
+        #         return
+        #     else:
+        #         unit_tbl = get_unit_tbl(session, data_type, summary=True)
+        #         if 'p_max' not in unit_tbl.columns:
+        #             opto_summary(session, data_type, target, save=True)
+        #             print(f'Finished {session}')
+        #             return
             
-        else: 
-            print(f'No {data_type} data found for {session}')
+        # else: 
+        #     print(f'No {data_type} data found for {session}')
+        opto_summary(session, data_type, target, save=True)
         # elif session_dir['curated_dir_raw'] is not None:
         #     data_type = 'raw'
         #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_t hresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, ephys_cut = False, save=True)
-    # Parallel(n_jobs=2)(delayed(process)(session) for session in session_list)
+    # Parallel(n_jobs=2)(delayed(process)(session) for session in session_list[-9:])
     # print(session_list[10:17])
-    for session in session_list:
-        # try:
-        process(session) 
+    # for session in session_list[-9:]:
+    #     # try:
+    #     process(session) 
          # except:
         #     print(f'Failed {session}')
-    # process('behavior_761038_2025-04-15_10-25-11')
+    process('behavior_784803_2025-07-01_13-58-26')
 
 
 

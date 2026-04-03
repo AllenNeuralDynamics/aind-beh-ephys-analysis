@@ -25,13 +25,15 @@ from hdmf_zarr import NWBZarrIO
 from scipy.io import loadmat
 import pickle
 import shutil
-from open_ephys.analysis import Session
+
+import itertools
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
 from scipy.stats import norm
 import statsmodels.api as sm
+from sklearn.metrics import r2_score
 
 import spikeinterface as si
 
@@ -605,7 +607,7 @@ def get_stream_info(directory):
         A DataFrame with information about the streams
 
     """
-
+    from open_ephys.analysis import Session
     session = Session(directory)
 
     stream_info = {
@@ -641,11 +643,13 @@ def get_stream_info(directory):
 
     return pd.DataFrame(data=stream_info)
 
-def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
+def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch', hopkins = False):
     # parse session_id 
     aniID, date_obj, raw_id = parseSessionID(session_id)
-    if aniID.startswith('ZS'):
-        print('Old data, using hopkins formats')
+    hopkins_list = ['672850', '669492', '669489', '754898', '754896', '754895', '749624', '749472', '701707', '699472', '699461', '699462']
+    # print(f"Parsing session_id: {session_id}, aniID: {aniID}")
+    if aniID.startswith('ZS') or aniID in hopkins_list:
+        # print('Old data, using hopkins formats')
         return session_dirs_hopkins(session_id, model_name, data_dir, scratch_dir)
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
@@ -666,6 +670,11 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     seg_id = None   
     max_len_ind = None
     all_rec_count = None
+    stream_name_surface = None
+    surface_exp_id = None
+    surface_seg_id = None
+    surface_recording_dir = None
+    all_rec_count_surface = None
     if os.path.exists(session_dir):
         stream_info = get_stream_info(session_dir)
         stream_info = stream_info[(stream_info['Stream'].str.contains('ProbeA')) & (~stream_info['Stream'].str.contains('LFP'))]
@@ -675,16 +684,20 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
             rec_path = os.path.join(session_dir_raw, experiment)
             experiment_id = 1
             seg_id = 1
-            print(f'Single experiment found: experiment{experiment_id}, recording{seg_id}')
-            stream_name = experiment.split('.zarr')[0]
+            # print(f'Single experiment found: experiment{experiment_id}, recording{seg_id}')
+            stream_name = experiment.split('.zarr')[0] + '_recording1'
             all_rec_count = experiment_id-1 + seg_id-1
             raw_recording_dir = os.path.join(session_dir_raw, experiment)
+            surface_exp_id = None
+            surface_seg_id = None
+            surface_recording_dir = None
+            all_rec_count_surface = None
         else:
             # loop through experiments and segments to get the longest one
             lengths = []
             experiment_ids = []
             segment_inds = []
-            stream_name = []
+            stream_names = []
 
             for experiment in os.listdir(session_dir_raw):
                 if 'ProbeA' in experiment: 
@@ -699,18 +712,29 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                         lengths.append(recording_curr.get_num_samples(segment_index = rec_ind))
                         experiment_ids.append(int(exp_match.group(1)))
                         segment_inds.append(rec_ind)
-                        stream_name.append(experiment.split('.zarr')[0])
+                        stream_names.append(experiment.split('.zarr')[0])
 
             max_len_ind = np.argmax(np.array(lengths))
             experiment_id = experiment_ids[max_len_ind]
             seg_id = segment_inds[max_len_ind]+1
-            print(f'Selected experiment{experiment_id} recording{seg_id}, length:{lengths[max_len_ind]/32000 :.2f}')
-            experiment_name = stream_name[max_len_ind]
+            # print(f'Selected experiment{experiment_id} recording{seg_id}, length:{lengths[max_len_ind]/32000 :.2f}')
+            experiment_name = stream_names[max_len_ind]
             stream_name = experiment_name + f'_recording{seg_id}'
             all_rec_count = experiment_id-1 + seg_id-1
             raw_recording_dir = os.path.join(session_dir_raw, experiment_name+'.zarr')
-    else:
-        print(f'No raw session directory found for {session_id}.')
+            # check if there is a surface recording
+            if np.sum(np.array(experiment_ids)>experiment_id) > 0:
+                surface_inds = np.where(np.array(experiment_ids)>experiment_id)[0]
+                surface_ind = surface_inds[np.argmax(np.array(lengths)[surface_inds])]
+                surface_exp_id = experiment_ids[surface_ind]
+                surface_seg_id = segment_inds[surface_ind]+1
+                surface_experiment_name = stream_names[surface_ind]
+                stream_name_surface = surface_experiment_name + f'_recording{surface_seg_id}'
+                surface_recording_dir = os.path.join(session_dir_raw, surface_experiment_name+'.zarr')
+                all_rec_count_surface = surface_exp_id-1 + surface_seg_id-1
+                 
+    # else:
+    #     print(f'No raw session directory found for {session_id}.')
 
     # raw version
     nwb_dir_temp = os.path.join(sorted_raw_dir, 'nwb')
@@ -718,14 +742,16 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     if os.path.exists(nwb_dir_temp):
         nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
         nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb) and (f'recording{seg_id}' in nwb)]
+        if len(nwb) == 0:
+            nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb)]
         if len(nwb) == 1:
             nwb_dir_raw = os.path.join(nwb_dir_temp, nwb[0])
         elif len(nwb) > 1:
-            print('There are multiple recordings in the raw nwb directory. Picked one with units.')
+            # print('There are multiple recordings in the raw nwb directory. Picked one with units.')
             nwb_dir_raw = None
         else:
             nwb_dir_raw = None
-            print('There is no nwb file in the raw directory.')
+            # print('There is no nwb file in the raw directory.')
     nwb_dir_curated = None
     # curated version
     if os.path.exists(sorted_dir):
@@ -736,23 +762,25 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
             elif len(nwb_dir_temp) > 1:
                 nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
-                print('There are multiple nwb files in the curated directory. Picked first one.')
+                # print('There are multiple nwb files in the curated directory. Picked first one.')
             else:
                 nwb_dir_temp = None
                 nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
+                # print('There is no nwb file in the curated directory.')
 
         if nwb_dir_temp is not None:
             nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb')]
             nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb) and (f'recording{seg_id}' in nwb)]
+            if len(nwb) == 0:
+                nwb = [nwb for nwb in nwbs if (f'experiment{experiment_id}' in nwb)]
             if len(nwb) == 1:
                 nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
             elif len(nwb) > 1:
-                print('There are multiple recordings in the curated nwb directory. Picked one with units.')
+                # print('There are multiple recordings in the curated nwb directory. Picked one with units.')
                 nwb_dir_curated = None
             else:
                 nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
+                # print('There is no nwb file in the curated directory.')
     # postprocessed dirs
     postprocessed_dir_raw = None
     postprocessed_dir_curated = None
@@ -762,14 +790,27 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         if os.path.exists(postprocessed_dir_temp):
             postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
             postprocessed_sub_folder = [s for s in postprocessed_sub_folders if ('post' not in s) and (stream_name in s)]
-            postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+            if len(postprocessed_sub_folder) == 0:
+                postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name[:-1] in s]
+            if len(postprocessed_sub_folder) > 0:
+                postprocessed_dir_curated = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+            else:
+                postprocessed_dir_curated = None
+                # print('No postprocessed dir found in curated sorted dir')
 
     if os.path.exists(sorted_raw_dir):
         postprocessed_dir_temp = os.path.join(sorted_raw_dir, 'postprocessed')
         if os.path.exists(postprocessed_dir_temp):
             postprocessed_sub_folders = os.listdir(postprocessed_dir_temp)
             postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name in s]
-            postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+            if len(postprocessed_sub_folder) == 0:
+                postprocessed_sub_folder = [s for s in postprocessed_sub_folders if 'post' not in s and stream_name[:-1] in s]
+            if len(postprocessed_sub_folder) > 0:
+                postprocessed_dir_raw = os.path.join(postprocessed_dir_temp, postprocessed_sub_folder[0])
+            else:
+                postprocessed_dir_raw = None
+                # print('No postprocessed dir found in raw sorted dir')
+
 
     
     # curated dirs
@@ -781,14 +822,26 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         if os.path.exists(curated_dir_temp):
             curated_sub_folders = os.listdir(curated_dir_temp)
             curated_sub_folders = [s for s in curated_sub_folders if stream_name in s]
-            curated_dir_curated = os.path.join(curated_dir_temp, curated_sub_folders[0])    
+            if len(curated_sub_folders) == 0:
+                curated_sub_folders = [s for s in os.listdir(curated_dir_temp) if stream_name[:-1] in s]
+            if len(curated_sub_folders) > 0:
+                curated_dir_curated = os.path.join(curated_dir_temp, curated_sub_folders[0])
+            else:
+                curated_dir_curated = None
+                # print('No curated dir found in curated sorted dir') 
     
     if os.path.exists(sorted_raw_dir):
         curated_dir_temp = os.path.join(sorted_raw_dir, 'curated')
         if os.path.exists(curated_dir_temp):
             curated_sub_folders = os.listdir(curated_dir_temp)
             curated_sub_folders = [s for s in curated_sub_folders if stream_name in s]
-            curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
+            if len(curated_sub_folders) == 0:
+                curated_sub_folders = [s for s in os.listdir(curated_dir_temp) if stream_name[:-1] in s]
+            if len(curated_sub_folders) > 0:
+                curated_dir_raw = os.path.join(curated_dir_temp, curated_sub_folders[0])
+            else:
+                curated_dir_raw = None
+                # print('No curated dir found in raw sorted dir')
 
     # model dir
     models_dir = os.path.join(data_dir, f'{aniID}_model_stan')
@@ -812,6 +865,10 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
     if os.path.exists(opto_csv_dir):
         temp_files = os.listdir(opto_csv_dir)
         opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
+
+    # FP dir
+    fp_dir = os.path.join(raw_dir, 'fib')
+    photo_nwb_dir = None
 
     # processed dirs
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
@@ -868,9 +925,16 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'sorted_dir_raw': sorted_raw_dir,
                 'opto_csvs': opto_csvs,
                 'stream_name': stream_name,
+                'stream_name_surface': stream_name_surface,
                 'experiment_id': experiment_id,
                 'seg_id': seg_id,
-                'rec_id_all': all_rec_count}
+                'rec_id_all': all_rec_count,
+                'surface_exp_id': surface_exp_id,
+                'surface_seg_id': surface_seg_id,
+                'surface_rec': surface_recording_dir,
+                'surface_rec_id_all': all_rec_count_surface,
+                'photometry_data_dir': fp_dir,
+                'fp_nwb_dir': photo_nwb_dir}
 
     # make directories
     makedirs(dir_dict)
@@ -885,24 +949,30 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     session_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'session')
     session_dir_raw = session_dir
     mat_dir = os.path.join(raw_dir, 'ecephys', 'sorted', 'session')
-    beh_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_behav.mat')]
-    if len(beh_mat) > 0:
-        beh_mat = os.path.join(mat_dir, beh_mat[0])
+    if not os.path.exists(session_dir):
+        mat_dir = os.path.join(raw_dir, 'fib', 'sorted', 'session')
+    if os.path.exists(mat_dir):
+        beh_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_behav.mat')]
+        if len(beh_mat) > 0:
+            beh_mat = os.path.join(mat_dir, beh_mat[0])
+        else:
+            beh_mat = None
+        ephys_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_nL.mat')]
+        if len(ephys_mat) > 0:
+            ephys_mat = os.path.join(mat_dir, ephys_mat[0])
+        else:
+            ephys_mat = None
     else:
         beh_mat = None
-    ephys_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_nL.mat')]
-    if len(ephys_mat) > 0:
-        ephys_mat = os.path.join(mat_dir, ephys_mat[0])
-    else:
         ephys_mat = None
+    
+
     if not os.path.exists(session_dir):
         session_dir = None
         session_dir_raw = None
-    sorted_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'sorted')
-    sorted_raw_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'sorted')
+    sorted_dir = os.path.join(raw_dir, 'ecephys', 'sorted')
+    sorted_raw_dir = os.path.join(raw_dir, 'ecephys', 'sorted')
     # nwb files
-    nwb_dir_raw = None
-    nwb_dir_curated = None
     # find raw recording
     if session_dir is not None:
         raw_recording_dir = os.path.join(session_dir, 'raw_data.hdf5')
@@ -963,8 +1033,9 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
                 nwb_dir_curated = None
                 print('There is no nwb file in the curated directory.')
     # postprocessed dirs
-    postprocessed_dir_raw = None
-    postprocessed_dir_curated = None
+    processed_dir = os.path.join(scratch_dir, aniID, session_id)
+    postprocessed_dir_raw = os.path.join(processed_dir, 'ephys', 'curated', 'analyzer.zarr')
+    postprocessed_dir_curated = os.path.join(processed_dir, 'ephys', 'curated', 'analyzer.zarr')
 
     # if os.path.exists(sorted_dir):
     #     postprocessed_dir_temp = os.path.join(sorted_dir, 'postprocessed')
@@ -982,8 +1053,8 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
 
     
     # curated dirs
-    curated_dir_raw = None
-    curated_dir_curated = None
+    curated_dir_raw = os.path.join(sorted_raw_dir, 'session')
+    curated_dir_curated = os.path.join(sorted_raw_dir, 'session')
     
     # if os.path.exists(sorted_dir):
     #     curated_dir_temp = os.path.join(sorted_dir, 'curated')
@@ -1021,7 +1092,8 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     # if os.path.exists(opto_csv_dir):
     #     temp_files = os.listdir(opto_csv_dir)
     #     opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
-
+    # photometry dir
+    photometry_data_dir = os.path.join(raw_dir, 'fib')
     # processed dirs
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
     alignment_dir = os.path.join(processed_dir, 'alignment')
@@ -1041,6 +1113,13 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     # pro   
     
     beh_nwb_dir = os.path.join(processed_dir, 'behavior', f'{session_id}.nwb')
+
+    # photometry nwb
+    photometry_nwb_files = [f for f in os.listdir(raw_dir) if f.endswith('nwb.zarr')]
+    if len(photometry_nwb_files) > 0:
+        photometry_nwb_dir = os.path.join(raw_dir, photometry_nwb_files[0])
+    else:
+        photometry_nwb_dir = None
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
@@ -1081,7 +1160,9 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
                 'seg_id': 1,
                 'rec_id_all': 0,
                 'beh_mat': beh_mat,
-                'ephys_mat': ephys_mat}
+                'ephys_mat': ephys_mat,
+                'fp_nwb_dir': photometry_nwb_dir,
+                'photometry_data_dir': photometry_data_dir}
 
     # make directories
     makedirs(dir_dict)
@@ -1143,7 +1224,8 @@ def delete_files_without_name(folder_path, name):
                 # Delete the file
                 os.remove(file_path)
 
-def makeSessionDF(session, cut = [0, np.nan], model_name = None):
+def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptions = False, load_glm = False):
+    session_dir = session_dirs(session)
     tblTrials = get_session_tbl(session)
 
     if model_name is not None:
@@ -1180,10 +1262,11 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
     choice_time = tblTrials.loc[tblTrials['animal_response']!=2, 'reward_outcome_time']
 
     # outcome_time
-    outcome_time = tblTrials.loc[tblTrials['animal_response']!=2, 'reward_outcome_time'] + tblTrials.loc[tblTrials['animal_response']!=2, 'reward_delay']
+    outcome_time = tblTrials.loc[tblTrials['animal_response']!=2, 'reward_outcome_time'] + np.unique(tblTrials[~tblTrials['reward_delay'].isnull()]['reward_delay'])[0]
 
     
     # laser
+
     laserChoice = tblTrials.loc[tblTrials['animal_response']!=2, 'laser_on_trial'] == 1
     laser = tblTrials['laser_on_trial'] == 1
     laserPrev = np.concatenate((np.full((1), np.nan), laserChoice[:-1]))
@@ -1192,6 +1275,11 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
     # stay vs switch
     svs = np.zeros(len(choices), dtype=bool)
     svs[choices!=choicesPrev] = True
+
+    # time since last trial
+    time_between_trials = np.diff(tblTrials['goCue_start_time'], prepend = np.nan)
+    time_between_trials = time_between_trials[responseInds]
+    # create dataframe
 
     trialData = pd.DataFrame({
         # 'trial_id': trial_id,
@@ -1202,14 +1290,49 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
         'laser_prev': laserPrev,
         'choices_prev': choicesPrev,
         'go_cue_time': go_cue_time.values,
-        'choice_time': outcome_time.values,
+        'choice_time': choice_time.values,
         'outcome_time': outcome_time.values,
-        'svs': svs
+        'svs': svs,
+        'time_between_trials': time_between_trials,
         })
     # combine all columns of trialData and tblTrials
     choice_tbl = tblTrials.loc[tblTrials['animal_response']!=2].copy()
     choice_tbl.reset_index(inplace=True)
     trialData = pd.concat([trialData, choice_tbl], axis=1)
+    if model_name is not None and load_glm:
+        # load glm results if exist 
+        if os.path.exists(os.path.join(f"/root/capsule/scratch/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl')):
+            with open(os.path.join(f"/root/capsule/scratch/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl'), 'rb') as f:
+                glm_results = pickle.load(f)
+            p_choice = glm_results['choice_prob_by_session'][session]
+            session_interruptions = trialData['auto_manual_trial'] | trialData['extra_reward']
+            longest_start, longest_end, longest_len = longest_zero_chunk(session_interruptions.tolist())
+            trialData['pChoice_glm'] = np.nan
+            trialData.loc[longest_start:longest_end, 'pChoice_glm'] = p_choice
+
+            p_left_glm = p_choice.copy()
+            p_right_glm = p_choice.copy()
+            choice_cut = trialData['choice'].values.copy()[longest_start:longest_end+1]
+            p_left_glm[choice_cut == 1] = 1 - p_left_glm[choice_cut == 1]
+            p_right_glm[choice_cut == 0] = 1 - p_right_glm[choice_cut == 0]
+            p_choice_updated = np.full(len(p_choice), np.nan)
+            for t in range(len(p_choice)-1):
+                if choice_cut[t] == 1:
+                    p_choice_updated[t] = p_right_glm[t+1]
+                else:
+                    p_choice_updated[t] = p_left_glm[t+1]
+            trialData['policy_glm_change'] = np.nan
+            trialData.loc[longest_start:longest_end, 'policy_glm_change'] = p_choice_updated - p_choice
+            trialData['policy_glm_change_log_odd'] = np.nan
+            trialData.loc[longest_start:longest_end, 'policy_glm_change_log_odd'] = np.log(p_choice_updated / (1-p_choice_updated) ) - np.log(p_choice / (1-p_choice))
+            svs_cut = trialData['svs'].values.copy()[longest_start:longest_end+1]
+            policy_update_mean = (np.concatenate([
+                                        1 - svs_cut[1:],
+                                        [np.nan]
+                                    ])
+                                    - p_choice)
+            trialData['policy_glm_update_mean'] = np.nan
+            trialData.loc[longest_start:longest_end, 'policy_glm_update_mean'] = policy_update_mean
 
     if model_name is not None and model_dv is not None:
         session_df = pd.merge(trialData, model_dv, left_index=True, right_index=True, suffixes=('', '_model'))
@@ -1218,10 +1341,41 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None):
             if '_model' in column:
                 session_df.drop(column, axis=1, inplace=True)
         if 'Q_r' in session_df.columns:
-            Qchosen = session_df['Q_l'].values
-            Qchosen[np.where(session_df['choice']>0)] = session_df.loc[session_df['choice']>0, 'Q_r']
+            Qchosen = session_df['Q_l'].values.copy()
+            Qchosen[np.where(session_df['choice']>0)] = session_df.loc[session_df['choice']>0, 'Q_r'].values.copy()
             session_df['Qchosen'] = Qchosen
+        # policy update 
+        p_choice = session_df['pChoice'].values
+        p_choice_L = p_choice.copy()
+        p_choice_L[session_df['choice'].values == 1] = 1-p_choice_L[session_df['choice'].values == 1]
+        p_choice_R = p_choice.copy()
+        p_choice_R[session_df['choice'].values == 0] = 1-p_choice_R[session_df['choice'].values == 0]
+        policy_pre = session_df['pChoice'].values.copy()
+        policy_post = np.full(len(policy_pre), np.nan)
+        for t in range(len(policy_pre)-1):
+            if session_df['choice'].values[t] == 1:
+                policy_post[t] = p_choice_R[t+1]
+            else:
+                policy_post[t] = p_choice_L[t+1]
+        session_df['policy_pre'] = policy_pre
+        session_df['policy_post'] = policy_post
+        session_df['policy_change'] = session_df['policy_post'] - session_df['policy_pre']
+        session_df['policy_change_log_odd'] = np.log(policy_post / (1-policy_post) ) - np.log(policy_pre / (1-policy_pre))
+        policy_update_mean = (
+                                np.concatenate([
+                                    1 - session_df['svs'].values[1:],
+                                    [np.nan]
+                                ])
+                                - session_df['pChoice'].values
+                            )
+        session_df['policy_update_mean'] = policy_update_mean
         trialData = session_df.copy()
+    
+    if cut_interruptions:
+        session_interruptions = trialData['auto_manual_trial'] | trialData['extra_reward']
+        longest_start, longest_end, longest_len = longest_zero_chunk(session_interruptions.tolist())
+        trialData = trialData.iloc[longest_start:longest_end+1]
+        
 
     return trialData
 
@@ -1383,7 +1537,24 @@ def plot_session_glm(session, tMax = 10, cut = [0, np.nan], model_name = None):
 
     return fig, session, coeffs_dict
 
-def get_session_tbl(session):
+def longest_zero_chunk(binary_list):
+    longest_len = 0
+    longest_start = None
+    longest_end = None
+
+    # group consecutive values (e.g., [0,0,1,0,0,0,1] -> [(0,2), (1,1), (0,3), (1,1)])
+    for value, group in itertools.groupby(enumerate(binary_list), key=lambda x: x[1]):
+        if value == 0:
+            indices = [idx for idx, _ in group]
+            length = len(indices)
+            if length > longest_len:
+                longest_len = length
+                longest_start = indices[0]
+                longest_end = indices[-1]
+
+    return longest_start, longest_end, longest_len
+
+def get_session_tbl(session, cut_interruptions = False):
     session_dir = session_dirs(session)
     nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
     if os.path.exists(nwb_file):
@@ -1391,6 +1562,50 @@ def get_session_tbl(session):
         tbl = nwb.trials.to_dataframe()
         tbl['lick_lat'] = tbl['reward_outcome_time'] - tbl['goCue_start_time']
         tbl['trial_ind'] = tbl.index
+        right_rewards = nwb.acquisition['right_reward_delivery_time'].timestamps[:]
+        left_rewards = nwb.acquisition['left_reward_delivery_time'].timestamps[:]
+        # In all sessions, find reward times before reward_outcome_times
+        right_rewards_times = [None] * len(tbl)
+        left_rewards_times = [None] * len(tbl)
+
+        for i, row in tbl.iterrows():
+            right_rewards_trial = right_rewards[(right_rewards <= row['reward_outcome_time'] + row['reward_delay']+0.1) & (right_rewards > row['goCue_start_time'])]
+            left_rewards_trial = left_rewards[(left_rewards <= row['reward_outcome_time'] + row['reward_delay']+0.1) & (left_rewards > row['goCue_start_time'])]
+            if len(right_rewards_trial) > 0:
+                right_rewards_times[i] = right_rewards_trial-row['goCue_start_time']
+            if len(left_rewards_trial) > 0:
+                left_rewards_times[i] = left_rewards_trial-row['goCue_start_time']
+        tbl['right_reward_times'] = right_rewards_times
+        tbl['left_reward_times'] = left_rewards_times
+        tbl['choice_time_trial'] = tbl['reward_outcome_time'] - tbl['goCue_start_time']
+        auto_manual_trials = [
+            (
+                (tbl['right_reward_times'].values[i] is not None and 
+                np.any(tbl['right_reward_times'].values[i] < tbl['choice_time_trial'].values[i]))
+                or
+                (tbl['left_reward_times'].values[i] is not None and 
+                np.any(tbl['left_reward_times'].values[i] < tbl['choice_time_trial'].values[i]))
+            )
+            for i in range(len(tbl))
+        ]
+
+        extra_reward = [
+            (
+                (tbl['right_reward_times'].values[i] is not None and 
+                ~tbl['rewarded_historyR'].values[i])
+                or
+                (tbl['left_reward_times'].values[i] is not None and 
+                ~tbl['rewarded_historyL'].values[i])
+            )
+            for i in range(len(tbl))
+
+        ]
+        tbl['auto_manual_trial'] = auto_manual_trials
+        tbl['extra_reward'] = extra_reward
+        if cut_interruptions:
+            session_interruptions = tbl['auto_manual_trial'] | tbl['extra_reward']
+            longest_start, longest_end, longest_len = longest_zero_chunk(session_interruptions.tolist())
+            tbl = tbl.iloc[longest_start:longest_end+1]
     else:
         tbl = None
     return tbl
@@ -1398,12 +1613,19 @@ def get_session_tbl(session):
 def get_unit_tbl(session, data_type, summary = True):
     session_dir = session_dirs(session)
     unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
+    if 'ZS' in session:
+        unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary_raw_wf.pkl')
     unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
+    ccf_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'],'ccf_unit_locations.csv')
     if summary: 
         if os.path.exists(unit_tbl_summary):
             with open(unit_tbl_summary, 'rb') as f:
                   unit_data = pickle.load(f)
             unit_tbl = unit_data
+            if os.path.exists(ccf_dir):
+                ccf_data = pd.read_csv(ccf_dir)
+                unit_tbl.drop(columns=['x_ccf', 'y_ccf', 'z_ccf'], inplace=True, errors='ignore')
+                unit_tbl = pd.merge(unit_tbl, ccf_data, left_on='unit_id', right_on='unit_id', how='left')
         elif os.path.exists(unit_tbl_dir):
             with open(unit_tbl_dir, 'rb') as f:
                 unit_data = pickle.load(f)
@@ -1420,8 +1642,8 @@ def get_unit_tbl(session, data_type, summary = True):
         print(f'No unit table found for {session} in {data_type} data.')
         return None
 
-def transfer_nwb(session_id):
-    session_dir = session_dirs(session_id)
+def transfer_nwb(session_id, hopkins=False):
+    session_dir = session_dirs(session_id, hopkins=hopkins)
     src_path = session_dir['nwb_dir_raw']
     with NWBZarrIO(src_path, mode="r") as io:
         src_nwb = io.read()
@@ -1510,3 +1732,289 @@ def transfer_nwb(session_id):
     shutil.rmtree(out_path, ignore_errors=True)
     with NWBZarrIO(out_path, mode="w") as out_io:
         out_io.write(new_nwb)
+
+
+# concatenate all session data for the certain list of sessions
+def fit_glm_session_list(session_list, max_lag=5, plot=False):
+    max_lag = 5
+    all_reward_side_hist_mat = []
+    all_noreward_side_hist_mat = []
+    all_choice_hist_mat = []
+    all_choices = []
+    all_choices_prev = []
+    session_lens = []
+    session_list_valid = []
+    for sess in session_list:
+        if get_session_tbl(sess) is not None:
+            sess_df = makeSessionDF(sess, cut_interruptions=True, model_name='stan_qLearning_5params')
+            choice = 2*(sess_df['choice'].values.copy() - 0.5)
+            all_choices.append(sess_df['choice'].values)
+            all_choices_prev.append(sess_df['choices_prev'].values)
+            outcome = sess_df['outcome'].values
+            reward_side = choice * outcome
+            noreward_side = choice * (1 - outcome)
+            reward_side_hist_mat = np.full((len(choice), max_lag), np.nan)
+            noreward_side_hist_mat = np.full((len(choice), max_lag), np.nan)
+            choice_hist_mat = np.full((len(choice), max_lag), np.nan)
+
+            for lag in range(1, max_lag+1):
+                reward_side_hist_mat[lag:, lag-1] = reward_side[:-lag]
+                noreward_side_hist_mat[lag:, lag-1] = noreward_side[:-lag]
+                choice_hist_mat[lag:, lag-1] = choice[:-lag]
+
+            all_reward_side_hist_mat.append(reward_side_hist_mat)
+            all_noreward_side_hist_mat.append(noreward_side_hist_mat)
+            all_choice_hist_mat.append(choice_hist_mat)
+            session_lens.append(len(choice))
+            session_list_valid.append(sess)
+    if len(all_choices) == 0:
+        raise ValueError("No valid sessions found in the provided session list.")
+        return None, None
+    all_reward_side_hist_mat = np.vstack(all_reward_side_hist_mat)
+    all_noreward_side_hist_mat = np.vstack(all_noreward_side_hist_mat)
+    all_choice_hist_mat = np.vstack(all_choice_hist_mat)
+    all_choices = np.hstack(all_choices)
+    all_choices_prev = np.hstack(all_choices_prev)
+    # fit logistic regression model
+    # reward side and choice history as predictors
+    X = np.hstack([all_reward_side_hist_mat, all_choice_hist_mat])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices, X, missing='drop')
+    result_rwd_choice = model.fit()
+
+    # reward side and no-reward side history as predictors
+    X = np.hstack([all_reward_side_hist_mat, all_noreward_side_hist_mat])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices, X, missing='drop')
+    result_rwd_norwd = model.fit()
+
+    # predict switch and stay probability, all regressors become interaction with previousl choice
+    # reward side and no reward side history as predictors
+    all_reward_side_hist_mat_inter = all_reward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_noreward_side_hist_mat_inter = all_noreward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choices_switch = (all_choices != all_choices_prev).astype(float)
+    # filter out where all_choices_prev is nan
+    valid_idx = ~np.isnan(all_choices_prev)
+    X = np.hstack([all_reward_side_hist_mat_inter[valid_idx], all_noreward_side_hist_mat_inter[valid_idx]])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices_switch[valid_idx], X, missing='drop')
+    result_switch_rwd_norwd = model.fit()
+
+    # predict switch and stay probability, all regressors become interaction with previousl choice, with no reward side and choice history as predictors
+    # all_reward_side_hist_mat_inter = all_reward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_noreward_side_hist_mat_inter = all_noreward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choice_hist_mat_inter = all_choice_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choices_switch = (all_choices != all_choices_prev).astype(float)
+    # filter out where all_choices_prev is nan
+    valid_idx = ~np.isnan(all_choices_prev)
+    X = np.hstack([all_noreward_side_hist_mat_inter[valid_idx], all_choice_hist_mat_inter[valid_idx]])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices_switch[valid_idx], X, missing='drop')
+    result_switch_norwd_choice = model.fit()
+
+    # predict switch probability, all regressors become interaction with previousl choice, with reward side and choice history as predictors
+    all_reward_side_hist_mat_inter = all_reward_side_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choice_hist_mat_inter = all_choice_hist_mat * all_choices_prev[:, np.newaxis]
+    all_choices_switch = (all_choices != all_choices_prev).astype(float)
+    # filter out where all_choices_prev is nan
+    valid_idx = ~np.isnan(all_choices_prev)
+    X = np.hstack([all_reward_side_hist_mat_inter[valid_idx], all_choice_hist_mat_inter[valid_idx]])
+    X = sm.add_constant(X, has_constant='add')
+    model = sm.Logit(all_choices_switch[valid_idx], X, missing='drop')
+    result_switch_rwd_choice = model.fit()
+
+
+    # make predictions of choice probability using the first model
+    X_pred = np.hstack([all_reward_side_hist_mat, all_choice_hist_mat])
+    X_pred = sm.add_constant(X_pred, has_constant='add')
+    choice_prob = result_rwd_choice.predict(X_pred)
+    # flip choice probability for left choices
+    left_choices = all_choices == 0
+    choice_prob[left_choices] = 1 - choice_prob[left_choices]
+
+    # make prediction of switch probability using the switch model
+    valid_idx = ~np.isnan(all_choices_prev)
+    X_pred_switch = np.hstack([all_noreward_side_hist_mat_inter[valid_idx], all_choice_hist_mat_inter[valid_idx]])
+    X_pred_switch = sm.add_constant(X_pred_switch, has_constant='add')
+    switch_prob = result_switch_norwd_choice.predict(X_pred_switch)
+    # fill back the switch probability into the original array
+    switch_prob_full = np.full(len(all_choices), np.nan)
+    switch_prob_full[valid_idx] = switch_prob
+    switch_prob = switch_prob_full
+
+
+    # create a dictionary to hold results
+    # cut choice_prob into sessions
+    choice_prob_sess = []
+    switch_prob_sess = []
+    start_idx = 0
+    for sess_len in session_lens:
+        choice_prob_sess.append(choice_prob[start_idx:start_idx+sess_len])
+        switch_prob_sess.append(switch_prob[start_idx:start_idx+sess_len])
+        start_idx += sess_len
+
+    results = {
+        'reward_side_and_choice_history_model': result_rwd_choice,
+        'reward_side_and_noreward_side_history_model': result_rwd_norwd,
+        'switch_model_reward_noreward': result_switch_rwd_norwd,
+        'switch_model_noreward_choice': result_switch_norwd_choice,
+        'sitch_model_reward_choice': result_switch_rwd_choice,
+        'choice_prob_by_session': {session: choice_prob_sess[idx] for idx, session in enumerate(session_list_valid)},
+        'switch_prob_by_session': {session: switch_prob_sess[idx] for idx, session in enumerate(session_list_valid)}
+    }
+
+    # plot
+    if plot:
+        fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+        ax = axes[0, 0]
+
+        coef = result_rwd_choice.params[1:max_lag+1]
+        err = result_rwd_choice.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Rewarded Side History Coefficients')
+
+        ax = axes[0, 1]
+        coef = result_rwd_choice.params[max_lag+1:]
+        err = result_rwd_choice.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Choice History Coefficients')
+
+        ax = axes[1, 0]
+        coef = result_rwd_norwd.params[1:max_lag+1]
+        err = result_rwd_norwd.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Rewarded Side History Coefficients')
+        ax = axes[1, 1]
+        coef = result_rwd_norwd.params[max_lag+1:]
+        err = result_rwd_norwd.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+
+        ax.set_ylabel('Coefficient')
+        ax.set_title('No-Rewarded Side History Coefficients')
+        plt.tight_layout()
+
+        fig, axes = plt.subplots(3, 2, figsize=(10, 5))
+        # first row: switch model with reward and no reward side history as predictors
+        ax = axes[0, 0]
+        coef = result_switch_rwd_norwd.params[1:max_lag+1]
+        err = result_switch_rwd_norwd.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - Reward Side History Coefficients')
+
+        ax = axes[0, 1]
+        coef = result_switch_rwd_norwd.params[max_lag+1:]
+        err = result_switch_rwd_norwd.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - No-Reward Side History Coefficients')
+
+        # second row: switch model with no reward side history and choice history as predictors
+        ax = axes[1, 0]
+        coef = result_switch_norwd_choice.params[1:max_lag+1]
+        err = result_switch_norwd_choice.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - No-Reward Side History Coefficients')
+
+        ax = axes[1, 1]
+        coef = result_switch_norwd_choice.params[max_lag+1:]
+        err = result_switch_norwd_choice.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - Choice History Coefficients')
+        # third row: switch model with reward side history and choice history as predictors
+        ax = axes[2, 0]
+        coef = result_switch_rwd_choice.params[1:max_lag+1]
+        err = result_switch_rwd_choice.bse[1:max_lag+1]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - Reward Side History Coefficients')
+        ax = axes[2, 1]
+        coef = result_switch_rwd_choice.params[max_lag+1:]
+        err = result_switch_rwd_choice.bse[max_lag+1:]
+        lags = np.arange(1, max_lag+1)
+        ax.errorbar(lags, coef, yerr=err, fmt='-o', capsize=5)
+        ax.axhline(0, color='gray', linestyle='--')
+        ax.set_xticks(lags)
+        ax.set_xticklabels(lags)
+        ax.set_xlabel('Lag (trials)')
+        ax.set_ylabel('Coefficient')
+        ax.set_title('Switch Model - Choice History Coefficients')
+        plt.tight_layout()
+
+    else:
+        fig = None
+    return results, fig
+
+def fit_glm_animal(ani_focus, max_lag=5, plot=False):
+    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
+            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv'),
+            pd.read_csv('/root/capsule/code/data_management/hopkins_FP_session_assets.csv')]
+    df = pd.concat(dfs)
+    session_list = df['session_id'].values.tolist()
+    ani_list = [str(session).split('_')[1] for session in session_list if str(session).startswith('behavior')]
+    session_list = [session for session in session_list if str(session).startswith('behavior')]
+    ani_session_df = pd.DataFrame({'animal': ani_list, 'session_id': session_list})
+
+    ani_session_list = ani_session_df[ani_session_df['animal'] == ani_focus]['session_id'].values.tolist()
+    results, fig = fit_glm_session_list(ani_session_list, max_lag=max_lag, plot=plot)
+    if results is None:
+        return None, None
+    save_dir = f'/root/capsule/scratch/{ani_focus}/ani_combinded'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    save_file = os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', 'glm_choice_history_model_results.pkl')
+    with open(save_file, 'wb') as f:
+        pickle.dump(results, f)
+    if plot:
+        fig.savefig(fname=os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', f'{ani_focus}_glm_choice_history_model_results.pdf'))
+    return results, fig

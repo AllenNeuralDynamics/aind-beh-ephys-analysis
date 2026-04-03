@@ -50,8 +50,9 @@ from multiprocessing import Pool
 from functools import partial
 import time
 import shutil 
+from aind_ephys_utils import align
 
-def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue', curate_time=True, 
+def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue', curate_time=True, opto_only=False,
                         model_name = 'stan_qLearning_5params', 
                         formula = 'spikes ~ 1 + outcome + choice + Qchosen',
                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
@@ -130,7 +131,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                                                         binSize=binSize, stepSize=stepSize)
 
             fig = plt.figure(figsize=(20, 10))
-            gs = gridspec.GridSpec(2, 7, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
+            gs = gridspec.GridSpec(2, 8, height_ratios=[3, 1], wspace=0.35, hspace=0.2)
             # plot session
             ax = fig.add_subplot(gs[0, 0]) 
             choice_history, reward_history, p_reward, autowater_offered, trial_time = get_history_from_nwb(session_df_curr)
@@ -318,11 +319,13 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
             ax.set_title('Left: rwd nrwd', fontsize = fs+2)
 
             # go vs miss
-            map_value = tblTrials_curr['animal_response'].values!=2
+            no_reward_ind = (~tblTrials_curr['rewarded_historyL']) & (~tblTrials_curr['rewarded_historyR'])
+            tbl_subset = tblTrials_curr[no_reward_ind]
+            map_value = tbl_subset['animal_response'].values!=2
             bins = [-0.5, 0.5, 1.5]
             labels = ['miss', 'go']
             fig, ax = plot_rate(
-                                spike_matrix_all,
+                                spike_matrix_all[no_reward_ind, :],
                                 slide_times,
                                 map_value,
                                 bins,
@@ -334,6 +337,25 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                                 tf=post_event,
                                 )
 
+            # go vs miss
+            no_reward_ind = (~tblTrials_curr['rewarded_historyL']) & (~tblTrials_curr['rewarded_historyR'])
+            tbl_subset = tblTrials_curr[no_reward_ind]
+            bins = [-0.5, 0.5, 1.5]
+            labels = ['miss', 'go']
+            map_value = tbl_subset['animal_response'].values!=2
+            fig, ax1, ax2 = plot_raster_rate(spike_times_curr,
+                                            align_time_all[no_reward_ind], 
+                                            map_value, # sorted by certain value
+                                            bins,
+                                            labels,
+                                            custom_cmap,
+                                            fig,
+                                            gs[0, 6],
+                                            tb=pre_event,
+                                            tf=post_event,
+                                            time_bin=stepSize,
+                                            )
+            ax1.set_title('Miss vs Go', fontsize = fs+2)
 
             
             if len(session_df_curr) > 100 and np.sum((spike_times_curr>=session_df_curr['go_cue_time'].values[0]) & (spike_times_curr<=session_df_curr['go_cue_time'].values[-1]))/(session_df_curr['go_cue_time'].values[-1] - session_df_curr['go_cue_time'].values[0]) > 0.1:
@@ -391,7 +413,7 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
                         ax.plot(range(trials_back[0], trials_back[1] + 1), np.zeros(trials_back[1]-trials_back[0]+1), c = 'c', lw = 2, label = 'right failed')
 
                 # plot regresssions
-                gs = gridspec.GridSpec(3, 7, height_ratios=[1, 1, 1], wspace=0.3, hspace=0.3)
+                gs = gridspec.GridSpec(3, 8, height_ratios=[1, 1, 1], wspace=0.3, hspace=0.3)
                 ax = fig.add_subplot(gs[0,-1])
                 try: 
                     regressors, TvCurrU, PvCurrU, EvCurrU = fitSpikeModelG(session_df_curr, spike_matrix_LM, formula)
@@ -448,20 +470,25 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     # with Pool(processes=4) as pool:  # Ensures cleanup
     #     result = pool.map(process, unit_tbl['unit_id'].values)
     if units is None:
-        units= unit_tbl['unit_id'].values
+        if not opto_only:
+            units= unit_tbl['unit_id'].values
+        else:
+            units = unit_tbl[unit_tbl['opto_pass']==True]['unit_id'].values
+            # units = unit_tbl[unit_tbl['p_max']>=0.3].values
 
-    Parallel(n_jobs=8)(
+
+    Parallel(n_jobs=12)(
         delayed(process)(unit_id)
         for unit_id in units
     )
-    # for unit_id in unit_tbl['unit_id'].values:
+    # for unit_id in units:
     #     process(unit_id)
 
     output_pdf = os.path.join(session_dirs(session)[f'ephys_dir_{data_type}'],f'{session}_unit_beh_{align_name}.pdf')
 
-    if os.path.exists(pdf_dir):
-        print(f'Combining {session}')
-        combine_pdf_big(pdf_dir, output_pdf)
+    # if os.path.exists(pdf_dir):
+    #     print(f'Combining {session}')
+    #     combine_pdf_big(pdf_dir, output_pdf)
     
     plt.close('all')
 
@@ -976,13 +1003,14 @@ if __name__ == '__main__':
     curate_time = True
     align_name = 'response'
     formula = 'spikes ~ 1 + outcome + choice + Qchosen'
-    for session in session_ids[-14:-10]:
+    
+    def process_session(session):
         print(session)
         session_dir = session_dirs(session)
         if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
             if session_dir['curated_dir_curated'] is not None:
                 # if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_curated'],f'{session}_unit_beh_{align_name}.pdf')):
-                plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, 
+                plot_unit_beh_session(session, data_type = 'curated', align_name = align_name, curate_time=curate_time, opto_only=True,
                             model_name = model_name, formula=formula,
                             pre_event=-1.5, post_event=3, binSize=0.2, stepSize=0.05,
                             units=None)
@@ -990,20 +1018,24 @@ if __name__ == '__main__':
                 #     print(f'Already plotted {session} for curated data')
             else:
                 print(f'No curated data for {session}')
-            # elif session_dir['curated_dir_raw'] is not None:
-            #     if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
-            #         plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
-            #                         model_name = model_name, formula=formula,
-            #                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-            #                         units=None)
-    # session = 'behavior_751004_2024-12-19_11-50-37'
-    # plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
-    #                     model_name = model_name, formula=formula,
-    #                     pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-    #                     units=None)
+        # elif session_dir['curated_dir_raw'] is not None:
+        #     if not os.path.exists(os.path.join(session_dirs(session)['ephys_dir_raw'],f'{session}_unit_beh_{align_name}.pdf')):
+        #         plot_unit_beh_session(session, data_type = 'raw', align_name = align_name, curate_time=curate_time, 
+        #                         model_name = model_name, formula=formula,
+        #                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+        #                         units=None)
+        print('----------------------------------')
+        print(f'Finished plotting behavior alignment for session {session}')
+    session = 'behavior_751004_2024-12-21_13-28-28'
+    # session = 'behavior_763590_2025-05-02_11-07-09' 
+    plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
+                        model_name = model_name, formula=formula,
+                        pre_event=-1, post_event=3, binSize=0.3, stepSize=0.1,
+                        units=None, opto_only=True)
 
     # plot_unit_beh_session('behavior_754897_2025-03-14_11-28-53', data_type = 'curated', align_name = align_name, curate_time=curate_time, 
     #             model_name = model_name, formula=formula,
     #             pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
     #             units=[82])
+    # Parallel(n_jobs=12)(delayed(process_session)(session) for session in session_ids[76:])
 

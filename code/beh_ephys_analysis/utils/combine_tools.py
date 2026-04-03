@@ -21,14 +21,22 @@ import shutil
 import seaborn as sns
 import math  
 import seaborn as sns
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.metrics import r2_score
+import statsmodels.api as sm
+from sklearn.model_selection import KFold
+from scipy.stats import fisher_exact
+from statsmodels.stats.proportion import proportions_ztest
+from scipy.stats import ttest_ind
 
-def apply_qc(combined_tagged_units, constraints):
+def apply_qc(combined_tagged_units, constraints, density = True, plot_all = True, plot_half = True):
     # start with a mask of all True
     mask = pd.Series(True, index=combined_tagged_units.index)
     mask_no_opto = pd.Series(True, index=combined_tagged_units.index)
     opto_list = ['p_max', 'eu', 'corr', 'tag_loc', 'lat_max_p', 'p_mean', 'sig_counts']
     multi_condition_list = ['p_max', 'eu', 'corr', 'lat_max_p', 'p_mean', 'sig_counts']
     for col, cfg in constraints.items():
+        curr_count_true = mask.sum()
         if col not in combined_tagged_units:
             print(f'Column {col} not found in combined_tagged_units, skipping...')
             continue
@@ -40,15 +48,60 @@ def apply_qc(combined_tagged_units, constraints):
             print(f'Applying bounds for {col}: {cfg["bounds"]}')
             lb, ub = np.array(cfg["bounds"], dtype=float)  # np.nan for null
             if not np.isnan(lb):
-                mask &= combined_tagged_units[col] > lb
+                mask &= combined_tagged_units[col] >= lb
             if not np.isnan(ub):
-                mask &= combined_tagged_units[col] < ub
+                mask &= combined_tagged_units[col] <= ub
+
 
         # Categorical list?
         elif "items" in cfg:
             print(f'Applying items for {col}: {cfg["items"]}')
             allowed = cfg["items"]
             mask &= combined_tagged_units[col].isin(allowed)
+        
+        elif "conditional" in cfg:
+            print(f'Applying conditional bounds for {col}')
+            cond_mask = pd.Series(False, index=combined_tagged_units.index)
+            for cond in cfg["conditional"]:
+                if "if" in cond:
+                    for dep_col, (op, val) in cond["if"].items():
+                        if dep_col not in combined_tagged_units:
+                            print(f"Dependent column {dep_col} missing, skipping condition.")
+                            continue
+                        if op == "<":
+                            condition = combined_tagged_units[dep_col] < val
+                        elif op == "<=":
+                            condition = combined_tagged_units[dep_col] <= val
+                        elif op == ">":
+                            condition = combined_tagged_units[dep_col] > val
+                        elif op == ">=":
+                            condition = combined_tagged_units[dep_col] >= val
+                        elif op == "==":
+                            condition = combined_tagged_units[dep_col] == val
+                        else:
+                            raise ValueError(f"Unsupported operator: {op}")
+
+                        lb, ub = np.array(cond["bounds"], dtype=float)
+                        bounds_mask = pd.Series(True, index=combined_tagged_units.index)
+                        if not np.isnan(lb):
+                            bounds_mask &= combined_tagged_units[col] >= lb
+                        if not np.isnan(ub):
+                            bounds_mask &= combined_tagged_units[col] <= ub
+
+                        cond_mask |= (condition & bounds_mask)
+
+                elif "else" in cond:
+                    lb, ub = np.array(cond["bounds"], dtype=float)
+                    bounds_mask = pd.Series(True, index=combined_tagged_units.index)
+                    if not np.isnan(lb):
+                        bounds_mask &= combined_tagged_units[col] >= lb
+                    if not np.isnan(ub):
+                        bounds_mask &= combined_tagged_units[col] <= ub
+                    cond_mask |= (~condition & bounds_mask)
+
+            mask &= cond_mask
+        new_count_true = mask.sum()
+        print(f' - {col}: {curr_count_true} -> {new_count_true} units passed')
     mask_no_opto = mask.copy()  
     combined_tagged_units['selected_qc_only'] = mask
     # for each neuron, apply combined opto constraints
@@ -92,8 +145,8 @@ def apply_qc(combined_tagged_units, constraints):
     combined_tagged_units_filtered = combined_tagged_units[mask_all].reset_index(drop=True)
     combined_tagged_units['selected'] = mask_all
     combined_tagged_units['selected_no_opto'] = mask_no_opto
-    print(f'Number of opto units after filtering: {len(combined_tagged_units_filtered)}')
-    print(f'Number of non-opto units after filtering: {len(combined_tagged_units[mask_no_opto])}')
+    print(f'Number of opto rows after filtering: {len(combined_tagged_units_filtered)}')
+    print(f'Number of non-opto rows after filtering: {len(combined_tagged_units[mask_no_opto])}')
 
     # plot
     valid_constraints = {col: cfg for col, cfg in constraints.items() if col in combined_tagged_units.columns}
@@ -111,8 +164,9 @@ def apply_qc(combined_tagged_units, constraints):
         filtered_data = combined_tagged_units_filtered[col].dropna()
         half_filtered_data = combined_tagged_units[mask_no_opto][col].dropna()
 
-        if "bounds" in cfg:
-            lb, ub = np.array(cfg["bounds"], dtype=float)
+        if "bounds" in cfg or "conditional" in cfg:
+            if "bounds" in cfg:
+                lb, ub = np.array(cfg["bounds"], dtype=float)
             # bins = np.linspace(np.nanmin(full_data), np.nanmax(full_data), 50)
             # bins[0] = bins[0]-0.0001
             # bins[-1] = bins[-1]+0.0001
@@ -121,36 +175,65 @@ def apply_qc(combined_tagged_units, constraints):
             bins = np.linspace(np.nanmin(full_data), np.nanmax(full_data), 50)
             match col:
                 case 'isi_violations':
-                    bins =  np.linspace(0, 1, 50)
+                    bins = np.logspace(np.log10(1e-5), np.log10(np.nanmax(full_data)), 50)
                 case 'eu':
-                    bins =  np.linspace(0, 1, 50)
+                    linear_bins = np.arange(0, 2.1, 0.1)
+
+                    # ----- log bins above 2 -----
+                    ymax = np.nanmax(half_filtered_data)
+
+                    log_edges = np.linspace(
+                        np.log10(2),
+                        np.log10(ymax),
+                        20
+                    )
+
+                    # Convert edges BACK to linear space
+                    log_bins = 10 ** log_edges
+
+                    # Remove duplicate 2
+                    log_bins = log_bins[log_bins > 2]
+
+                    bins = np.concatenate([linear_bins, log_bins])
+                    # bins =  np.linspace(0, np.nanmax(half_filtered_data), 500)
                 case 'corr':
-                    bins =  np.linspace(0.7, 1, 30)
+                    bins =  np.linspace(np.nanmin(full_data), 1, 30)
                 case 'p_max':
-                    bins =  np.linspace(0, 1, 50)
+                    bins =  np.linspace(-0.6, 1, 50)
                 case 'lat_max_p':
-                    bins =  np.linspace(0, 0.025, 50)
+                    bins =  np.linspace(0, np.nanmax(full_data), 50)
                 case 'peak':
-                    bins = np.linspace(-500, 300, 50)
+                    bins = np.linspace(-800, 500, 50)
                 case 'snr':
                     bins = np.linspace(0, 50, 50)
                 case 'peak_raw':
-                    bins = np.linspace(-500, 300, 50)
-            ax.hist(full_data, bins=bins, color='gray', edgecolor=None, alpha=0.5, label='All units', density=True)
-            ax.hist(filtered_data, bins=bins, color='orange', edgecolor=None, alpha=0.5, label='Filtered units', density=True)
-            ax.hist(half_filtered_data, bins=bins, color='green', edgecolor=None, alpha=0.5, label='Non-opto units', density=True)
-            
+                    bins = np.linspace(-800, 500, 50)
+            if plot_all:
+                ax.hist(full_data, bins=bins, color='gray', edgecolor=None, alpha=0.5, label='All', density=density)
+            ax.hist(filtered_data, bins=bins, color='orange', edgecolor=None, alpha=0.5, label='Opto-Filtered', density=density)
+            if plot_half:
+                ax.hist(half_filtered_data, bins=bins, color='green', edgecolor=None, alpha=0.5, label='Filtered', density=density)
+            if 'isi' in col:
+                ax.set_xscale('log')
+                ax.axvline(x=0.1, color='red', linestyle='--')
+                ax.axvline(x=0.2, color='blue', linestyle='--')
                 
 
-            ax.set_title(f'{col}\nBounds: [{lb}, {ub}]')
+            if "bounds" in cfg:
+                ax.set_title(f'{col}\nBounds: [{lb}, {ub}]')
             ax.set_xlabel(col)
-            ax.set_ylabel('Density')
+            if density:
+                ax.set_ylabel('Probability Density')
+            else:
+                ax.set_ylabel('Count')
 
-            if not np.isnan(lb) and lb > full_data.min():
-                ax.axvline(lb, color='red', linestyle='--', label='Lower bound')
-            if not np.isnan(ub) and ub < full_data.max():
-                ax.axvline(ub, color='green', linestyle='--', label='Upper bound')
+            if "bounds" in cfg:
+                if not np.isnan(lb) and lb > full_data.min():
+                    ax.axvline(lb, color='red', linestyle='--', label='Lower bound')
+                if not np.isnan(ub) and ub < full_data.max():
+                    ax.axvline(ub, color='green', linestyle='--', label='Upper bound')
             ax.legend()
+            ax.set_yscale('log')
 
         elif "items" in cfg:
             full_counts = combined_tagged_units[col].dropna().astype(str).value_counts()
@@ -176,6 +259,7 @@ def apply_qc(combined_tagged_units, constraints):
             ax.set_title(f'{col}\nItems: {cfg["items"]}') 
             ax.set_xlabel(col)
             ax.set_ylabel('Count')
+            ax.set_yscale('log')
             ax.legend()
 
     # Remove unused subplots
@@ -186,6 +270,687 @@ def apply_qc(combined_tagged_units, constraints):
 
     plt.tight_layout()
     # plt.savefig(os.path.join(wf_folder, f'Pass_histo_{criteria_name}.pdf'))
-    plt.show()
+    # plt.show()
 
-    return combined_tagged_units_filtered, combined_tagged_units, fig
+    return combined_tagged_units_filtered, combined_tagged_units, fig, axes
+
+def to_str_intlike(x):
+    """
+    Convert any integer-like or numeric-like value to a clean string without '.0'.
+
+    Examples:
+        297       → '297'
+        '297.0'   → '297'
+        297.0     → '297'
+        np.int64(297) → '297'
+        'abc'     → 'abc'   (unchanged)
+        np.nan    → np.nan   (kept as NaN)
+    """
+    if pd.isna(x):
+        return np.nan  # or return '' if you prefer empty string for NaN
+
+    # Try to convert to float first (handles both numeric and numeric-like strings)
+    try:
+        val = float(x)
+        # If it's a whole number like 297.0 → cast to int and then str
+        if val.is_integer():
+            return str(int(val))
+        else:
+            # Keep decimals if not an integer-like number
+            return str(val)
+    except (ValueError, TypeError):
+        # Non-numeric string: return as-is
+        return str(x)
+
+
+def merge_df_with_suffix(dfs, on_list, prefixes = None, suffixes = None, how = 'left'):
+    """
+    Merges multiple DataFrames on specified columns, renaming columns with prefixes and suffixes.
+    """
+    # check if dfs, prefixes, and suffixes are lists of same lengths
+    
+    for ind, df in enumerate(dfs):
+        # loop through columns and rename them with suffix
+        for col in df.columns:
+            if col not in on_list:
+                col_name = col
+                if prefixes is not None:
+                    col_name = f"{prefixes[ind]}_{col_name}"
+                if suffixes is not None:
+                    col_name = f"{col_name}_{suffixes[ind]}"
+                # print(f"Renaming column '{col}' in DataFrame to '{col}_{suffixes[ind]}'")
+                df.rename(columns={col: col_name}, inplace=True)
+    
+    merge_df = dfs[0]
+    for df in dfs[1:]:
+        merge_df = merge_df.merge(df, on=on_list, how=how)
+    return merge_df
+
+
+# def spatial_dependence_summary(
+#     coords,
+#     values,
+#     *,
+#     k_neighbors=15,
+#     n_splits=5,
+#     permutations=5000,
+#     seed=0,
+#     return_null=False,
+# ):
+#     """
+#     Combines:
+#       (1) Linear trend test: value ~ x + y + z (F-test vs intercept-only)
+#       (2) 5-fold CV predictability with kNN (distance-weighted) + permutation p-value
+
+#     Returns a dictionary of results.
+#     """
+#     rng = np.random.default_rng(seed)
+
+#     X = np.asarray(coords, float)
+#     y = np.asarray(values, float)
+
+#     # drop NaNs / infs
+#     ok = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
+#     X = X[ok]
+#     y = y[ok]
+#     n = y.size
+#     if n < 10:
+#         raise ValueError(f"Too few valid points after filtering (n={n}).")
+
+#     # -------------------------
+#     # (1) Linear regression trend
+#     # -------------------------
+#     X_const = sm.add_constant(X)  # [1, x, y, z]
+#     model_full = sm.OLS(y, X_const).fit()
+#     model_null = sm.OLS(y, np.ones((n, 1))).fit()
+#     f_stat, p_trend, _ = model_full.compare_f_test(model_null)
+
+#     # -------------------------
+#     # (2) CV predictability (kNN) + permutation test
+#     # -------------------------
+#     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
+
+#     def cv_r2(y_target):
+#         preds = np.zeros_like(y_target)
+#         for tr, te in kf.split(X):
+#             model = KNeighborsRegressor(
+#                 n_neighbors=min(k_neighbors, len(tr)),
+#                 weights="distance",
+#             )
+#             model.fit(X[tr], y_target[tr])
+#             preds[te] = model.predict(X[te])
+#         return r2_score(y_target, preds)
+
+#     r2_cv_obs = cv_r2(y)
+
+#     r2_cv_perm = np.empty(permutations, float)
+#     for i in range(permutations):
+#         r2_cv_perm[i] = cv_r2(rng.permutation(y))
+
+#     p_cv = (np.sum(r2_cv_perm >= r2_cv_obs) + 1) / (permutations + 1)
+
+#     out = {
+#         "n_used": int(n),
+#         "inputs": {
+#             "k_neighbors": int(k_neighbors),
+#             "n_splits": int(n_splits),
+#             "permutations": int(permutations),
+#             "seed": int(seed),
+#         },
+#         "linear_trend": {
+#             "coef_const_x_y_z": model_full.params.tolist(),      # [const, bx, by, bz]
+#             "p_value_F_test_vs_intercept_only": float(p_trend),
+#             "F_stat": float(f_stat),
+#             "r2": float(model_full.rsquared),
+#         },
+#         "cv_predictability_knn": {
+#             "r2_cv": float(r2_cv_obs),
+#             "p_value_permutation": float(p_cv),                 # one-sided: better than random
+#             "null_mean": float(np.mean(r2_cv_perm)),
+#             "null_std": float(np.std(r2_cv_perm, ddof=1)),
+#         },
+#     }
+
+#     if return_null:
+#         out["cv_predictability_knn"]["r2_null_distribution"] = r2_cv_perm.tolist()
+
+#     return out
+
+def spatial_dependence_summary(
+    coords,
+    values,
+    *,
+    k_neighbors=15,
+    n_splits=5,
+    permutations=5000,
+    seed=0,
+    return_null=False,
+):
+    """
+    Combines:
+      (1) Linear trend test: value ~ x + y + z (PERMUTATION test; permute values, keep coords fixed)
+      (2) 5-fold CV predictability with kNN (distance-weighted) + permutation p-value
+
+    Returns a dictionary of results.
+    """
+    import numpy as np
+    import statsmodels.api as sm
+    from sklearn.model_selection import KFold
+    from sklearn.neighbors import KNeighborsRegressor
+    from sklearn.metrics import r2_score
+
+    rng = np.random.default_rng(seed)
+
+    X = np.asarray(coords, float)
+    y = np.asarray(values, float)
+
+    # drop NaNs / infs; reshape X to N x D
+    X = X.reshape(X.shape[0], -1)
+    ok = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
+    X = X[ok]
+    y = y[ok]
+    n = y.size
+    if n < 10:
+        raise ValueError(f"Too few valid points after filtering (n={n}).")
+
+    # -------------------------
+    # (1) Linear regression trend (PERMUTATION p-value)
+    # -------------------------
+    X_const = sm.add_constant(X)  # [1, x, y, z] (or [1, ...D dims])
+
+    model_full = sm.OLS(y, X_const).fit()
+    r2_obs = float(model_full.rsquared)
+
+    # Deterministic per-permutation seeds (same pattern you used below)
+    perm_seeds = np.random.SeedSequence(seed + 12345).spawn(permutations)
+    perm_seeds_uint = np.array(
+        [s.generate_state(1, dtype=np.uint32)[0] for s in perm_seeds],
+        dtype=np.uint32
+    )
+
+    def _one_perm_r2_linear(s_uint):
+        r = np.random.default_rng(int(s_uint))
+        y_perm = r.permutation(y)
+        return sm.OLS(y_perm, X_const).fit().rsquared
+
+    # compute permutation null (parallel if possible)
+    try:
+        from joblib import Parallel, delayed
+        r2_perm = np.asarray(
+            Parallel(n_jobs=-1, prefer="processes")(
+                delayed(_one_perm_r2_linear)(s_uint) for s_uint in perm_seeds_uint
+            ),
+            dtype=float,
+        )
+    except Exception:
+        r2_perm = np.empty(permutations, float)
+        for i, s_uint in enumerate(perm_seeds_uint):
+            r2_perm[i] = _one_perm_r2_linear(s_uint)
+
+    # one-sided permutation p-value (greater-than)
+    p_trend_perm = (np.sum(r2_perm >= r2_obs) + 1) / (permutations + 1)
+
+    # (Optional) also report the classic F-stat if you still want it (no p-value)
+    # This is just for interpretability; p-value comes from permutations.
+    # F = ( (SSE_null - SSE_full)/df1 ) / ( SSE_full/df2 )
+    y_mean = y.mean()
+    sse_null = np.sum((y - y_mean) ** 2)
+    sse_full = np.sum(model_full.resid ** 2)
+    df1 = X_const.shape[1] - 1
+    df2 = n - X_const.shape[1]
+    f_stat = ((sse_null - sse_full) / df1) / (sse_full / df2) if df2 > 0 else np.nan
+
+    # -------------------------
+    # (2) CV predictability (kNN) + permutation test (parallel)
+    # -------------------------
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
+
+    def cv_r2(y_target):
+        preds = np.zeros_like(y_target)
+        for tr, te in kf.split(X):
+            model = KNeighborsRegressor(
+                n_neighbors=min(k_neighbors, len(tr)),
+                weights="distance",
+            )
+            model.fit(X[tr], y_target[tr])
+            preds[te] = model.predict(X[te])
+        return r2_score(y_target, preds)
+
+    r2_cv_obs = cv_r2(y)
+
+    perm_seeds = np.random.SeedSequence(seed).spawn(permutations)
+    perm_seeds_uint = np.array([s.generate_state(1, dtype=np.uint32)[0] for s in perm_seeds], dtype=np.uint32)
+
+    def _one_perm_r2_knn(s_uint):
+        r = np.random.default_rng(int(s_uint))
+        return cv_r2(r.permutation(y))
+
+    try:
+        from joblib import Parallel, delayed
+        r2_cv_perm = np.asarray(
+            Parallel(n_jobs=-1, prefer="processes")(
+                delayed(_one_perm_r2_knn)(s_uint) for s_uint in perm_seeds_uint
+            ),
+            dtype=float,
+        )
+    except Exception:
+        r2_cv_perm = np.empty(permutations, float)
+        for i, s_uint in enumerate(perm_seeds_uint):
+            r2_cv_perm[i] = _one_perm_r2_knn(s_uint)
+
+    p_cv = (np.sum(r2_cv_perm >= r2_cv_obs) + 1) / (permutations + 1)
+
+    out = {
+        "n_used": int(n),
+        "inputs": {
+            "k_neighbors": int(k_neighbors),
+            "n_splits": int(n_splits),
+            "permutations": int(permutations),
+            "seed": int(seed),
+        },
+        "linear_trend": {
+            "coef_const_x_y_z": model_full.params.tolist(),  # [const, b1..bD]
+            "r2": float(r2_obs),
+            "F_stat": float(f_stat),
+            "p_value_permutation_r2": float(p_trend_perm),
+            "null_mean_r2": float(np.mean(r2_perm)),
+            "null_std_r2": float(np.std(r2_perm, ddof=1)),
+        },
+        "cv_predictability_knn": {
+            "r2_cv": float(r2_cv_obs),
+            "p_value_permutation": float(p_cv),
+            "null_mean": float(np.mean(r2_cv_perm)),
+            "null_std": float(np.std(r2_cv_perm, ddof=1)),
+        },
+    }
+
+    if return_null:
+        out["linear_trend"]["r2_null_distribution"] = r2_perm.tolist()
+        out["cv_predictability_knn"]["r2_null_distribution"] = r2_cv_perm.tolist()
+
+    return out
+
+
+
+
+def welch_shift_P_vs_U(
+    x_all,
+    is_known_P,
+    *,
+    alternative="two-sided",   # "two-sided", "greater", "less"
+    permutations=20000,
+    seed=0,
+    n_boot=5000,
+):
+    """
+    More powerful distribution-shift test for continuous, roughly normal data:
+      Known P vs unlabeled U using Welch's t-test (unequal variances),
+      plus a label-permutation p-value and effect size.
+
+    Returns a dict with stats and uncertainty.
+    """
+    rng = np.random.default_rng(seed)
+
+    x = np.asarray(x_all, float)
+    mP = np.asarray(is_known_P, dtype=bool)
+
+    # filter NaNs
+    ok = np.isfinite(x) & np.isfinite(mP.astype(float))
+    x = x[ok]
+    mP = mP[ok]
+
+    xP = x[mP]
+    xU = x[~mP]
+    nP, nU = len(xP), len(xU)
+
+    if nP < 2 or nU < 2:
+        raise ValueError(f"Need at least 2 samples in each group. Got nP={nP}, nU={nU}.")
+
+    # --- observed Welch t-test ---
+    t_obs, p_asym = ttest_ind(xP, xU, equal_var=False, alternative=alternative)
+
+    # effect size: Cohen's d (using pooled SD; for unequal variances, this is still a useful standardized diff)
+    sP = np.var(xP, ddof=1)
+    sU = np.var(xU, ddof=1)
+    s_pooled = np.sqrt(((nP - 1) * sP + (nU - 1) * sU) / (nP + nU - 2))
+    cohen_d = (np.mean(xP) - np.mean(xU)) / (s_pooled + 1e-12)
+
+    # --- permutation p-value (label shuffle; keeps group sizes fixed) ---
+    x_all_clean = np.concatenate([xP, xU])
+    n = len(x_all_clean)
+    idx = np.arange(n)
+
+    t_perm = np.empty(permutations, float)
+    for i in range(permutations):
+        rng.shuffle(idx)
+        p_idx = idx[:nP]
+        u_idx = idx[nP:]
+        # Welch t statistic on permuted labels
+        t_perm[i] = ttest_ind(
+            x_all_clean[p_idx],
+            x_all_clean[u_idx],
+            equal_var=False,
+            alternative="two-sided",   # compute symmetric t; handle alternative below
+        ).statistic
+
+    # convert perm stats to p-value matching the requested alternative
+    if alternative == "two-sided":
+        p_perm = (np.sum(np.abs(t_perm) >= np.abs(t_obs)) + 1) / (permutations + 1)
+    elif alternative == "greater":
+        # t is larger when mean(P) > mean(U)
+        p_perm = (np.sum(t_perm >= t_obs) + 1) / (permutations + 1)
+    elif alternative == "less":
+        p_perm = (np.sum(t_perm <= t_obs) + 1) / (permutations + 1)
+    else:
+        raise ValueError("alternative must be 'two-sided', 'greater', or 'less'.")
+
+    # --- bootstrap CI for mean difference (P - U) ---
+    # (Useful and interpretable for firing rate)
+    boot = np.empty(n_boot, float)
+    for i in range(n_boot):
+        bp = rng.choice(xP, size=nP, replace=True)
+        bu = rng.choice(xU, size=nU, replace=True)
+        boot[i] = np.mean(bp) - np.mean(bu)
+    ci_low, ci_high = np.quantile(boot, [0.025, 0.975])
+
+    return {
+        "n_total": int(n),
+        "n_P": int(nP),
+        "n_U": int(nU),
+        "test": "Welch t-test (P vs unlabeled U)",
+        "alternative": alternative,
+        "mean_P": float(np.mean(xP)),
+        "mean_U": float(np.mean(xU)),
+        "mean_diff_P_minus_U": float(np.mean(xP) - np.mean(xU)),
+        "mean_diff_bootstrap_CI95": [float(ci_low), float(ci_high)],
+        "t_stat": float(t_obs),
+        "p_value_asymptotic": float(p_asym),
+        "p_value_permutation": float(p_perm),
+        "cohens_d": float(cohen_d),
+    }
+
+
+def binary_shift_P_vs_U(
+    x_all,
+    is_known_P,
+    *,
+    alternative="two-sided",  # "two-sided", "larger", "smaller" (Fisher wording)
+    permutations=20000,
+    seed=0,
+):
+    """
+    Test whether binary values differ between known P and unlabeled U (mixture).
+
+    Returns:
+      - event rates
+      - odds ratio + Fisher exact p-value
+      - two-proportion z-test p-value
+      - permutation p-value (label shuffle)
+    """
+    rng = np.random.default_rng(seed)
+
+    x = np.asarray(x_all)
+    mP = np.asarray(is_known_P, dtype=bool)
+
+    # Keep only finite / valid entries; ensure binary
+    ok = np.isfinite(x.astype(float)) & np.isfinite(mP.astype(float))
+    x = x[ok].astype(int)
+    mP = mP[ok]
+    if not np.isin(x, [0, 1]).all():
+        raise ValueError("x_all must be binary (0/1).")
+
+    xP = x[mP]
+    xU = x[~mP]
+
+    nP, nU = len(xP), len(xU)
+    if nP < 1 or nU < 1:
+        raise ValueError(f"Need at least 1 sample in each group. Got nP={nP}, nU={nU}.")
+
+    # counts
+    a = int(xP.sum())           # P successes
+    b = int(nP - a)             # P failures
+    c = int(xU.sum())           # U successes
+    d = int(nU - c)             # U failures
+
+    rate_P = a / nP
+    rate_U = c / nU
+    risk_diff = rate_P - rate_U
+    risk_ratio = (rate_P / rate_U) if rate_U > 0 else np.inf
+
+    # 2x2 table for Fisher
+    table = np.array([[a, b],
+                      [c, d]], dtype=int)
+
+    # Fisher exact: alternative uses "larger"/"smaller"/"two-sided"
+    OR, p_fisher = fisher_exact(table, alternative=alternative)
+
+    # Two-proportion z-test (more powerful when counts are moderate)
+    # statsmodels uses alternative: 'two-sided', 'larger', 'smaller'
+    z_stat, p_z = proportions_ztest(
+        count=[a, c],
+        nobs=[nP, nU],
+        alternative=alternative
+    )
+
+    # Permutation test on risk difference (rate_P - rate_U)
+    x_all_clean = np.concatenate([xP, xU])
+    n = len(x_all_clean)
+    idx = np.arange(n)
+
+    perm_stats = np.empty(permutations, float)
+    for i in range(permutations):
+        rng.shuffle(idx)
+        p_idx = idx[:nP]
+        u_idx = idx[nP:]
+        perm_stats[i] = x_all_clean[p_idx].mean() - x_all_clean[u_idx].mean()
+
+    if alternative == "two-sided":
+        p_perm = (np.sum(np.abs(perm_stats) >= abs(risk_diff)) + 1) / (permutations + 1)
+    elif alternative == "larger":
+        p_perm = (np.sum(perm_stats >= risk_diff) + 1) / (permutations + 1)
+    else:  # "smaller"
+        p_perm = (np.sum(perm_stats <= risk_diff) + 1) / (permutations + 1)
+
+    return {
+        "n_P": int(nP),
+        "n_U": int(nU),
+        "count_P_1": int(a),
+        "count_U_1": int(c),
+        "rate_P": float(rate_P),
+        "rate_U": float(rate_U),
+        "risk_diff_P_minus_U": float(risk_diff),
+        "risk_ratio_P_over_U": float(risk_ratio),
+        "odds_ratio_fisher": float(OR),
+        "p_value_fisher": float(p_fisher),
+        "z_stat": float(z_stat),
+        "p_value_ztest": float(p_z),
+        "p_value_permutation": float(p_perm),
+    }
+
+import numpy as np
+from scipy.stats import ttest_ind, fisher_exact
+from statsmodels.stats.proportion import proportions_ztest
+
+
+def welch_shift_X_vs_Y(
+    x,
+    y,
+    *,
+    alternative="two-sided",   # "two-sided", "greater", "less"
+    permutations=20000,
+    seed=0,
+    n_boot=5000,
+):
+    """
+    Distribution shift test for continuous, roughly normal data:
+      X vs Y using Welch's t-test (unequal variances),
+      plus a label-permutation p-value and effect size,
+      and bootstrap CI for mean difference (X - Y).
+    """
+    rng = np.random.default_rng(seed)
+
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+
+    # filter NaNs
+    x = x[np.isfinite(x)]
+    y = y[np.isfinite(y)]
+
+    nX, nY = len(x), len(y)
+    if nX < 2 or nY < 2:
+        raise ValueError(f"Need at least 2 samples in each group. Got nX={nX}, nY={nY}.")
+
+    # --- observed Welch t-test ---
+    t_obs, p_asym = ttest_ind(x, y, equal_var=False, alternative=alternative)
+
+    # effect size: Cohen's d (pooled SD; still useful standardized diff)
+    sX = np.var(x, ddof=1)
+    sY = np.var(y, ddof=1)
+    s_pooled = np.sqrt(((nX - 1) * sX + (nY - 1) * sY) / (nX + nY - 2))
+    cohen_d = (np.mean(x) - np.mean(y)) / (s_pooled + 1e-12)
+
+    # --- permutation p-value (shuffle labels; keep group sizes fixed) ---
+    all_clean = np.concatenate([x, y])
+    n = len(all_clean)
+    idx = np.arange(n)
+
+    t_perm = np.empty(permutations, float)
+    for i in range(permutations):
+        rng.shuffle(idx)
+        x_idx = idx[:nX]
+        y_idx = idx[nX:]
+        t_perm[i] = ttest_ind(
+            all_clean[x_idx],
+            all_clean[y_idx],
+            equal_var=False,
+            alternative="two-sided",  # symmetric; apply alternative below
+        ).statistic
+
+    if alternative == "two-sided":
+        p_perm = (np.sum(np.abs(t_perm) >= np.abs(t_obs)) + 1) / (permutations + 1)
+    elif alternative == "greater":
+        # t larger when mean(X) > mean(Y)
+        p_perm = (np.sum(t_perm >= t_obs) + 1) / (permutations + 1)
+    elif alternative == "less":
+        p_perm = (np.sum(t_perm <= t_obs) + 1) / (permutations + 1)
+    else:
+        raise ValueError("alternative must be 'two-sided', 'greater', or 'less'.")
+
+    # --- bootstrap CI for mean difference (X - Y) ---
+    boot = np.empty(n_boot, float)
+    for i in range(n_boot):
+        bx = rng.choice(x, size=nX, replace=True)
+        by = rng.choice(y, size=nY, replace=True)
+        boot[i] = np.mean(bx) - np.mean(by)
+    ci_low, ci_high = np.quantile(boot, [0.025, 0.975])
+
+    return {
+        "n_X": int(nX),
+        "n_Y": int(nY),
+        "test": "Welch t-test (X vs Y)",
+        "alternative": alternative,
+        "mean_X": float(np.mean(x)),
+        "mean_Y": float(np.mean(y)),
+        "mean_diff_X_minus_Y": float(np.mean(x) - np.mean(y)),
+        "mean_diff_bootstrap_CI95": [float(ci_low), float(ci_high)],
+        "t_stat": float(t_obs),
+        "p_value_asymptotic": float(p_asym),
+        "p_value_permutation": float(p_perm),
+        "cohens_d": float(cohen_d),
+    }
+
+
+def binary_shift_X_vs_Y(
+    x,
+    y,
+    *,
+    alternative="two-sided",  # "two-sided", "larger", "smaller" (Fisher wording)
+    permutations=20000,
+    seed=0,
+):
+    """
+    Test whether binary values differ between group X and group Y.
+
+    Returns:
+      - event rates
+      - odds ratio + Fisher exact p-value
+      - two-proportion z-test p-value
+      - permutation p-value (label shuffle) on risk difference (rate_X - rate_Y)
+    """
+    rng = np.random.default_rng(seed)
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # filter to finite, ensure binary
+    x = x[np.isfinite(x.astype(float))].astype(int)
+    y = y[np.isfinite(y.astype(float))].astype(int)
+
+    if not np.isin(x, [0, 1]).all() or not np.isin(y, [0, 1]).all():
+        raise ValueError("x and y must be binary (0/1).")
+
+    nX, nY = len(x), len(y)
+    if nX < 1 or nY < 1:
+        raise ValueError(f"Need at least 1 sample in each group. Got nX={nX}, nY={nY}.")
+
+    # counts
+    a = int(x.sum())         # X successes
+    b = int(nX - a)          # X failures
+    c = int(y.sum())         # Y successes
+    d = int(nY - c)          # Y failures
+
+    rate_X = a / nX
+    rate_Y = c / nY
+    risk_diff = rate_X - rate_Y
+    risk_ratio = (rate_X / rate_Y) if rate_Y > 0 else np.inf
+
+    table = np.array([[a, b],
+                      [c, d]], dtype=int)
+
+    OR, p_fisher = fisher_exact(table, alternative=alternative)
+
+    # statsmodels uses alternative: 'two-sided', 'larger', 'smaller'
+    z_stat, p_z = proportions_ztest(
+        count=[a, c],
+        nobs=[nX, nY],
+        alternative=alternative
+    )
+
+    # permutation test on risk difference
+    all_clean = np.concatenate([x, y])
+    n = len(all_clean)
+    idx = np.arange(n)
+
+    perm_stats = np.empty(permutations, float)
+    for i in range(permutations):
+        rng.shuffle(idx)
+        x_idx = idx[:nX]
+        y_idx = idx[nX:]
+        perm_stats[i] = all_clean[x_idx].mean() - all_clean[y_idx].mean()
+
+    if alternative == "two-sided":
+        p_perm = (np.sum(np.abs(perm_stats) >= abs(risk_diff)) + 1) / (permutations + 1)
+    elif alternative == "larger":
+        p_perm = (np.sum(perm_stats >= risk_diff) + 1) / (permutations + 1)
+    else:  # "smaller"
+        p_perm = (np.sum(perm_stats <= risk_diff) + 1) / (permutations + 1)
+
+    return {
+        "n_X": int(nX),
+        "n_Y": int(nY),
+        "count_X_1": int(a),
+        "count_Y_1": int(c),
+        "rate_X": float(rate_X),
+        "rate_Y": float(rate_Y),
+        "risk_diff_X_minus_Y": float(risk_diff),
+        "risk_ratio_X_over_Y": float(risk_ratio),
+        "odds_ratio_fisher": float(OR),
+        "p_value_fisher": float(p_fisher),
+        "z_stat": float(z_stat),
+        "p_value_ztest": float(p_z),
+        "p_value_permutation": float(p_perm),
+    }
+    
+# Example:
+# res = welch_shift_P_vs_U(x_all, is_known_P, alternative="two-sided", permutations=20000, seed=0)
+# print(res)
