@@ -12,7 +12,7 @@ client = CodeOcean(domain="https://codeocean.allenneuraldynamics.org", token=os.
 # load and parse data ids
 script_dir = os.path.dirname(os.path.abspath(__file__))
 datalist_dirs = [os.path.join(script_dir, 'hopkins_session_assets.csv'), os.path.join(script_dir, 'hopkins_FP_session_assets.csv')]
-datalist_dir =  [os.path.join(script_dir, 'hopkins_FP_session_assets.csv')]
+# datalist_dir =  [os.path.join(script_dir, 'hopkins_FP_session_assets.csv')]
 dfs = [pd.read_csv(curr_dir) for curr_dir in datalist_dirs]
 data_df = pd.concat(dfs, ignore_index=True)
 data_df = data_df[data_df['session_id'].notna() & (data_df['session_id'] != "")]
