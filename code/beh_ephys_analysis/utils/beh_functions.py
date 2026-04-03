@@ -646,7 +646,7 @@ def get_stream_info(directory):
 def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch', hopkins = False):
     # parse session_id 
     aniID, date_obj, raw_id = parseSessionID(session_id)
-    if aniID.startswith('ZS') or hopkins:
+    if aniID.startswith('ZS'):
         # print('Old data, using hopkins formats')
         return session_dirs_hopkins(session_id, model_name, data_dir, scratch_dir)
     # raw dirs
@@ -864,6 +864,10 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
         temp_files = os.listdir(opto_csv_dir)
         opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
 
+    # FP dir
+    fp_dir = os.path.join(raw_dir, 'fib')
+    photo_nwb_dir = None
+
     # processed dirs
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
     alignment_dir = os.path.join(processed_dir, 'alignment')
@@ -926,7 +930,9 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
                 'surface_exp_id': surface_exp_id,
                 'surface_seg_id': surface_seg_id,
                 'surface_rec': surface_recording_dir,
-                'surface_rec_id_all': all_rec_count_surface}
+                'surface_rec_id_all': all_rec_count_surface,
+                'photometry_data_dir': fp_dir,
+                'fp_nwb_dir': photo_nwb_dir}
 
     # make directories
     makedirs(dir_dict)
@@ -1084,7 +1090,8 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     # if os.path.exists(opto_csv_dir):
     #     temp_files = os.listdir(opto_csv_dir)
     #     opto_csvs = [os.path.join(opto_csv_dir, s) for s in temp_files if '.opto.csv' in s]
-
+    # photometry dir
+    photometry_data_dir = os.path.join(raw_dir, 'fib')
     # processed dirs
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
     alignment_dir = os.path.join(processed_dir, 'alignment')
@@ -1104,6 +1111,13 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     # pro   
     
     beh_nwb_dir = os.path.join(processed_dir, 'behavior', f'{session_id}.nwb')
+
+    # photometry nwb
+    photometry_nwb_files = [f for f in os.listdir(raw_dir) if f.endswith('nwb.zarr')]
+    if len(photometry_nwb_files) > 0:
+        photometry_nwb_dir = os.path.join(raw_dir, photometry_nwb_files[0])
+    else:
+        photometry_nwb_dir = None
 
     dir_dict = {'aniID': aniID,
                 'raw_id': raw_id,
@@ -1144,7 +1158,9 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
                 'seg_id': 1,
                 'rec_id_all': 0,
                 'beh_mat': beh_mat,
-                'ephys_mat': ephys_mat}
+                'ephys_mat': ephys_mat,
+                'fp_nwb_dir': photometry_nwb_dir,
+                'photometry_data_dir': photometry_data_dir}
 
     # make directories
     makedirs(dir_dict)
@@ -1974,12 +1990,13 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
         plt.tight_layout()
 
     else:
-        fig, fig_switch = None, None
-    return results, fig, fig_switch
+        fig = None
+    return results, fig
 
 def fit_glm_animal(ani_focus, max_lag=5, plot=False):
     dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
-            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')]
+            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv'),
+            pd.read_csv('/root/capsule/code/data_management/hopkins_FP_session_assets.csv')]
     df = pd.concat(dfs)
     session_list = df['session_id'].values.tolist()
     ani_list = [str(session).split('_')[1] for session in session_list if str(session).startswith('behavior')]
@@ -1990,6 +2007,9 @@ def fit_glm_animal(ani_focus, max_lag=5, plot=False):
     results, fig = fit_glm_session_list(ani_session_list, max_lag=max_lag, plot=plot)
     if results is None:
         return None, None
+    save_dir = f'/root/capsule/scratch/{ani_focus}/ani_combinded'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     save_file = os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', 'glm_choice_history_model_results.pkl')
     with open(save_file, 'wb') as f:
         pickle.dump(results, f)

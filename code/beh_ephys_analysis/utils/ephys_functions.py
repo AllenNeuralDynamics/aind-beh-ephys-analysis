@@ -118,6 +118,7 @@ def fitSpikeModelG(dfTrial, matSpikes, formula, matIso = None):
     TvCurrU = np.array([])
     PvCurrU = np.array([])
     EvCurrU = np.array([])
+    ciCurrU = np.array([])
     for i in range(np.shape(matSpikes)[1]):
         currSpikes = np.squeeze(matSpikes[:,i])
         currData = dfTrial.copy()
@@ -133,16 +134,20 @@ def fitSpikeModelG(dfTrial, matSpikes, formula, matIso = None):
         pv = model.pvalues.values.reshape(1,-1)
         # t value
         ev = model.params.values.reshape(1,-1)
+        # ci value
+        ci = model.conf_int(alpha=0.05)  # (p, 2)
         # concatenate
         # initialize shape if not
         if np.shape(TvCurrU)[0] == 0:
             TvCurrU = np.empty((0, len(regressors)))
             PvCurrU = np.empty((0, len(regressors)))
             EvCurrU = np.empty((0, len(regressors)))
+            ciCurrU = np.empty((0, 2, len(regressors)))
 
         TvCurrU = np.concatenate((TvCurrU, tv), axis = 0)
         PvCurrU = np.concatenate((PvCurrU, pv), axis = 0)
         EvCurrU = np.concatenate((EvCurrU, ev), axis = 0)
+        ciCurrU = np.concatenate((ciCurrU, ci.values.T.reshape(1, 2, -1)), axis = 0)
 
         used_idx = model.model.data.row_labels
 
@@ -151,7 +156,7 @@ def fitSpikeModelG(dfTrial, matSpikes, formula, matIso = None):
             model.fittedvalues
         )
 
-    return regressors, TvCurrU, PvCurrU, EvCurrU, r2_score_value
+    return regressors, TvCurrU, PvCurrU, EvCurrU, ciCurrU, r2_score_value
 
 
 def fitSpikeModelG_CI(

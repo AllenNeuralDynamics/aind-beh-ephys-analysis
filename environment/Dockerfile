@@ -34,7 +34,7 @@ RUN pip install -U --no-cache-dir \
     matplotlib==3.9.1 \
     numpy==2.1.3 \
     open-ephys-python-tools==0.1.10 \
-    pynwb==2.8.3 \
+    pynwb==3.1.3 \
     pypdf2==3.0.1 \
     spikeinterface[full]==0.103.0 \
     statsmodels==0.14.2 \
