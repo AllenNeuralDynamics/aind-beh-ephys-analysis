@@ -49,7 +49,9 @@ RUN pip install -U --no-cache-dir \
     aind-s3-cache==0.1.0 \
     codeocean==0.14.0 \
     pandas==2.3.2 \
-    scikit-image==0.25.2 
+    scikit-image==0.25.2 \
+    aind_data_schema==2.6.0 \
+    openpyxl==3.1.5
 
 
 
