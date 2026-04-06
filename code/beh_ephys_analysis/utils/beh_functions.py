@@ -13,6 +13,7 @@ import ast
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_data
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
+from utils.capsule_migration import capsule_directories
 from uuid import uuid4
 import json
 from datetime import datetime
@@ -643,14 +644,20 @@ def get_stream_info(directory):
 
     return pd.DataFrame(data=stream_info)
 
-def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch', hopkins = False):
+def session_dirs(session_id, model_name = None, data_dir = None, scratch_dir = None, hopkins = False):
+    # set up directories if not provided
+    if data_dir is None:
+        data_dir = capsule_directories()['data_dir']
+    if scratch_dir is None:
+        scratch_dir = capsule_directories()['scratch_dir']
     # parse session_id 
+
     aniID, date_obj, raw_id = parseSessionID(session_id)
-    hopkins_list = ['672850', '669492', '669489', '754898', '754896', '754895', '749624', '749472', '701707', '699472', '699461', '699462']
+    hopkins_list = ['672850', '669492', '669489', '754898', '754896', '754895', '749624',  '749472', '701707', '699472', '699461', '699462']
     # print(f"Parsing session_id: {session_id}, aniID: {aniID}")
     if aniID.startswith('ZS') or aniID in hopkins_list:
         # print('Old data, using hopkins formats')
-        return session_dirs_hopkins(session_id, model_name, data_dir, scratch_dir)
+        return session_dirs_hopkins(session_id, model_name, data_dir = data_dir, scratch_dir = scratch_dir)
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
     session_dir = os.path.join(raw_dir, 'ecephys_clipped')
