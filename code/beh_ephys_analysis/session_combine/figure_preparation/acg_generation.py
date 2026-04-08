@@ -27,6 +27,7 @@ from utils.ephys_functions import*
 from utils.ccf_utils import ccf_pts_convert_to_mm, pir_to_lps, project_to_plane
 from utils.combine_tools import apply_qc, to_str_intlike, spatial_dependence_summary, binary_shift_P_vs_U, welch_shift_P_vs_U
 from utils.plot_utils import combine_pdf_big
+from utils.capsule_migration import capsule_directories
 import pickle
 import scipy.stats as stats
 import spikeinterface as si
@@ -60,7 +61,8 @@ warnings.filterwarnings('ignore')
 
 # %%
 # load basic ephys
-target_folder = '/root/capsule/scratch/manuscript/F_basicephys'
+capsule_directory = capsule_directories()
+target_folder = f'{capsule_directory["manuscript_fig_prep_dir"]}/F_basicephys'
 target_folder = os.path.join(target_folder, 'acg', 'generation')
 if not os.path.exists(target_folder):
     os.makedirs(target_folder, exist_ok=True)

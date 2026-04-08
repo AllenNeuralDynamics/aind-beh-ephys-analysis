@@ -38,7 +38,7 @@ from sklearn.metrics import r2_score
 
 import spikeinterface as si
 
-save_folder=R'/root/capsule/scratch/check_rwd_licks'
+# save_folder=R'/root/capsule/scratch/check_rwd_licks'
 
 logger = logging.getLogger(__name__)
 
@@ -649,7 +649,7 @@ def session_dirs(session_id, model_name = None, data_dir = None, scratch_dir = N
     if data_dir is None:
         data_dir = capsule_directories()['data_dir']
     if scratch_dir is None:
-        scratch_dir = capsule_directories()['scratch_dir']
+        scratch_dir = capsule_directories()['derived_dir']
     # parse session_id 
 
     aniID, date_obj, raw_id = parseSessionID(session_id)
@@ -1176,7 +1176,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
 
     return dir_dict
 
-def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule'):
+def load_model_dv(session_id, model_name, data_dir = None, scratch_dir = None):
+    if data_dir is None:
+        data_dir = capsule_directories()['data_dir']
+    if scratch_dir is None:
+        scratch_dir = capsule_directories()['derived_dir']
     model_dirs = session_dirs(session_id, model_name, data_dir=data_dir, scratch_dir=scratch_dir)
     if model_dirs['model_file'] is not None and os.path.exists(model_dirs['model_file']):
         model_dv_temp = pd.read_csv(model_dirs['model_file'], index_col=0)
@@ -1194,7 +1198,7 @@ def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scrat
 
 def makedirs(directories):
     for directory_name, directory in directories.items():
-        if 'dir' in directory_name and directory is not None and 'scratch' in directory:
+        if 'dir' in directory_name and directory is not None and 'scratch' in directory and 'data' not in directory:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
@@ -1232,6 +1236,7 @@ def delete_files_without_name(folder_path, name):
                 os.remove(file_path)
 
 def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptions = False, load_glm = False):
+    capsule_dirs = capsule_directories()
     session_dir = session_dirs(session)
     tblTrials = get_session_tbl(session)
 
@@ -1308,8 +1313,9 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
     trialData = pd.concat([trialData, choice_tbl], axis=1)
     if model_name is not None and load_glm:
         # load glm results if exist 
-        if os.path.exists(os.path.join(f"/root/capsule/scratch/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl')):
-            with open(os.path.join(f"/root/capsule/scratch/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl'), 'rb') as f:
+        glm_path = os.path.join(f"{capsule_dirs['derived_dir']}/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl')
+        if os.path.exists(glm_path):
+            with open(glm_path, 'rb') as f:
                 glm_results = pickle.load(f)
             p_choice = glm_results['choice_prob_by_session'][session]
             session_interruptions = trialData['auto_manual_trial'] | trialData['extra_reward']
@@ -2003,6 +2009,7 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
     return results, fig
 
 def fit_glm_animal(ani_focus, max_lag=5, plot=False):
+    capsule_dirs = capsule_directories()
     dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
             pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv'),
             pd.read_csv('/root/capsule/code/data_management/hopkins_FP_session_assets.csv')]
@@ -2016,12 +2023,13 @@ def fit_glm_animal(ani_focus, max_lag=5, plot=False):
     results, fig = fit_glm_session_list(ani_session_list, max_lag=max_lag, plot=plot)
     if results is None:
         return None, None
-    save_dir = f'/root/capsule/scratch/{ani_focus}/ani_combinded'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    save_file = os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', 'glm_choice_history_model_results.pkl')
-    with open(save_file, 'wb') as f:
-        pickle.dump(results, f)
-    if plot:
-        fig.savefig(fname=os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', f'{ani_focus}_glm_choice_history_model_results.pdf'))
+    save_dir = os.path.join(capsule_dirs['derived_dir'], f'{ani_focus}/ani_combinded')
+    if 'data' not in save_dir: # to avoid saving in the data directory
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_file = os.path.join(save_dir, 'glm_choice_history_model_results.pkl')
+        with open(save_file, 'wb') as f:
+            pickle.dump(results, f)
+        if plot:
+            fig.savefig(fname=os.path.join(save_dir, f'{ani_focus}_glm_choice_history_model_results.pdf'))
     return results, fig

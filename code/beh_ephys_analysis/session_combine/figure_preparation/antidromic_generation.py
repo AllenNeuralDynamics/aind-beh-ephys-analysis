@@ -64,6 +64,7 @@ from utils.beh_functions import session_dirs
 from utils.combine_tools import apply_qc
 from utils.ccf_utils import pir_to_lps
 from utils.plot_utils import combine_pdf_big
+from utils.capsule_migration import capsule_directories
 
 import k3d
 from scipy.stats import pearsonr
@@ -74,22 +75,22 @@ from scipy.stats import pearsonr
 
 # %%
 criteria_name = 'basic_ephys_low'
-
+capsure_dirs = capsule_directories()
 # %%
 # load constraints and data
-with open(os.path.join('/root/capsule/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
+with open(os.path.join(capsure_dirs["manuscript_fig_prep_dir"], 'combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
     combined_tagged_units = pickle.load(f)
     
 with open(os.path.join('/root/capsule/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
     constraints = json.load(f)
-beh_folder = os.path.join('/root/capsule/scratch/combined/beh_plots', criteria_name)
+beh_folder = os.path.join(capsure_dirs['manuscript_fig_prep_dir'], 'antidromic_analysis')
 if not os.path.exists(beh_folder):
     os.makedirs(beh_folder)
 # start with a mask of all True
 mask = pd.Series(True, index=combined_tagged_units.index)
 
 # %%
-combined_tagged_units_filtered, combined_tagged_units, fig = apply_qc(combined_tagged_units, constraints)
+combined_tagged_units_filtered, combined_tagged_units, fig, axes = apply_qc(combined_tagged_units, constraints)
 
 # %% [markdown]
 # # Load antidromic units
@@ -119,9 +120,9 @@ if re_compute:
             concatenate_antidromic_results_all.append(merged_df)
     concatenate_antidromic_results = pd.concat(concatenate_antidromic_results_all, ignore_index=True)
     concatenate_antidromic_results.rename(columns={'unit_id': 'unit'}, inplace=True)
-    file = os.path.join(beh_folder, 'combined_antidromic_results.pkl')
-    with open(file, 'wb') as f:
-        pickle.dump(concatenate_antidromic_results, f)
+    # file = os.path.join(beh_folder, 'combined_antidromic_results.pkl')
+    # with open(file, 'wb') as f:
+    #     pickle.dump(concatenate_antidromic_results, f)
 
 # %% [markdown]
 # # Process target region

@@ -33,6 +33,7 @@ from hdmf_zarr.nwb import NWBZarrIO
 from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
 from utils.ephys_functions import*
 from utils.opto_utils import opto_metrics, load_opto_sig
+from utils.capsule_migration import capsule_directories
 import pandas as pd
 import pickle
 import scipy.stats as stats
@@ -51,10 +52,13 @@ from joblib import Parallel, delayed
 
 # %%
 # Make combined session-unit table
+capsule_dirs = capsule_directories()
 dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
         pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')]
-df = pd.concat(dfs)
-exclude = ['ecephys_717120_2024-03-06_12-23-53', 'ecephys_713854_2024-03-08_14-54-25', 'ecephys_713854_2024-03-08_16-20-33', 'behavior_754897_2025-03-15_11-32-18']
+df = pd.concat(dfs).reset_index(drop=True)
+session_exclude_file = '/root/capsule/code/data_management/sessions_to_exclude.txt'
+with open(session_exclude_file, 'r') as f:
+    exclude = [line.strip() for line in f.readlines()]
 # session_ids, behs = zip(*[
 #     (session, beh)
 #     for session, beh in zip(session_ids, behs)
@@ -66,7 +70,6 @@ df = df[~df['session_id'].isin(exclude)]
 df = df[df['session_id'].apply(lambda x: isinstance(x, str))]
 # session_ids = list(session_ids)
 # behs = list(behs)
-
 # %%
 def process_session(session, beh, rec_side, probe, sex, target='soma'):
     session_dir = session_dirs(session)
@@ -247,7 +250,12 @@ def process_session(session, beh, rec_side, probe, sex, target='soma'):
                 for i in range(len(temp_bins)-1):
                     bin_mask = (spike_times_curr >= temp_bins[i]-0.5*bin_long) & (spike_times_curr < temp_bins[i+1] + 0.5*bin_long)
                     spike_counts_slow[i] = np.sum(bin_mask)/bin_long
-                sd = np.std(spike_counts_slow[np.where(~np.isnan(spike_counts_slow))[0]])/np.nanmean(spike_counts_slow)
+                
+                if np.nanmean(spike_counts_slow) > 0:
+                    sd = np.std(spike_counts_slow[np.where(~np.isnan(spike_counts_slow))[0]])/np.nanmean(spike_counts_slow)
+                else:
+                    print(f'{session}_{unit_id} spike_count_slow weird.\n')
+                    sd = np.nan
 
 
         len_all.append(end_time-start_time)
@@ -310,7 +318,6 @@ def process_session(session, beh, rec_side, probe, sex, target='soma'):
         'rec_len': len_all,
     }
 
-
 # %%
 target = 'soma'
 def safe_process(session, beh, rec_side, probe, sex):
@@ -321,15 +328,13 @@ def safe_process(session, beh, rec_side, probe, sex):
     #     return None
 
 # for index, row in df.iterrows():
-#     result = safe_process(row['session_id'], row['behavior'], row['side'], row['probe'])
+#     result = safe_process(row['session_id'], row['behavior'], row['side'], row['probe'], row['sex'])
 #     if result is not None:
 #         results.append(result)
 results = Parallel(n_jobs=12)(
     delayed(safe_process)(row['session_id'], row['behavior'], row['side'], row['probe'], row['sex'])
     for _, row in df.iterrows()
 )
-
-
 # %%
 # remove all None results
 results = [res for res in results if res is not None]
@@ -353,8 +358,11 @@ combined_tagged_units = combined_tagged_units[~row_ind].reset_index(drop=True)
 
 # %%
 # save dataframe in combined folder
-with open(os.path.join('/root/capsule/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'wb') as f:
-    pickle.dump(combined_tagged_units, f)
+save_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"],'combine_unit_tbl')
+if not os.path.exists(save_folder):
+    os.makedirs(save_folder)
+with open(os.path.join(save_folder, 'combined_unit_tbl.pkl'), 'wb') as f:
+    pickle.dump(combined_tagged_units, f) 
 
 # %%
 

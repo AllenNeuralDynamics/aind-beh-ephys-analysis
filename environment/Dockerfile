@@ -1,11 +1,14 @@
 # hash:sha256:8d5d3da8954239b6d5b596e398a691544b9471cecd013aadb57a59f47ce13dd2
 ARG REGISTRY_HOST
-FROM $REGISTRY_HOST/codeocean/cuda-miniconda-jupyterlab:latest
+FROM $REGISTRY_HOST/codeocean/code-server-python-extensions-pack:v5.0
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG AWS_ACCESS_KEY_ID
 ARG AWS_DEFAULT_REGION
 ARG AWS_SECRET_ACCESS_KEY
+
+ENV CLAUDE_CODE_USE_BEDROCK=1
+ENV AWS_REGION=us-west-1
 
 ARG GIT_ASKPASS
 ARG GIT_ACCESS_TOKEN
@@ -51,10 +54,12 @@ RUN pip install -U --no-cache-dir \
     pandas==2.3.2 \
     scikit-image==0.25.2 \
     aind_data_schema==2.6.0 \
-    openpyxl==3.1.5
+    openpyxl==3.1.5 \
+    pycircstat2==0.1.15
 
 
 
 COPY postInstall /
-RUN /postInstall
+RUN --mount=type=secret,id=secrets . /run/secrets/secrets \
+    && /postInstall
 
