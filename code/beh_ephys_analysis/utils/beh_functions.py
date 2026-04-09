@@ -1722,16 +1722,30 @@ def transfer_nwb(session_id, hopkins=False):
     # add aquisition 
     from pynwb import TimeSeries
 
+    def _materialize_array_like(value):
+        """Load lazy datasets into memory to avoid external zarr links in output."""
+        if value is None:
+            return None
+        try:
+            return np.asarray(value[:])
+        except Exception:
+            return np.asarray(value)
+
     for name, acq in src_nwb.acquisition.items():
         if isinstance(acq, TimeSeries):
-            new_acq = TimeSeries(
-                name=acq.name,
-                data=acq.data,
-                unit=acq.unit,
-                rate=acq.rate,
-                timestamps=acq.timestamps,
-                description=acq.description
-            )
+            new_acq_kwargs = {
+                'name': acq.name,
+                'data': _materialize_array_like(acq.data),
+                'unit': acq.unit,
+                'description': acq.description,
+            }
+            if acq.timestamps is not None:
+                new_acq_kwargs['timestamps'] = _materialize_array_like(acq.timestamps)
+            else:
+                new_acq_kwargs['starting_time'] = acq.starting_time
+                new_acq_kwargs['rate'] = acq.rate
+
+            new_acq = TimeSeries(**new_acq_kwargs)
             new_nwb.add_acquisition(new_acq)
         else:
             new_nwb.add_acquisition(acq)  # fallback

@@ -65,7 +65,7 @@ with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combine_unit_tb
     
 with open(os.path.join('/root/capsule/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
     constraints = json.load(f)
-target_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'basic_ephys', criteria_name)
+target_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'basic_ephys')
 if not os.path.exists(target_folder):
     os.makedirs(target_folder)
 # start with a mask of all True
