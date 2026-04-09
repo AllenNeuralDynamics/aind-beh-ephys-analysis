@@ -1,11 +1,16 @@
 import numpy as np
 import pandas as pd
-import sys
 from pathlib import Path
 
 from requests import session
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
-from utils.ephys_functions import fitSpikeModelG
+try:
+    from .ephys_functions import fitSpikeModelG
+    from .beh_functions import session_dirs, parseSessionID, get_session_tbl, makeSessionDF, load_model_dv
+    from .photometry_utils import get_FP_data, align_signal_to_events
+except ImportError:
+    from ephys_functions import fitSpikeModelG
+    from beh_functions import session_dirs, parseSessionID, get_session_tbl, makeSessionDF, load_model_dv
+    from photometry_utils import get_FP_data, align_signal_to_events
 import platform
 import os
 from pathlib import Path
@@ -15,8 +20,6 @@ import shutil
 # from utils.behavior.session_utils import load_session_df, parse_session_string
 # from utils.behavior.lick_analysis import clean_up_licks, parse_lick_trains
 # from utils.behavior.model_utils import get_param_names_dF, get_model_variables_dF, get_stan_model_params_samps_only, infer_model_var
-from utils.beh_functions import session_dirs, parseSessionID, get_session_tbl, makeSessionDF, load_model_dv
-from utils.photometry_utils import get_FP_data, align_signal_to_events
 from itertools import chain
 from matplotlib import pyplot as plt
 from IPython.display import display

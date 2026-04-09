@@ -1,6 +1,4 @@
 import numpy as np
-import sys
-sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
 from scipy import stats
 import statsmodels.api as sm
 import re
@@ -13,13 +11,17 @@ import ast
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_data
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
-from utils.capsule_migration import capsule_directories
+try:
+    from .capsule_migration import capsule_directories
+    from .mat_converter import load_df_from_mat
+except ImportError:
+    from capsule_migration import capsule_directories
+    from mat_converter import load_df_from_mat
 from uuid import uuid4
 import json
 from datetime import datetime
 import logging
 from dateutil.tz import tzlocal
-from mat_converter import load_df_from_mat
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
 from pynwb.file import Subject
 from hdmf_zarr import NWBZarrIO
