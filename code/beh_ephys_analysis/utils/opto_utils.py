@@ -5,7 +5,10 @@ import re
 from PyPDF2 import PdfMerger
 import pandas as pd
 import os
-from utils.beh_functions import session_dirs, parseSessionID
+try:
+    from .beh_functions import session_dirs, parseSessionID
+except ImportError:
+    from beh_functions import session_dirs, parseSessionID
 from scipy.stats import norm
 from datetime import datetime
 import ast

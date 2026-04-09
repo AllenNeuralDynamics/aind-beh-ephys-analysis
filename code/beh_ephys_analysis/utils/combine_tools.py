@@ -1,6 +1,4 @@
-import sys
 import os
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -13,7 +11,10 @@ import json
 import seaborn as sns
 from PyPDF2 import PdfMerger
 import re
-from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
+try:
+    from .beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
+except ImportError:
+    from beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
 import pandas as pd
 import pickle
 import scipy.stats as stats

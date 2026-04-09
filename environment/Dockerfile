@@ -40,7 +40,7 @@ RUN pip install -U --no-cache-dir \
     pynwb==3.1.3 \
     pypdf2==3.0.1 \
     spikeinterface[full]==0.103.0 \
-    statsmodels==0.14.2 \
+    statsmodels==0.14.5 \
     wavpack-numcodecs==0.2.2 \
     natsort==8.4.0 \
     harp-python@git+https://github.com/jsiegle/harp-python@decode-clock \

@@ -5,15 +5,16 @@ import re
 from PyPDF2 import PdfMerger
 import pandas as pd
 import os
-import sys
 from matplotlib.colors import LinearSegmentedColormap
-sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
 # from beh_functions import session_dirs
 from matplotlib import gridspec
 import matplotlib.pyplot as plt
 # from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 # from aind_ephys_utils import align
-from beh_functions import session_dirs 
+try:
+    from .beh_functions import session_dirs
+except ImportError:
+    from beh_functions import session_dirs
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 import ast
 import json
