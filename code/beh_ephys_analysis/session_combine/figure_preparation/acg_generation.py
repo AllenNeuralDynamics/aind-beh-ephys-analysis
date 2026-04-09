@@ -47,26 +47,25 @@ from aind_ephys_utils import align
 import k3d
 from scipy.stats import rankdata
 from scipy.ndimage import binary_dilation
+from scipy.optimize import least_squares
 from skimage.measure import find_contours
 from joblib import Parallel, delayed
 import seaborn as sns
 from sklearn.decomposition import PCA
-
+capsule_dirs = capsule_directories()
 warnings.filterwarnings('ignore')
 
 
 
 # %% [markdown]
 # ## Load data
-
+verbose = 0
 # %%
 # load basic ephys
-capsule_directory = capsule_directories()
-target_folder = f'{capsule_directory["manuscript_fig_prep_dir"]}/F_basicephys'
-target_folder = os.path.join(target_folder, 'acg', 'generation')
+target_folder = f'{capsule_dirs["manuscript_fig_prep_dir"]}/acg'
 if not os.path.exists(target_folder):
     os.makedirs(target_folder, exist_ok=True)
-be_folder = os.path.join('/root/capsule/scratch/combined/beh_plots', 'basic_ephys_low')
+be_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'basic_ephys')
 be_file = os.path.join(be_folder, f'basic_ephys.pkl')
 with open(be_file, 'rb') as f:
     basic_ephys_df = pickle.load(f)
@@ -76,59 +75,15 @@ basic_ephys_df['be_filter'] = filter
 basic_ephys_df.rename(columns={'unit': 'unit_id'}, inplace=True)
 basic_ephys_df['unit_id'] = basic_ephys_df['unit_id'].apply(to_str_intlike)
 
-# %%
-# load and add model variables
-
-beh_folder = os.path.join('/root/capsule/scratch/combined/beh_plots', 'beh_all')
-
-model_combined = pd.read_csv(os.path.join(beh_folder, 'figures_in_generation', 'model_combined_beh_all.csv'), index_col=0)
-model_combined['theta'] = model_combined['theta'] - 0.5
-model_combined['unit_id'] = model_combined['unit_id'].apply(to_str_intlike)
-
-versions = ['e', 'l', 'com']
-for version in versions:
-    all_vec = np.column_stack((
-        model_combined[f'coef_outcome_{version}_mc'],
-        model_combined[f'coef_Qchosen_{version}_ori']
-    ))
-    theta, rho = np.arctan2(all_vec[:, 1], all_vec[:, 0]), np.hypot(all_vec[:, 1], all_vec[:, 0])
-    bound_1, bound_2, bound_3 = -(1 / 4) * np.pi, np.pi, -np.pi
-    theta_scaled_dis = np.zeros_like(theta)
-    for ind, angle_curr in enumerate(theta):
-        if bound_1 < angle_curr <= bound_2:
-            theta_scaled_dis[ind] = (angle_curr - bound_1) / (bound_2 - bound_1)
-        else:
-            theta_scaled_dis[ind] = (bound_1 - angle_curr) / (bound_1 - bound_3)
-    theta_scaled_dis_all = 1 - theta_scaled_dis - 0.5
-    model_combined[f'theta_{version}'] = theta_scaled_dis_all
-
-# derived features
-model_combined['coef_outcome|(|coef_outcome| + |coef_Q|)'] = (
-    model_combined['coef_outcome_com_mc'] /
-    (np.abs(model_combined['coef_outcome_com_mc']) + np.abs(model_combined['coef_Qchosen_com_mc']))
-)
-model_combined['outcome_ipsi'] = (
-    model_combined['coef_outcome_com_mc'] + model_combined['coef_outcome:ipsi_com_mc']
-)
-model_combined['outcome_contra'] = (
-    model_combined['coef_outcome_com_mc'] - model_combined['coef_outcome:ipsi_com_mc']
-)
-# combined-beh
-# model_combined = model_combined.merge(combined_labeled_beh[['session', 'selected', 'diff_1']], on=['session'], how='left')
-# model_combined = model_combined[model_combined['selected']]
-
-# load response
-response_tbl = pd.read_csv(f'/root/capsule/scratch/combined/beh_plots/beh_all/response_ratio_beh_all_go_cue.csv')
-response_tbl['unit_id'] = response_tbl['unit'].apply(to_str_intlike)
 
 # %%
-with open(os.path.join('/root/capsule/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
+with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combined_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
     combined_tagged_units = pickle.load(f)
 combined_tagged_units.rename(columns={'unit': 'unit_id'}, inplace=True)
 combined_tagged_units['unit_id'] = combined_tagged_units['unit_id'].apply(to_str_intlike)
 # antidromic data
 version = 'PrL_S1'
-antidromic_file = f'/root/capsule/scratch/combined/beh_plots/basic_ephys/{version}/combined_antidromic_results.pkl'
+antidromic_file = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'antidromic_analysis', version, 'combined_antidromic_results.pkl')
 with open(antidromic_file, 'rb') as f:
     antidromic_df = pickle.load(f)
 
@@ -163,11 +118,6 @@ fig.savefig(fname=os.path.join(target_folder, f'{criteria_name}_qc.pdf'), bbox_i
 features_combined = basic_ephys_df.merge(combined_tagged_units_filtered, on=['session', 'unit_id'], how='inner')
 # merge with model variables
 
-
-# %%
-features_combined = features_combined.merge(model_combined, on=['session', 'unit_id'], how='left')
-# merge with response
-features_combined = features_combined.merge(response_tbl, on=['session', 'unit_id'], how='left')
 
 # %%
 # plot all autocorrelograms
@@ -331,7 +281,7 @@ fig.savefig(fname=os.path.join(target_folder, f'pca_denoised_acg_comparison_bl_o
 
 
 # %%
-from scipy.optimize import least_squares
+# Fit additive model to ACF: short inhibition (negative exponential), mid excitation (gamma with free k), long inhibition (gamma with fixed k)
 
 def gamma_peak(t, A, peak, k):
     k = np.maximum(k, 1.01)
@@ -513,7 +463,7 @@ def _fit_one_unit(unit_ind, unit_id, session_id,
         dt,
         ftol=10**-17,
         xtol=10**-50,
-        verbose=1
+        verbose=verbose,
     )
 
     # overlay raw ACF on the first axis returned by fit_acf
@@ -533,7 +483,7 @@ def _fit_one_unit(unit_ind, unit_id, session_id,
     return params
 
 # Run in parallel (processes)
-all_params = Parallel(n_jobs=-1, prefer="processes", verbose=10)(
+all_params = Parallel(n_jobs=-1, prefer="processes", verbose=verbose)(
     delayed(_fit_one_unit)(
         unit_ind, unit_id, session_id,
         auto_corr_mat_denoised, auto_corr_mat,
@@ -755,6 +705,6 @@ with open(save_file, 'wb') as f:
         'C3_mat': C3_mat,
         'acg_mat': auto_corr_mat_denoised,
     }, f)
-
+print(f"Saved fit parameters and components to {save_file}")
 
 

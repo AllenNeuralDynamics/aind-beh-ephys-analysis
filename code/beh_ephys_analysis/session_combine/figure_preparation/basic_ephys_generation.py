@@ -60,7 +60,7 @@ criteria_name = 'basic_ephys'
 
 # %%
 # load constraints and data
-with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
+with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combined_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
     combined_tagged_units = pickle.load(f)
     
 with open(os.path.join('/root/capsule/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:

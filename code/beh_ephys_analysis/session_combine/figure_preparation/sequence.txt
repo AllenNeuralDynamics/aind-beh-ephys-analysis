@@ -4,9 +4,8 @@ waveform_generation_np.py Done
 waveform_generation_tt.py Done
 basic_pehys_generation.py Done
 behavior_metrics_generation.py Done
-
-
-acg_generation.py
-outcome_window_generation.py
-beh_combined_outcome_generation.py
-photometry_generation.py
+acg_generation.py Done
+response_tstats_generation.py Done
+outcome_window_generation_parallel.py Done
+beh_combined_outcome_generation.py Done
+photometry_generation.py Done

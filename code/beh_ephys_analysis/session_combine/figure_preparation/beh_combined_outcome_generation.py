@@ -25,6 +25,7 @@ from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, mak
 from utils.ephys_functions import*
 from utils.ccf_utils import ccf_pts_convert_to_mm, pir_to_lps
 from utils.combine_tools import apply_qc, merge_df_with_suffix, to_str_intlike
+from utils.capsule_migration import capsule_directories
 import pickle
 import scipy.stats as stats
 import spikeinterface as si
@@ -42,6 +43,7 @@ from scipy.stats import pearsonr
 import statsmodels.api as sm
 from aind_ephys_utils import align
 warnings.filterwarnings('ignore')
+capsule_dirs = capsule_directories()
 
 # %%
 criteria_name = 'beh_all'
@@ -50,16 +52,16 @@ overview = False
 
 # %%
 # load constraints and data
-with open(os.path.join('/root/capsule/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
+with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combined_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
     combined_tagged_units = pickle.load(f)
 combined_tagged_units['unit_id'] = combined_tagged_units['unit'].apply(to_str_intlike)
-with open(os.path.join('/root/capsule/scratch/combined/combined_session_tbl', 'combined_beh_sessions.pkl'), 'rb') as f:
+with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combined_session_tbl', 'combined_beh_sessions.pkl'), 'rb') as f:
     combined_session_qc = pickle.load(f)
 # combined_session_qc.drop(columns=['probe'], inplace=True, errors='ignore')
 # combined_tagged_units = combined_tagged_units.merge(combined_session_qc, on='session', how='left')
 
 # antidromic data
-antidromic_file = f'/root/capsule/scratch/combined/beh_plots/basic_ephys_low/{version}/combined_antidromic_results.pkl'
+antidromic_file = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'antidromic_analysis', version, 'combined_antidromic_results.pkl')
 with open(antidromic_file, 'rb') as f:
     antidromic_df = pickle.load(f)
 
@@ -77,15 +79,14 @@ combined_tagged_units['tier_2_long'].fillna(False, inplace=True)
 
 with open(os.path.join('/root/capsule/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
     constraints = json.load(f)
-beh_folder = os.path.join('/root/capsule/scratch/combined/beh_plots', criteria_name)
-beh_folder = os.path.join(beh_folder, 'figures_in_generation')
+beh_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'outcome_regressions')
 if not os.path.exists(beh_folder):
     os.makedirs(beh_folder)
 # start with a mask of all True
 mask = pd.Series(True, index=combined_tagged_units.index)
 
 # %%
-combined_tagged_units_filtered, combined_tagged_units, fig = apply_qc(combined_tagged_units, constraints)
+combined_tagged_units_filtered, combined_tagged_units, fig, axes = apply_qc(combined_tagged_units, constraints)
 
 if overview:
 # %% [markdown]
@@ -160,7 +161,7 @@ if overview:
         
             
         # try:
-        regressors, curr_T, curr_p, curr_coefs = fitSpikeModelG(session_df_curr, spike_matrix_LM, formula)
+        regressors, curr_T, curr_p, curr_coefs, _, _ = fitSpikeModelG(session_df_curr, spike_matrix_LM, formula)
         # pick regressors from regressors_focus list, sort them according to sequence in regressors_focus
         focus_ind = [regressors.index(r) for r in regressors_focus if r in regressors]
         curr_T = [T_t[focus_ind] for T_t in curr_T]

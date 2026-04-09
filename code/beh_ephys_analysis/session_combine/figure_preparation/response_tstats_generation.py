@@ -26,6 +26,7 @@ from utils.ephys_functions import*
 from utils.ccf_utils import ccf_pts_convert_to_mm
 from utils.combine_tools import apply_qc, to_str_intlike, merge_df_with_suffix
 from utils.plot_utils import combine_pdf_big
+from utils.capsule_migration import capsule_directories
 import pickle
 import scipy.stats as stats
 import spikeinterface as si
@@ -41,16 +42,16 @@ from utils.ccf_utils import ccf_pts_convert_to_mm
 from trimesh import load_mesh
 from scipy.stats import pearsonr
 from aind_ephys_utils import align
-
+capsule_dirs = capsule_directories()
 # %%
 criteria_name = 'beh_all'
 version = 'PrL_S1'
 # load constraints and data
-with open(os.path.join('/root/capsule/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
+with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combined_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
     combined_tagged_units = pickle.load(f)
 combined_tagged_units['unit_id'] = combined_tagged_units['unit'].apply(to_str_intlike)
 # antidromic data
-antidromic_file = f'/root/capsule/scratch/combined/beh_plots/basic_ephys_low/{version}/combined_antidromic_results.pkl'
+antidromic_file = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'antidromic_analysis', version, 'combined_antidromic_results.pkl')
 with open(antidromic_file, 'rb') as f:
     antidromic_df = pickle.load(f)
 
@@ -66,7 +67,7 @@ combined_tagged_units['tier_1_long'].fillna(False, inplace=True)
 combined_tagged_units['tier_2_long'].fillna(False, inplace=True)   
 with open(os.path.join('/root/capsule/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
     constraints = json.load(f)
-beh_folder = os.path.join('/root/capsule/scratch/combined/beh_plots', criteria_name)
+beh_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'response_regression')
 if not os.path.exists(beh_folder):
     os.makedirs(beh_folder)
     
@@ -150,8 +151,9 @@ def process(session, unit_id, rec_side, formula_all, formula_hit, focus_all, foc
     response_count = response.groupby('event_index').size()
     response_rate = [response_count.get(i, 0) for i in range(len(align_time))]/np.abs(post_event)
 
-    response_ratio = (np.array(response_rate) - np.array(spikes_bl_rate))/ np.array(spikes_bl_rate)
-    response_ratio[np.isinf(response_ratio)] = np.nan
+    response_ratio = np.full(len(response_rate), np.nan)
+    non_zero_bl = np.array(spikes_bl_rate) > 0 # only compute ratio for trials with non-zero baseline firing to avoid inf values
+    response_ratio[non_zero_bl] = (np.array(response_rate)[non_zero_bl] - np.array(spikes_bl_rate)[non_zero_bl])/ np.array(spikes_bl_rate)[non_zero_bl]
     # spike_matrix_all, slide_times = get_spike_matrix(spike_times_curr, align_time_all, 
     #                                             pre_event=pre_event, post_event=post_event, 
     #                                             binSize=binSize, stepSize=stepSize)
@@ -163,8 +165,8 @@ def process(session, unit_id, rec_side, formula_all, formula_hit, focus_all, foc
     hit_ind = np.where(session_df_curr['hit'].values)[0]
     # ratio
     # all  trials
-    regressors, curr_T, curr_p, curr_coefs, r2_score_value = fitSpikeModelG(session_df_curr, response_ratio.reshape(-1, 1), formula_all)
-    regressors_hit, curr_T_hit, curr_p_hit, curr_coefs_hit, r2_score_value_hit = fitSpikeModelG(session_df_curr.iloc[hit_ind].reset_index(), response_ratio[hit_ind].reshape(-1, 1), formula_hit)
+    regressors, curr_T, curr_p, curr_coefs, _, r2_score_value = fitSpikeModelG(session_df_curr, response_ratio.reshape(-1, 1), formula_all)
+    regressors_hit, curr_T_hit, curr_p_hit, curr_coefs_hit, _, r2_score_value_hit = fitSpikeModelG(session_df_curr.iloc[hit_ind].reset_index(), response_ratio[hit_ind].reshape(-1, 1), formula_hit)
     # pick regressors from regressors_focus list, sort them according to sequence in regressors_focus
     curr_T_focus = []
     curr_p_focus = []
@@ -207,8 +209,8 @@ def process(session, unit_id, rec_side, formula_all, formula_hit, focus_all, foc
 
 
     # baseline
-    regressors, curr_T, curr_p, curr_coefs, r2_score_value  = fitSpikeModelG(session_df_curr, np.array(spikes_bl_rate).reshape(-1, 1), formula_all)
-    regressors_hit, curr_T_hit, curr_p_hit, curr_coefs_hit, r2_score_value_hit = fitSpikeModelG(session_df_curr.iloc[hit_ind].reset_index(), np.array(spikes_bl_rate)[hit_ind].reshape(-1, 1), formula_hit)
+    regressors, curr_T, curr_p, curr_coefs, _, r2_score_value  = fitSpikeModelG(session_df_curr, np.array(spikes_bl_rate).reshape(-1, 1), formula_all)
+    regressors_hit, curr_T_hit, curr_p_hit, curr_coefs_hit, _, r2_score_value_hit = fitSpikeModelG(session_df_curr.iloc[hit_ind].reset_index(), np.array(spikes_bl_rate)[hit_ind].reshape(-1, 1), formula_hit)
     # pick regressors from regressors_focus list, sort them according to sequence in regressors_focus
     curr_T_focus = []
     curr_p_focus = []
@@ -250,8 +252,8 @@ def process(session, unit_id, rec_side, formula_all, formula_hit, focus_all, foc
 
 
     # response
-    regressors, curr_T, curr_p, curr_coefs, r2_score_value  = fitSpikeModelG(session_df_curr, np.array(response_rate).reshape(-1, 1), formula_all)
-    regressors_hit, curr_T_hit, curr_p_hit, curr_coefs_hit, r2_score_value_hit = fitSpikeModelG(session_df_curr.iloc[hit_ind].reset_index(), np.array(response_rate)[hit_ind].reshape(-1, 1), formula_hit)
+    regressors, curr_T, curr_p, curr_coefs, _, r2_score_value  = fitSpikeModelG(session_df_curr, np.array(response_rate).reshape(-1, 1), formula_all)
+    regressors_hit, curr_T_hit, curr_p_hit, curr_coefs_hit, _, r2_score_value_hit = fitSpikeModelG(session_df_curr.iloc[hit_ind].reset_index(), np.array(response_rate)[hit_ind].reshape(-1, 1), formula_hit)
     # pick regressors from regressors_focus list, sort them according to sequence in regressors_focus
     curr_T_focus = []
     curr_p_focus = []
@@ -495,3 +497,4 @@ plt.savefig(os.path.join(beh_folder, f'Regression_R2_comparison_all_hit_{criteri
 
 # %%
 summary_df.to_csv(os.path.join(beh_folder, f'response_ratio_{criteria_name}_{align_name}.csv'), index=False)
+print(f"Saved regression results to {os.path.join(beh_folder, f'response_ratio_{criteria_name}_{align_name}.csv')}")

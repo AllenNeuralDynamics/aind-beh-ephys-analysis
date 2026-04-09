@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 from utils.beh_functions import session_dirs, get_session_tbl, makeSessionDF, parseSessionID
 from utils.photometry_utils import get_FP_data
+from utils.capsule_migration import capsule_directories
 from matplotlib import pyplot as plt
 from IPython.display import display
 from scipy.signal import find_peaks
@@ -32,13 +33,13 @@ import random
 from matplotlib.gridspec import GridSpec
 from utils.photometry_combine import population_GLM, plot_tuning_curve, plot_psth, population_GLM_ani
 from contextlib import redirect_stdout
-
+capsule_dirs = capsule_directories()
 # %%
 session_csv = '/root/capsule/code/data_management/hopkins_FP_session_assets.csv'
 session_tbl = pd.read_csv(session_csv)
 session_list = session_tbl['session_id'].tolist()
-target_folder = '/root/capsule/scratch/manuscript/F_photometry'
-
+target_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'photometry_regressions')
+save_dir = target_folder
 # %%
 # session-wise GLM for reward-related variables
 region_curr = 'PL'
@@ -75,7 +76,6 @@ print(
 
 results = population_GLM(session_list, **params_dict_reward)
 
-save_dir = os.path.join(target_folder, 'population_GLM_results')
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 formula_clean = (
@@ -109,7 +109,6 @@ print(
 
 results = population_GLM_ani(session_list, **params_dict_reward)
 
-save_dir = os.path.join(target_folder, 'population_GLM_results')
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 formula_clean = (
@@ -166,7 +165,6 @@ print(
 
 results = population_GLM(session_list, **params_dict_hit)
 
-save_dir = os.path.join(target_folder, 'population_GLM_results')
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 formula_clean = (
@@ -201,7 +199,6 @@ print(
 
 results = population_GLM_ani(session_list, **params_dict_hit)
 
-save_dir = os.path.join(target_folder, 'population_GLM_results')
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 formula_clean = (
@@ -258,7 +255,6 @@ print(
 
 results = population_GLM(session_list, **params_dict_svs)
 
-save_dir = os.path.join(target_folder, 'population_GLM_results')
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 formula_clean = (
@@ -294,7 +290,6 @@ print(
 
 results = population_GLM_ani(session_list, **params_dict_svs)
 
-save_dir = os.path.join(target_folder, 'population_GLM_results')
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 formula_clean = (
