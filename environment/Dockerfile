@@ -34,6 +34,7 @@ RUN pip install -U --no-cache-dir \
     aind-ephys-utils==0.0.15 \
     hdmf-zarr==0.11.0 \
     ipympl==0.9.3 \
+    nbconvert==7.16.6 \
     matplotlib==3.9.1 \
     numpy==2.1.3 \
     open-ephys-python-tools==0.1.10 \
