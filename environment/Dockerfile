@@ -55,7 +55,8 @@ RUN pip install -U --no-cache-dir \
     scikit-image==0.25.2 \
     aind_data_schema==2.6.0 \
     openpyxl==3.1.5 \
-    pycircstat2==0.1.15
+    pycircstat2==0.1.15 \
+    scanpy==1.12.1
 
 
 

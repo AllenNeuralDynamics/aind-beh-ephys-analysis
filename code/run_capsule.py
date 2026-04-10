@@ -1,4 +1,4 @@
-"""Top-level runner for figure-preparation scripts."""
+"""Top-level runner for figure-preparation scripts and manuscript notebooks."""
 
 from __future__ import annotations
 
@@ -9,30 +9,33 @@ from pathlib import Path
 
 CODE_DIR = Path(__file__).resolve().parent
 WORKSPACE_DIR = CODE_DIR.parent
+DATA_ATTACH_SCRIPT = CODE_DIR / "data_management" / "attach_all_data_capsule.py"
 FIG_PREP_DIR = CODE_DIR / "beh_ephys_analysis" / "session_combine" / "figure_preparation"
-SEQUENCE_FILE = FIG_PREP_DIR / "sequence.txt"
+FIG_PREP_SEQUENCE_FILE = FIG_PREP_DIR / "sequence.txt"
+MANUSCRIPT_FIG_DIR = CODE_DIR / "beh_ephys_analysis" / "session_combine" / "manuscript_figures"
+FIG_NOTEBOOK_LIST = MANUSCRIPT_FIG_DIR / "fig_notebook_list.txt"
 
 
-def load_sequence(sequence_file: Path = SEQUENCE_FILE) -> list[str]:
-    """Load the ordered script list from `sequence.txt`."""
+def load_sequence(sequence_file: Path) -> list[str]:
+    """Load an ordered list of files from a plain-text sequence file."""
     if not sequence_file.exists():
         raise FileNotFoundError(f"Sequence file not found: {sequence_file}")
 
-    scripts = []
+    entries = []
     for line in sequence_file.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        scripts.append(line)
+        entries.append(line)
 
-    if not scripts:
-        raise ValueError(f"No scripts found in: {sequence_file}")
+    if not entries:
+        raise ValueError(f"No entries found in: {sequence_file}")
 
-    return scripts
+    return entries
 
 
 def run_script(script_name: str, check_only: bool = False) -> None:
-    """Run a single script, or just validate that it exists."""
+    """Run one figure-preparation Python script, or just validate that it exists."""
     script_path = FIG_PREP_DIR / script_name
     if not script_path.is_file():
         raise FileNotFoundError(f"Script listed in sequence does not exist: {script_path}")
@@ -51,26 +54,84 @@ def run_script(script_name: str, check_only: bool = False) -> None:
         raise subprocess.CalledProcessError(completed.returncode, completed.args)
 
 
-def run(check_only: bool = False) -> int:
-    """Run the figure-preparation scripts in the sequence-file order."""
-    scripts = load_sequence()
-    print(f"Loaded {len(scripts)} scripts from {SEQUENCE_FILE}", flush=True)
-
-    for idx, script_name in enumerate(scripts, start=1):
-        print(f"[{idx}/{len(scripts)}] {script_name}", flush=True)
-        run_script(script_name, check_only=check_only)
+def run_notebook(notebook_name: str, check_only: bool = False) -> None:
+    """Execute one manuscript-figure notebook in place, or just validate it exists."""
+    notebook_path = MANUSCRIPT_FIG_DIR / notebook_name
+    if not notebook_path.is_file():
+        raise FileNotFoundError(f"Notebook listed in figure order does not exist: {notebook_path}")
 
     if check_only:
-        print("Sequence validation completed successfully.", flush=True)
+        print(f"[CHECK] {notebook_path}", flush=True)
+        return
+
+    print(f"\n=== Executing {notebook_name} ===", flush=True)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "jupyter",
+            "nbconvert",
+            "--to",
+            "notebook",
+            "--execute",
+            "--inplace",
+            "--ExecutePreprocessor.timeout=-1",
+            str(notebook_path),
+        ],
+        cwd=str(WORKSPACE_DIR),
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise subprocess.CalledProcessError(completed.returncode, completed.args)
+
+
+def run_data_attachment(check_only: bool = False) -> None:
+    """Run data attachment helper before executing the main sequence."""
+    if not DATA_ATTACH_SCRIPT.is_file():
+        raise FileNotFoundError(f"Data-attachment script not found: {DATA_ATTACH_SCRIPT}")
+
+    if check_only:
+        print(f"[CHECK] {DATA_ATTACH_SCRIPT}", flush=True)
+        return
+
+    print("\n=== Attaching data ===", flush=True)
+    completed = subprocess.run(
+        [sys.executable, str(DATA_ATTACH_SCRIPT)],
+        cwd=str(WORKSPACE_DIR),
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise subprocess.CalledProcessError(completed.returncode, completed.args)
+
+
+def run(check_only: bool = False) -> int:
+    """Run figure-preparation scripts, then manuscript notebooks, in their listed order."""
+    scripts = load_sequence(FIG_PREP_SEQUENCE_FILE)
+    notebooks = load_sequence(FIG_NOTEBOOK_LIST)
+    print(f"Loaded {len(scripts)} scripts from {FIG_PREP_SEQUENCE_FILE}", flush=True)
+    print(f"Loaded {len(notebooks)} notebooks from {FIG_NOTEBOOK_LIST}", flush=True)
+
+    run_data_attachment(check_only=check_only)
+
+    for idx, script_name in enumerate(scripts, start=1):
+        print(f"[prep {idx}/{len(scripts)}] {script_name}", flush=True)
+        run_script(script_name, check_only=check_only)
+
+    for idx, notebook_name in enumerate(notebooks, start=1):
+        print(f"[figure {idx}/{len(notebooks)}] {notebook_name}", flush=True)
+        run_notebook(notebook_name, check_only=check_only)
+
+    if check_only:
+        print("Sequence validation completed successfully for scripts and notebooks.", flush=True)
     else:
-        print("All scripts completed successfully.", flush=True)
+        print("All scripts and notebooks completed successfully.", flush=True)
     return 0
 
 
 def main() -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Run figure-preparation scripts in the order stored in sequence.txt."
+        description="Run figure-preparation scripts and manuscript notebooks in their listed order."
     )
     parser.add_argument(
         "--check-only",

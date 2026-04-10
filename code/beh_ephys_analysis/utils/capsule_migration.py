@@ -1,7 +1,7 @@
 from pathlib import Path
 
 def capsule_directories():
-    output_dir = Path('/root/capsule/results/')
+    output_dir = Path('/root/capsule/scratch/results')
     dirs = {
         'output_dir': output_dir,
         'manuscript_fig_dir': output_dir / 'manuscript' / 'figures',
