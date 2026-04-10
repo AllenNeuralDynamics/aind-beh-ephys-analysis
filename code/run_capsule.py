@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ FIG_PREP_DIR = CODE_DIR / "beh_ephys_analysis" / "session_combine" / "figure_pre
 FIG_PREP_SEQUENCE_FILE = FIG_PREP_DIR / "sequence.txt"
 MANUSCRIPT_FIG_DIR = CODE_DIR / "beh_ephys_analysis" / "session_combine" / "manuscript_figures"
 FIG_NOTEBOOK_LIST = MANUSCRIPT_FIG_DIR / "fig_notebook_list.txt"
+SUPPRESSED_WARNINGS = "ignore::FutureWarning,ignore::DeprecationWarning,ignore::UserWarning"
 
 
 def load_sequence(sequence_file: Path) -> list[str]:
@@ -54,6 +56,16 @@ def run_script(script_name: str, check_only: bool = False) -> None:
         raise subprocess.CalledProcessError(completed.returncode, completed.args)
 
 
+def build_subprocess_env() -> dict[str, str]:
+    """Create a subprocess environment that suppresses noisy Python warnings."""
+    env = os.environ.copy()
+    existing = env.get("PYTHONWARNINGS", "").strip()
+    env["PYTHONWARNINGS"] = (
+        f"{existing},{SUPPRESSED_WARNINGS}" if existing else SUPPRESSED_WARNINGS
+    )
+    return env
+
+
 def run_notebook(notebook_name: str, check_only: bool = False) -> None:
     """Execute one manuscript-figure notebook in place, or just validate it exists."""
     notebook_path = MANUSCRIPT_FIG_DIR / notebook_name
@@ -69,7 +81,6 @@ def run_notebook(notebook_name: str, check_only: bool = False) -> None:
         [
             sys.executable,
             "-m",
-            "jupyter",
             "nbconvert",
             "--to",
             "notebook",
@@ -79,6 +90,7 @@ def run_notebook(notebook_name: str, check_only: bool = False) -> None:
             str(notebook_path),
         ],
         cwd=str(WORKSPACE_DIR),
+        env=build_subprocess_env(),
         check=False,
     )
     if completed.returncode != 0:
@@ -98,6 +110,7 @@ def run_data_attachment(check_only: bool = False) -> None:
     completed = subprocess.run(
         [sys.executable, str(DATA_ATTACH_SCRIPT)],
         cwd=str(WORKSPACE_DIR),
+        env=build_subprocess_env(),
         check=False,
     )
     if completed.returncode != 0:
@@ -111,11 +124,11 @@ def run(check_only: bool = False) -> int:
     print(f"Loaded {len(scripts)} scripts from {FIG_PREP_SEQUENCE_FILE}", flush=True)
     print(f"Loaded {len(notebooks)} notebooks from {FIG_NOTEBOOK_LIST}", flush=True)
 
-    run_data_attachment(check_only=check_only)
+    # run_data_attachment(check_only=check_only)
 
-    for idx, script_name in enumerate(scripts, start=1):
-        print(f"[prep {idx}/{len(scripts)}] {script_name}", flush=True)
-        run_script(script_name, check_only=check_only)
+    # for idx, script_name in enumerate(scripts, start=1):
+    #     print(f"[prep {idx}/{len(scripts)}] {script_name}", flush=True)
+    #     run_script(script_name, check_only=check_only)
 
     for idx, notebook_name in enumerate(notebooks, start=1):
         print(f"[figure {idx}/{len(notebooks)}] {notebook_name}", flush=True)
