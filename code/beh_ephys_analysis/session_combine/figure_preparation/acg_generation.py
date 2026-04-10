@@ -640,6 +640,8 @@ for i in range(pca_scores.shape[1]):
     all_params_df[f'PC{i+1}'] = np.nan
 all_params_df.loc[mask, [f'PC{i+1}' for i in range(pca_scores.shape[1])]] = pca_scores
 
+all_params_df.to_csv(os.path.join(target_folder, 'acf_fit_parameters_with_pcs.csv'))
+
 # %%
 # mean acg, C1, C2 and C3 by each parameter quartiles
 fig, axes = plt.subplots(4, pca_scores.shape[1], figsize=(5 * pca_scores.shape[1], 4*4), sharey=True)

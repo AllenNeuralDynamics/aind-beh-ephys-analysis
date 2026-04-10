@@ -120,9 +120,9 @@ if re_compute:
             concatenate_antidromic_results_all.append(merged_df)
     concatenate_antidromic_results = pd.concat(concatenate_antidromic_results_all, ignore_index=True)
     concatenate_antidromic_results.rename(columns={'unit_id': 'unit'}, inplace=True)
-    # file = os.path.join(beh_folder, 'combined_antidromic_results.pkl')
-    # with open(file, 'wb') as f:
-    #     pickle.dump(concatenate_antidromic_results, f)
+    file = os.path.join(beh_folder, 'combined_antidromic_results.pkl')
+    with open(file, 'wb') as f:
+        pickle.dump(concatenate_antidromic_results, f)
 
 # %% [markdown]
 # # Process target region
