@@ -1,13 +1,13 @@
 from pathlib import Path
 
 def capsule_directories():
-    output_dir = Path('/root/capsule/results')
+    output_dir = Path('/results')
     dirs = {
         'output_dir': output_dir,
         'manuscript_fig_dir': output_dir / 'manuscript' / 'figures',
         'manuscript_fig_prep_dir': output_dir / 'manuscript' / 'prep',
-        'derived_dir': Path('/root/capsule/data/scratch_data'),
-        'data_dir': Path('/root/capsule/data'),
+        'derived_dir': Path('/data/scratch_data'),
+        'data_dir': Path('/data'),
     }
     for dir in dirs.values():
         if not dir.exists():
