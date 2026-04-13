@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-pip uninstall -y traitlets
+# pip uninstall -y traitlets
 # pip install --no-cache-dir --ignore-installed traitlets==5.9.0
 # pip install -e git+https://github.com/AllenNeuralDynamics/aind_multisession_ephys.git#egg=aind-multisession-ephys
 pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO

@@ -3,7 +3,6 @@ F_basic_ephys.ipynb
 F_behavior.ipynb
 F_waveform_space.ipynb
 F_waveform_space_tetrode.ipynb
-F_cross_correlation.ipynb
 F_photometry_tuning_psth.ipynb
 F_ephys_behavior_action&outcome.ipynb
 F_ephys_behavior_examples.ipynb
@@ -11,4 +10,5 @@ F_hit_miss.ipynb
 F_pupil_beh_ephys.ipynb
 F_spatial-axis-comparison.ipynb
 F_spont_choice_lick_neuron.ipynb
+F_cross_correlation.ipynb
 
