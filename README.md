@@ -1,4 +1,4 @@
-# aind-beh-phys-analysis
+# aind-beh-physiology-analysis
 
 This capsule contains analysis code for a study of physiology of LC NE neurons and behavior in a dynamic foraging task, focusing on the distribution of neuron properties across space.
 
