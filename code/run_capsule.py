@@ -124,7 +124,7 @@ def run(check_only: bool = False) -> int:
     print(f"Loaded {len(scripts)} scripts from {FIG_PREP_SEQUENCE_FILE}", flush=True)
     print(f"Loaded {len(notebooks)} notebooks from {FIG_NOTEBOOK_LIST}", flush=True)
 
-    run_data_attachment(check_only=check_only)
+    # run_data_attachment(check_only=check_only)
 
     for idx, script_name in enumerate(scripts, start=1):
         print(f"[prep {idx}/{len(scripts)}] {script_name}", flush=True)
