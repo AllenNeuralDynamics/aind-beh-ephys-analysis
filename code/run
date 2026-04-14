@@ -7,7 +7,7 @@ set -euo pipefail
 #   CAPSULE_RUN_MODE=execute bash code/run
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
-dry_run=0
+dry_run=1
 
 if [[ $dry_run -eq 1 ]]; then
     python -u "$SCRIPT_DIR/run_capsule.py" --check-only "$@"
