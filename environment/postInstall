@@ -11,7 +11,7 @@ pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/
 ln -s /root/capsule/code/.vscode/ /.vscode
 
 # install updated version of code-server
-VERSION=4.20.1
+VERSION=4.116.0    #4.20.1
 mkdir /.code-server
 cd /.code-server
 curl -fL "https://github.com/coder/code-server/releases/download/v$VERSION/code-server-$VERSION-linux-amd64.tar.gz" \
