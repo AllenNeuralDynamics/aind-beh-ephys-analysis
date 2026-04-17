@@ -393,7 +393,7 @@ def ephys_opto_preprocessing(session, data_type, target):
     # save all focus laser conditions
     if target == 'soma':
         resp_win = 25/1000 # seconds
-        opto_df_target = opto_df.query('site == "surface" or site == "surface_LC"')
+        opto_df_target = opto_df.query('site == "surface" or site == "surface_LC" or site == "surface_DRN"')
         if len(opto_df_target)==0:
             opto_df_target = opto_df
     elif target == 'axon':

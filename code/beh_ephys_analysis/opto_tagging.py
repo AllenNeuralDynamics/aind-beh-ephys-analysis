@@ -510,6 +510,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
                                                             dim_1 = 'powers', resp_thresh=resp_thresh, lat_thresh=lat_thresh, plot=plot)
         if fig is not None:
             fig.savefig(os.path.join(session_dir[f'opto_dir_fig_{data_type}'], f'unit_{unit_id}_pulse_width_{pulse_width}_opto_tagging.pdf'))
+            fig.savefig(os.path.join(session_dir[f'opto_dir_fig_{data_type}'], f'unit_{unit_id}_pulse_width_{pulse_width}_opto_tagging.svg'))
         plt.close('all')
         opto_tagging_df_sess = pd.concat([opto_tagging_df_sess, pd.DataFrame([opto_tagging_dict_curr])], ignore_index=True)
         # opto_tagging_df_curr = opto_tagging_df_curr.dropna(how='all', axis=1)
@@ -528,8 +529,8 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
             pickle.dump(opto_tagging_data, f)
     unit_count_pass = np.sum(np.array(target_pass_qc) & np.array(opto_pass))
     print(f'{unit_count_pass} out of {len(target_pass_qc)} units pass quality control and opto tagging')
-    # if plot:
-    #     combine_pdf_big(session_dir[f'opto_dir_fig_{data_type}'], os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging.pdf'))
+    if plot:
+        combine_pdf_big(session_dir[f'opto_dir_fig_{data_type}'], os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging.pdf'))
         # merge_pdfs(session_dir[f'opto_dir_fig_{data_type}'], os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging.pdf'))
     # both pass qc and opto tagging
 
@@ -542,7 +543,7 @@ def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thres
 if __name__ == "__main__":
 
     target = 'soma'
-    data_type = 'curated' 
+    data_type = 'raw' 
     resp_thresh = 0.3
     lat_thresh = 0.02 
     # session level  
@@ -552,9 +553,9 @@ if __name__ == "__main__":
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
     session_list = session_assets['session_id']
     session_list = [session for session in session_list if isinstance(session, str)]
-    ind = [i for i, session in enumerate(session_list) if session == 'behavior_751181_2025-02-25_12-12-35'] 
-    ind = ind[0]
-    session = 'behavior_754897_2025-03-13_11-20-42'
+    #ind = [i for i, session in enumerate(session_list) if session == 'behavior_751181_2025-02-25_12-12-35'] 
+    #ind = ind[0]
+    #session = 'behavior_754897_2025-03-13_11-20-42'
     import warnings
     # with warnings.catch_warnings():
     #     warnings.simplefilter("ignore")
@@ -576,7 +577,7 @@ if __name__ == "__main__":
     from joblib import Parallel, delayed
     import os
     import pickle
-    data_type = 'curated'
+    data_type = 'raw'
     def process(session, data_type): 
         print(f'Starting {session}')
         finish = False
@@ -606,7 +607,7 @@ if __name__ == "__main__":
             #     opto_tagging_df_sess = opto_plotting_session(session, data_type, target, resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
     # session_list = ['behavior_791691_2025-06-24_13-21-29', 'behavior_791691_2025-06-26_13-39-26', 'behavior_784806_2025-06-17_14-59-23']
     # Parallel(n_jobs=2)(delayed(process)(session, data_type) for session in session_list)
-    opto_plotting_session('behavior_751004_2024-12-21_13-28-28', 'curated', 'soma', resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
+    opto_plotting_session('behavior_814515_2025-10-24_13-22-07', 'raw', 'soma', resp_thresh=resp_thresh, lat_thresh=lat_thresh, target_unit_ids= None, plot = True, save=True)
     # for session in session_list:
     #     process(session, data_type)
     # print(session_list[-13]) 

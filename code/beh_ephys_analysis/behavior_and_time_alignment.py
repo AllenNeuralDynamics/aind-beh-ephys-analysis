@@ -29,18 +29,18 @@ from utils.hdf5_extractor import HDF5Recording
 # %%
 def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     session_dir = session_dirs(session)
-    print(session)
+    print(f"Session: {session}")
     qm_dict = {'soundcard_sync': True, 'ephys_sync': True}
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_file = os.path.join(session_dir['processed_dir'], f"{session}_process_record.txt")
 
-    # Redirect stdout to the file
-    if not os.path.exists(output_file):
-        log_file = open(output_file, "w") 
-    else: 
-        log_file = open(output_file, "a")
-    sys.stdout = log_file
-    print(f"Session: {session} processed at {timestamp}")
+    # # Redirect stdout to the file #Commented out temporarily for debug - JL 251128
+    # if not os.path.exists(output_file):
+    #     log_file = open(output_file, "w") 
+    # else: 
+    #     log_file = open(output_file, "a")
+    # sys.stdout = log_file
+    # print(f"Session: {session} processed at {timestamp}")
 
 
     # %%
@@ -139,7 +139,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
                 ax.hist(unit_spike, bins=100, density=True, alpha=0.2, color='k')
             ax.legend()
             figure.savefig(os.path.join(session_dir['alignment_dir'], 'lick_goCue_ephys_time.pdf'))
-            if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]) and np.abs(np.mean(timestamps) - mean_spike_times) < 0.2*(timestamps[-1]-timestamps[0]): 
+            if np.abs(np.mean(all_licks) - np.mean(timestamps)) < 0.2*(timestamps[-1]-timestamps[0]): # and np.abs(np.mean(timestamps) - mean_spike_times) < 0.2*(timestamps[-1]-timestamps[0]): 
                 print(f'{session} ephys is synced.')
                 qm_dict['ephys_sync'] = True
             else:
@@ -157,6 +157,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
                     ]
                     harp_states = harp_events.state.values
                     harp_timestamps_local = harp_events.timestamp.values
+                    print("Decode harp clock running next")
                     local_times, harp_times = decode_harp_clock(
                         harp_timestamps_local, harp_states
                     )
@@ -181,10 +182,10 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     qm_file = os.path.join(session_dir['processed_dir'], f"{session}_qm.json")
     with open(qm_file, 'w') as f:
         json.dump(qm_dict, f, indent=4)
-    print(f"Output saved to {output_file}")
-    sys.stdout = sys.__stdout__
-    # Close the file
-    log_file.close()
+    # print(f"Output saved to {output_file}") #Commented out for debug JL 251128
+    # sys.stdout = sys.__stdout__
+    # # Close the file
+    # log_file.close()
 
 def beh_and_time_alignment_hopkins(session, ephys_cut = [0, 0]):
     session_dir = session_dirs(session)

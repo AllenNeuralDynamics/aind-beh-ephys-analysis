@@ -29,3 +29,9 @@ cd -
 # pip install codeocean
 # pip install pandas
 # pip install numpy
+
+## Create an environment to run the mount_data script (New data attachment API, updated ~Feb 2026)
+# conda create -n codeocean311 python=3.11 -y
+# conda run -n codeocean311 python -m pip install -U pip setuptools wheel
+# conda run -n codeocean311 python -m pip install -U codeocean pandas
+# conda run -n codeocean311 python /root/capsule/code/data_management/mount_data_multi_updated.py

@@ -9,7 +9,8 @@ ARG AWS_SECRET_ACCESS_KEY
 
 ARG GIT_ASKPASS
 ARG GIT_ACCESS_TOKEN
-COPY git-askpass /
+COPY git-ask-pass / 
+#Changed from git-askpass to git-ask-pass 
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -23,6 +24,7 @@ RUN apt-get update \
 
 RUN pip install -U --no-cache-dir \
     aind-ephys-utils==0.0.15 \
+    hdmf==4.3.1 \
     hdmf-zarr==0.11.0 \
     ipympl==0.9.3 \
     matplotlib==3.9.1 \

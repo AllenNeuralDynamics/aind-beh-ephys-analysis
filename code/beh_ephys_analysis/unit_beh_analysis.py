@@ -976,11 +976,11 @@ if __name__ == '__main__':
     df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
     session_ids = df['session_id'].values
     session_ids = [session_id for session_id in session_ids if isinstance(session_id, str)]  # filter only behavior sessions
-    model_name = 'stan_qLearning_5params'
+    model_name = None
     data_type = 'curated'
     curate_time = True
     align_name = 'response'
-    formula = 'spikes ~ 1 + outcome + choice + Qchosen'
+    formula = 'spikes ~ 1 + outcome + choice'
     
     def process_session(session):
         print(session)
@@ -1008,11 +1008,11 @@ if __name__ == '__main__':
     # plot_unit_beh_session(session, data_type = data_type, align_name = align_name, curate_time=curate_time, 
     #                     model_name = model_name, formula=formula,
     #                     pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-    #                     units=None)
+    #                     units=[82])
 
-    # plot_unit_beh_session('behavior_754897_2025-03-14_11-28-53', data_type = 'curated', align_name = align_name, curate_time=curate_time, 
-    #             model_name = model_name, formula=formula,
-    #             pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
-    #             units=[82])
-    Parallel(n_jobs=12)(delayed(process_session)(session) for session in session_ids[76:])
+    plot_unit_beh_session('behavior_792288_2025-08-26_11-41-18', data_type = 'raw', align_name = 'response', curate_time=False, 
+                model_name = model_name, formula=formula,
+                pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
+                units=[8,9])
+    # Parallel(n_jobs=12)(delayed(process_session)(session) for session in session_ids[76:])
 
