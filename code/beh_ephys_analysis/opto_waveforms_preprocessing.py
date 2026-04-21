@@ -1617,8 +1617,8 @@ if __name__ == "__main__":
 
     data_type = 'curated'
     target = 'soma'
-    load_sorting_analyzer = True
-    session = 'behavior_751766_2025-02-11_11-53-38'
+    load_sorting_analyzer = False
+    session = 'behavior_784803_2025-07-01_13-58-26'
     # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
  
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -1655,7 +1655,7 @@ if __name__ == "__main__":
     # for session in session_list[45:]:
     #     process(session)  
     # process('behavior_751004_2024-12-21_13-28-28') 
-    session = 'behavior_751004_2024-12-21_13-28-28'
+    # session = 'behavior_751004_2024-12-21_13-28-28'
     re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
     # short_isi_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
     # go_cue_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)

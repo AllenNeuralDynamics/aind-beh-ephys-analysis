@@ -377,7 +377,7 @@ def opto_summary(session, data_type, target, save=True):
 
 
 if __name__ == '__main__':
-    session = 'behavior_717121_2024-06-15_10-00-58'
+    session = 'behavior_784803_2025-07-01_13-58-26'
     data_type = 'curated'
     target = 'soma'
     session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
@@ -419,7 +419,7 @@ if __name__ == '__main__':
     #     process(session) 
          # except:
         #     print(f'Failed {session}')
-    process('behavior_751004_2024-12-21_13-28-28')
+    process('behavior_784803_2025-07-01_13-58-26')
 
 
 

@@ -474,14 +474,15 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
             units= unit_tbl['unit_id'].values
         else:
             units = unit_tbl[unit_tbl['opto_pass']==True]['unit_id'].values
+            # units = unit_tbl[unit_tbl['p_max']>=0.3].values
 
 
-    # Parallel(n_jobs=12)(
-    #     delayed(process)(unit_id)
-    #     for unit_id in units
-    # )
-    for unit_id in units:
-        process(unit_id)
+    Parallel(n_jobs=12)(
+        delayed(process)(unit_id)
+        for unit_id in units
+    )
+    # for unit_id in units:
+    #     process(unit_id)
 
     output_pdf = os.path.join(session_dirs(session)[f'ephys_dir_{data_type}'],f'{session}_unit_beh_{align_name}.pdf')
 

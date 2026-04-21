@@ -790,7 +790,7 @@ if __name__ == '__main__':
     #     print(f'Checking {session}')
     #     process(session, probe)
     # process('behavior_791691_2025-06-24_13-21-29', '2')
-    plot_ephys_corr_band('behavior_784803_2025-07-03_13-55-13', 'raw',  '2')
+    plot_ephys_corr_band('behavior_784803_2025-07-03_13-55-13', 'curated',  '2')
     # plot_ephys_probe('ecephys_713854_2024-03-08_14-54-25', data_type,  '2')
   
 

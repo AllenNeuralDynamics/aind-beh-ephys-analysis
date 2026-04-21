@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.ndimage import binary_dilation
+from skimage.measure import find_contours
 # ccf_res = 25
 # bregma_points = np.array([216, 18, 228])  # Example bregma points in ccf space
 # voxel_size = 25
@@ -28,3 +30,30 @@ def pir_to_lps(points):
     if pts.ndim == 1:
         return M @ pts
     return pts @ M.T
+
+def project_to_plane(verts, plane_axes, pitch=0.02, margin=0.5):
+    """Project 3D mesh vertices to a 2D binary mask and return contours in mm."""
+    X, Y = plane_axes
+    pts = verts[:, [X, Y]]
+
+    # Grid setup
+    mins = pts.min(axis=0) - margin
+    maxs = pts.max(axis=0) + margin
+    res = np.ceil((maxs - mins) / pitch).astype(int)
+
+    mask = np.zeros(res[::-1], dtype=bool)
+    # convert coordinates to pixel indices
+    ij = ((pts - mins) / pitch).astype(int)
+    ij = ij[(ij[:, 0] >= 0) & (ij[:, 1] >= 0) &
+            (ij[:, 0] < res[0]) & (ij[:, 1] < res[1])]
+    mask[ij[:, 1], ij[:, 0]] = True
+    mask = binary_dilation(mask, iterations=2)
+
+    # extract contours and convert to mm coordinates
+    contours = find_contours(mask.astype(float), 0.5)
+    contour_mm = []
+    for c in contours:
+        x_mm = c[:, 1] * pitch + mins[0]
+        y_mm = c[:, 0] * pitch + mins[1]
+        contour_mm.append(np.column_stack((x_mm, y_mm)))
+    return contour_mm

@@ -2,8 +2,8 @@
   "isi_violations": {
     "conditional": [
       {
-        "if": { "tier_2": ["==", true] },
-        "bounds": [0, 0.21]
+        "if": { "tier_1": ["==", true] },
+        "bounds": [0, 0.20]
       },
       {
         "else": true,
@@ -13,7 +13,7 @@
   },
   "p_max": {
     "bounds": [
-      0.5,
+      0.55,
       1.0
     ]
   },
@@ -73,6 +73,12 @@
     "bounds": [
       100,
       2000
+    ]
+  },
+  "sd": {
+    "bounds": [
+      0,
+      0.3
     ]
   }
 }

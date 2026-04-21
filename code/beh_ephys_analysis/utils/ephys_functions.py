@@ -5,14 +5,16 @@ import re
 from PyPDF2 import PdfMerger
 import pandas as pd
 import os
-import sys
 from matplotlib.colors import LinearSegmentedColormap
-sys.path.append('/root/capsule/code/beh_ephys_analysis/utils')
 # from beh_functions import session_dirs
 from matplotlib import gridspec
+import matplotlib.pyplot as plt
 # from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 # from aind_ephys_utils import align
-from beh_functions import session_dirs 
+try:
+    from .beh_functions import session_dirs
+except ImportError:
+    from beh_functions import session_dirs
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 import ast
 import json
@@ -117,6 +119,7 @@ def fitSpikeModelG(dfTrial, matSpikes, formula, matIso = None):
     TvCurrU = np.array([])
     PvCurrU = np.array([])
     EvCurrU = np.array([])
+    ciCurrU = np.array([])
     for i in range(np.shape(matSpikes)[1]):
         currSpikes = np.squeeze(matSpikes[:,i])
         currData = dfTrial.copy()
@@ -132,18 +135,156 @@ def fitSpikeModelG(dfTrial, matSpikes, formula, matIso = None):
         pv = model.pvalues.values.reshape(1,-1)
         # t value
         ev = model.params.values.reshape(1,-1)
+        # ci value
+        ci = model.conf_int(alpha=0.05)  # (p, 2)
         # concatenate
         # initialize shape if not
         if np.shape(TvCurrU)[0] == 0:
             TvCurrU = np.empty((0, len(regressors)))
             PvCurrU = np.empty((0, len(regressors)))
             EvCurrU = np.empty((0, len(regressors)))
+            ciCurrU = np.empty((0, 2, len(regressors)))
 
         TvCurrU = np.concatenate((TvCurrU, tv), axis = 0)
         PvCurrU = np.concatenate((PvCurrU, pv), axis = 0)
         EvCurrU = np.concatenate((EvCurrU, ev), axis = 0)
+        ciCurrU = np.concatenate((ciCurrU, ci.values.T.reshape(1, 2, -1)), axis = 0)
 
-    return regressors, TvCurrU, PvCurrU, EvCurrU
+        used_idx = model.model.data.row_labels
+
+        r2_score_value = r2_score(
+            currData.loc[used_idx, 'spikes'],
+            model.fittedvalues
+        )
+
+    return regressors, TvCurrU, PvCurrU, EvCurrU, ciCurrU, r2_score_value
+
+
+def fitSpikeModelG_CI(
+    dfTrial,
+    matSpikes,
+    formula,
+    matIso=None,
+    alpha=0.05,          # 95% CI by default
+):
+    """
+    Fit GLM per timepoint (column in matSpikes) and return t/p/coef plus CI.
+
+    Returns
+    -------
+    regressors : list[str]
+    TvCurrU : (n_timepoints, n_regressors) ndarray
+    PvCurrU : (n_timepoints, n_regressors) ndarray
+    EvCurrU : (n_timepoints, n_regressors) ndarray
+    CILowCurrU : (n_timepoints, n_regressors) ndarray
+    CIHighCurrU : (n_timepoints, n_regressors) ndarray
+    r2_scores : (n_timepoints,) ndarray
+    """
+
+    n_timepoints = np.shape(matSpikes)[1]
+
+    TvCurrU = np.empty((0, 0))
+    PvCurrU = np.empty((0, 0))
+    EvCurrU = np.empty((0, 0))
+    CILowCurrU = np.empty((0, 0))
+    CIHighCurrU = np.empty((0, 0))
+    valid_points = []
+
+    r2_scores = np.full(n_timepoints, np.nan)
+    regressors = None
+
+    for i in range(n_timepoints):
+        currSpikes = np.squeeze(matSpikes[:, i])
+        valid_mask = ~np.isnan(currSpikes)
+
+        currData = dfTrial.copy()
+        currData["spikes"] = currSpikes
+
+        if np.sum(valid_mask) < 30:
+            # append NaNs for this unit
+            continue
+           
+
+        if matIso is not None:
+            currData["iso"] = np.squeeze(matIso[:, i])
+
+        # Fit GLM
+        model = sm.GLM.from_formula(
+            formula=formula,
+            data=currData,
+            family=sm.families.Gaussian()
+        ).fit()
+
+        # Regressor names (strip category levels etc.)
+        reg_names = [re.sub(r"\[.*?\]", "", x) for x in model.tvalues.index]
+
+        # On first timepoint, initialize matrices with correct width
+        if regressors is None:
+            regressors = reg_names
+            p = len(regressors)
+
+            TvCurrU = np.empty((0, p))
+            PvCurrU = np.empty((0, p))
+            EvCurrU = np.empty((0, p))
+            CILowCurrU = np.empty((0, p))
+            CIHighCurrU = np.empty((0, p))
+        else:
+            # Safety check: formula/design should produce same columns every unit
+            if reg_names != regressors:
+                raise ValueError(
+                    f"Regressor mismatch at time {i}. "
+                    f"Expected {regressors}, got {reg_names}."
+                )
+
+        tv = model.tvalues.values.reshape(1, -1)
+        pv = model.pvalues.values.reshape(1, -1)
+        ev = model.params.values.reshape(1, -1)
+
+        ci = model.conf_int(alpha=alpha)  # (p, 2)
+        ci_low = ci[0].values.reshape(1, -1)
+        ci_high = ci[1].values.reshape(1, -1)
+
+        TvCurrU = np.concatenate((TvCurrU, tv), axis=0)
+        PvCurrU = np.concatenate((PvCurrU, pv), axis=0)
+        EvCurrU = np.concatenate((EvCurrU, ev), axis=0)
+        CILowCurrU = np.concatenate((CILowCurrU, ci_low), axis=0)
+        CIHighCurrU = np.concatenate((CIHighCurrU, ci_high), axis=0)
+
+        used_idx = model.model.data.row_labels
+        r2_scores[i] = r2_score(
+            currData.loc[used_idx, "spikes"],
+            model.fittedvalues
+        )
+        valid_points.append(i)
+    
+    if len(valid_points) < n_timepoints:
+        # fill missed timepoints with NaNs
+        TvCurrU_full = np.full((n_timepoints, TvCurrU.shape[1]), np.nan)
+        PvCurrU_full = np.full((n_timepoints, PvCurrU.shape[1]), np.nan)
+        EvCurrU_full = np.full((n_timepoints, EvCurrU.shape[1]), np.nan)
+        CILowCurrU_full = np.full((n_timepoints, CILowCurrU.shape[1]), np.nan)
+        CIHighCurrU_full = np.full((n_timepoints, CIHighCurrU.shape[1]), np.nan)
+        for idx, timepoint in enumerate(valid_points):
+            TvCurrU_full[timepoint, :] = TvCurrU[idx, :]
+            PvCurrU_full[timepoint, :] = PvCurrU[idx, :]
+            EvCurrU_full[timepoint, :] = EvCurrU[idx, :]
+            CILowCurrU_full[timepoint, :] = CILowCurrU[idx, :]
+            CIHighCurrU_full[timepoint, :] = CIHighCurrU[idx, :]
+        TvCurrU = TvCurrU_full
+        PvCurrU = PvCurrU_full
+        EvCurrU = EvCurrU_full
+        CILowCurrU = CILowCurrU_full
+        CIHighCurrU = CIHighCurrU_full
+
+
+    return {'regressors': regressors,
+            'TvCurrU': TvCurrU,
+            'PvCurrU': PvCurrU,
+            'EvCurrU': EvCurrU,
+            'CILowCurrU': CILowCurrU,
+            'CIHighCurrU': CIHighCurrU,
+            'r2_scores': r2_scores
+           }
 
 
 def fitSpikeModelP(dfTrial, matSpikes, formula):
@@ -269,18 +410,51 @@ def load_drift(session, unit_id, data_type='curated'):
         else:
             return None
 
-def get_spike_matrix(spike_times, align_time, pre_event, post_event, binSize, stepSize):
+def get_spike_matrix(spike_times, align_time, pre_event=-2, post_event=2, binSize=0.2, stepSize=0.1, avoid_overlap = False, avoid_win = [0, 1.5], kernel = False, tau_rise = None, tau_decay = None):
+    if kernel:
+        spike_matrix, bin_times = get_spike_matrix_filter(spike_times, align_time, pre_event, post_event, tau_decay = tau_decay, tau_rise= tau_rise, step_size=stepSize, avoid_overlap = avoid_overlap, avoid_win = avoid_win)
+        return spike_matrix, bin_times
     bin_times = np.arange(pre_event, post_event, stepSize) - 0.5*stepSize
     spike_matrix = np.zeros((len(align_time), len(bin_times)))
     for i, t in enumerate(align_time):
         for j, b in enumerate(bin_times):
-            spike_matrix[i, j] = np.sum((spike_times >= t + b - 0.5*binSize) & (spike_times < t + b + 0.5*binSize))
-    spike_matrix = spike_matrix / binSize
-    return spike_matrix, bin_times
+            start = t + b - 0.5*binSize
+            end = t + b + 0.5*binSize
+            spike_matrix[i, j] = np.sum((spike_times >= start) & (spike_times < end))
+            # if this window contains any other events
+            if avoid_overlap:
+                if any(((align_time+avoid_win[1]) >= start) & (align_time+avoid_win[0] < end) & (align_time != t)):
+                    spike_matrix[i, j] = np.nan
+    return spike_matrix/binSize, bin_times
+
+def psp_filter(x, tau_rise=0.001, tau_decay=0.02):
+    myPSP = (1 - np.exp(-x/tau_rise)) * np.exp(-x/tau_decay)
+    return myPSP
+
+def get_spike_matrix_filter(spike_times, align_time, tb, tf, tau_decay = 0.020, tau_rise= 0.001, step_size=0.05, avoid_overlap = False, avoid_win = [0, 1.5]):
+    tb_bin = 10*tau_decay
+    time_bins = np.arange(tb, tf, step_size)
+    fr_mat = np.zeros((len(align_time), len(time_bins)))
+    for event_ind, event_time in enumerate(align_time):
+        spike_times_aligned = spike_times - event_time
+        for bin_ind in range(len(time_bins)):
+            curr_t = time_bins[bin_ind]
+            t_start = curr_t - tb_bin
+            curr_spikes = spike_times_aligned[(spike_times_aligned >= t_start) & (spike_times_aligned < curr_t)]
+            if len(curr_spikes) > 0:
+                fr_mat[event_ind, bin_ind] = np.sum(psp_filter(curr_t - curr_spikes, tau_rise=tau_rise, tau_decay=tau_decay))
+            if avoid_overlap:
+                if any(((align_time+avoid_win[1]) >= (curr_t + event_time - tb_bin)) & (align_time+avoid_win[0] < (curr_t + event_time)) & (align_time != event_time)):
+                    fr_mat[event_ind, bin_ind] = np.nan
+    filter_int = (tau_decay*tau_decay)/(tau_decay + tau_rise)
+    fr_mat = fr_mat / filter_int
+    return fr_mat, time_bins
+
+
 
 def plot_filled_sem(time, y_mat, color, ax, label):
     ax.plot(time, np.nanmean(y_mat, 0), c = color, label = label)
-    sem = np.std(y_mat, axis = 0)/np.sqrt(np.shape(y_mat)[0])
+    sem = np.nanstd(y_mat, axis = 0)/np.sqrt(np.shape(y_mat)[0])
     ax.fill_between(time, np.nanmean(y_mat, 0) - sem, np.nanmean(y_mat, 0) + sem, color = color, alpha = 0.25, edgecolor = None)
 
 def plot_raster_rate(
@@ -295,6 +469,11 @@ def plot_raster_rate(
     tb=-2,
     tf=3,
     time_bin = 0.1,
+    step_size = 0.1,
+    kernel = False,
+    tau_rise = 0.001,
+    tau_decay = 0.04,
+    avoid_overlap = True
 ):
     n_colors = len(bins)-1
     color_list = [colormap(i / (n_colors - 1)) for i in range(n_colors)]
@@ -302,7 +481,8 @@ def plot_raster_rate(
     # get spike matrix
     currArray, slide_times = get_spike_matrix(spike_times, align_events, 
                                             pre_event=tb, post_event=tf, 
-                                            binSize=time_bin, stepSize=0.5*time_bin)
+                                            binSize=time_bin, stepSize=step_size, kernel=kernel,
+                                            tau_rise=tau_rise, tau_decay=tau_decay, avoid_overlap=avoid_overlap)
 
     """Plot raster and rate aligned to events"""
     nested_gs = gridspec.GridSpecFromSubplotSpec(2, 1, height_ratios= [3, 1], subplot_spec=subplot_spec)
@@ -319,7 +499,16 @@ def plot_raster_rate(
     ax1.axvline(x=0, c="r", ls="--", lw=1, zorder=1)
 
     # raster plot
-    ax1.scatter(df.time, df.event_index, c="k", marker="|", s=1)
+    N_lines = df['event_index'].max() + 1
+
+    # full bar height in y-units
+    bar_height =1
+
+    y0 = df.event_index - bar_height / 2
+    y1 = df.event_index + bar_height / 2
+
+    ax1.vlines(df.time, y0, y1, color="k", linewidth=1)
+
 
     # horizontal line for each type if discrete
     if len(np.unique(map_value)) <= 4:
@@ -644,6 +833,7 @@ def auto_corr_train_nogo(spike_times, bin_size, window_length, rec_start, rec_en
 
 class load_auto_corr():
     def __init__(self, session, data_type):
+        self.session = session
         """Initialize the object with a DataFrame."""
         session_dir = session_dirs(session)
         auto_corr_tbl_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], f'{session}_{data_type}_auto_corr.pkl')
@@ -664,10 +854,28 @@ class load_auto_corr():
             if len(unit_auto_corr_data) == 0:
                 unit_auto_corr_data = None
         return unit_auto_corr_data.to_dict(orient='records')[0] if unit_auto_corr_data is not None else None
+    
+    def plot_unit(self, unit_id):
+        """Plot the autocorrelation data for a specific unit."""
+        unit_auto_corr_data = self.load_unit(unit_id)
+        if unit_auto_corr_data is None:
+            print(f"No autocorrelation data found for unit {unit_id}.")
+            return None
+        else:
+            fig, ax = plt.subplots(1, 2, figsize=(8, 3))
+            ax[0].plot(unit_auto_corr_data['long_lags'][1:], unit_auto_corr_data['auto_corr_long'][1:], label='Long window')
+            ax[1].plot(unit_auto_corr_data['short_lags'][1:], unit_auto_corr_data['auto_corr_short'][1:], label='Short window')
+            ax[0].set_xlabel('Lag Time (s)')
+            ax[1].set_xlabel('Lag Time (s)')
+            ax[0].set_ylabel('Autocorrelation')
+            plt.suptitle(f'Autocorrelation for Unit {unit_id} session {self.session}')
+            plt.show()
+            return fig, ax
 
 class load_cross_corr():
     def __init__(self, session, data_type):
         """Initialize the object with a DataFrame."""
+        self.session = session
         session_dir = session_dirs(session)
         cross_corr_tbl_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'], f'{session}_{data_type}_cross_corr.pkl')
         if not os.path.exists(cross_corr_tbl_dir):
@@ -703,8 +911,34 @@ class load_cross_corr():
                 unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long_nogo'] = np.array(unit_cross_corr_data['cross_corr_long_nogo'].values[0])
                 unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short_nogo'] = np.array(unit_cross_corr_data['cross_corr_short_nogo'].values[0])
             else:
-                raise ValueError(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
+                print(f"Multiple cross-correlation entries found for units {unit_1} and {unit_2}. Please check the data.")
+                unit_cross_corr_data = unit_cross_corr_data.iloc[[0]].copy()
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long'] = np.array(unit_cross_corr_data['cross_corr_long'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short'] = np.array(unit_cross_corr_data['cross_corr_short'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_long_nogo'] = np.array(unit_cross_corr_data['cross_corr_long_nogo'].values[0])
+                unit_cross_corr_data.at[unit_cross_corr_data.index[0], 'cross_corr_short_nogo'] = np.array(unit_cross_corr_data['cross_corr_short_nogo'].values[0])
         return unit_cross_corr_data.to_dict(orient='records')[0] if unit_cross_corr_data is not None else None
+    
+    def plot_units(self, unit_1, unit_2):
+        """Plot the autocorrelation data for a specific unit."""
+        unit_cross_corr_data = self.load_units(unit_1, unit_2)
+        if unit_cross_corr_data is None:
+            print(f"No cross-correlation data found for units {unit_1} and {unit_2}.")
+            return None
+        else:
+            fig, ax = plt.subplots(1, 2, figsize=(8, 3))
+            ax[0].plot(unit_cross_corr_data['long_lags'], unit_cross_corr_data['cross_corr_long'], label='all')
+            ax[0].plot(unit_cross_corr_data['long_lags'], unit_cross_corr_data['cross_corr_long_nogo'], label='Go cue removed')
+            ax[1].plot(unit_cross_corr_data['short_lags'], unit_cross_corr_data['cross_corr_short'], label='all')
+            ax[1].plot(unit_cross_corr_data['short_lags'], unit_cross_corr_data['cross_corr_short_nogo'], label='Go cue removed')
+            ax[0].set_xlabel('Lag Time (s)')
+            ax[1].set_xlabel('Lag Time (s)')
+            ax[0].set_ylabel('Cross-correlation')
+            ax[0].legend()
+            ax[1].legend()
+            plt.suptitle(f'Cross-correlation for Units {unit_1} & {unit_2} session {self.session}')
+            plt.show()
+            return fig, ax
 
 def make_summary_unit_tbl(session): # this is for hopkins data
     session_dir = session_dirs(session)

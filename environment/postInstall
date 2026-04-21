@@ -7,17 +7,17 @@ pip uninstall -y traitlets
 pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO
 pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis@plot_session_in_time_sue
 
-# move VS code data directory into capsule, so it persists
-ln -s /root/capsule/code/.vscode/ /.vscode
+# # move VS code data directory into capsule, so it persists
+# ln -s /root/capsule/code/.vscode/ /.vscode
 
-# install updated version of code-server
-VERSION=4.116.0    #4.20.1
-mkdir /.code-server
-cd /.code-server
-curl -fL "https://github.com/coder/code-server/releases/download/v$VERSION/code-server-$VERSION-linux-amd64.tar.gz" \
-  | tar -xvz
-ln -s /.code-server/code-server-$VERSION-linux-amd64/bin/code-server  /usr/bin/code-server
-cd -
+# # install updated version of code-server
+# VERSION=4.20.1
+# mkdir /.code-server
+# cd /.code-server
+# curl -fL "https://github.com/coder/code-server/releases/download/v$VERSION/code-server-$VERSION-linux-amd64.tar.gz" \
+#   | tar -xvz
+# ln -s /.code-server/code-server-$VERSION-linux-amd64/bin/code-server  /usr/bin/code-server
+# cd -
 
 # eval "$(conda shell.bash hook)"
 
@@ -30,8 +30,35 @@ cd -
 # pip install pandas
 # pip install numpy
 
-## Create an environment to run the mount_data script (New data attachment API, updated ~Feb 2026)
-# conda create -n codeocean311 python=3.11 -y
-# conda run -n codeocean311 python -m pip install -U pip setuptools wheel
-# conda run -n codeocean311 python -m pip install -U codeocean pandas
-# conda run -n codeocean311 python /root/capsule/code/data_management/mount_data_multi_updated.py
+# install updated version of code-server
+# VERSION=4.103.2
+# mkdir /.code-server
+# cd /.code-server
+# curl -fL "https://github.com/coder/code-server/releases/download/v$VERSION/code-server-$VERSION-linux-amd64.tar.gz" \
+#   | tar -xz
+# ln -s /.code-server/code-server-$VERSION-linux-amd64/bin/code-server  /usr/bin/code-server
+# cd -
+
+
+# mkdir -p /.vscode/extensions
+# code-server --extensions-dir=/.vscode/extensions --install-extension ms-toolsai.jupyter 
+# code-server --extensions-dir=/.vscode/extensions --install-extension ms-python.python 
+# code-server --extensions-dir=/.vscode/extensions --install-extension detachhead.basedpyright
+# code-server --extensions-dir=/.vscode/extensions --install-extension saoudrizwan.claude-dev
+
+# # download and install vscode extension from file
+# # for extensions not available in the default open-vsx registry
+
+# # run from within a workstation or in postinstall
+# # won't work in postinstall if extensions folder has been moved to inside capsule filesystem!
+# download_and_install_extension() {
+#     publisher=$1
+#     name=$2
+#     version=$3
+#     file=/tmp/$publisher.$name.$version.vsix
+#     curl -fL http://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${name}/${version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage \
+#         --output $file
+#     code-server --extensions-dir=/.vscode/extensions --install-extension $file
+# }
+# download_and_install_extension github copilot 1.364.0
+# download_and_install_extension github copilot-chat 0.30.3
