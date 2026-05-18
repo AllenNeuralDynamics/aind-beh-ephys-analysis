@@ -958,7 +958,7 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     session_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'session')
     session_dir_raw = session_dir
     mat_dir = os.path.join(raw_dir, 'ecephys', 'sorted', 'session')
-    if not os.path.exists(session_dir):
+    if not os.path.exists(mat_dir):
         mat_dir = os.path.join(raw_dir, 'fib', 'sorted', 'session')
     if os.path.exists(mat_dir):
         beh_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_behav.mat')]
@@ -1657,7 +1657,7 @@ def get_unit_tbl(session, data_type, summary = True):
         print(f'No unit table found for {session} in {data_type} data.')
         return None
 
-def transfer_nwb(session_id, hopkins=False):
+def transfer_nwb(session_id, hopkins=False, CSplus_only=True):
     session_dir = session_dirs(session_id, hopkins=hopkins)
     src_path = session_dir['nwb_dir_raw']
     with NWBZarrIO(src_path, mode="r") as io:
@@ -1667,8 +1667,9 @@ def transfer_nwb(session_id, hopkins=False):
     trials_table = src_nwb.trials
 
     # --- Create a new NWBFile ---
+    session_description = "CS_plus only copy" if CSplus_only else "All trials copy"
     new_nwb = NWBFile(
-        session_description="CS_plus only copy",
+        session_description=session_description,
         identifier=src_nwb.identifier,
         session_start_time=src_nwb.session_start_time
     )
@@ -1708,17 +1709,32 @@ def transfer_nwb(session_id, hopkins=False):
         raise ValueError("Mismatch in number of trials between session and NWB file.")
         
     for ind, row in trials_df.iterrows():
-        if row['trial_type'] == 'CSplus':
+        if CSplus_only:
+            if row['trial_type'] != 'CSplus':
+                continue
             kwargs = row.to_dict()
             kwargs['ITI_duration'] = 0.5
-            if ind>0 and pre_row is not None:
+            if ind > 0 and pre_row is not None:
                 kwargs['start_time'] = pre_row['goCue_start_time'] + 3.1
             else:
                 kwargs['start_time'] = row['goCue_start_time'] - 1.5
             kwargs['stop_time'] = row['goCue_start_time'] + 3.1
             kwargs['delay_max'] = kwargs['delay_duration']
             kwargs['delay_min'] = kwargs['delay_duration']
-            kwargs['animal_response'] = choice_side[ind]  # 0 for left, 1 for right, 2 for no response
+            kwargs['animal_response'] = choice_side[ind]
+            new_nwb.add_trial(**kwargs)
+            pre_row = row
+        else:
+            kwargs = row.to_dict()
+            kwargs['ITI_duration'] = 0.5
+            if ind > 0 and pre_row is not None:
+                kwargs['start_time'] = pre_row['goCue_start_time'] + 3.1
+            else:
+                kwargs['start_time'] = row['goCue_start_time'] - 1.5
+            kwargs['stop_time'] = row['goCue_start_time'] + 3.1
+            kwargs['delay_max'] = kwargs['delay_duration']
+            kwargs['delay_min'] = kwargs['delay_duration']
+            kwargs['animal_response'] = choice_side[ind]
             new_nwb.add_trial(**kwargs)
             pre_row = row
     # add aquisition 
@@ -1758,6 +1774,9 @@ def transfer_nwb(session_id, hopkins=False):
 
     # --- Write the new NWB (Zarr) ---
     out_path = session_dir['nwb_beh']
+    if not CSplus_only:
+        base, ext = os.path.splitext(out_path)
+        out_path = base + '_all_trials' + ext
     shutil.rmtree(out_path, ignore_errors=True)
     with NWBZarrIO(out_path, mode="w") as out_io:
         out_io.write(new_nwb)

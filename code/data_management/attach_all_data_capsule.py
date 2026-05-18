@@ -16,9 +16,24 @@ import pandas as pd
 from codeocean import CodeOcean
 from codeocean.data_asset import DataAssetAttachParams
 
+os.sys.path.append(str(Path(__file__).resolve().parent.parent / "beh_ephys_analysis"))
+from utils.beh_functions import parseSessionID
+
 
 def _is_asset_id(value: object) -> bool:
     return isinstance(value, str) and 30 < len(value) < 40
+
+
+def _normalize_mount_name(mount: str) -> str:
+    """Match the legacy `mount_data_multi*.py` handling of stan-model mounts."""
+    if "stan" not in mount:
+        return mount
+
+    session_prefix = mount.split("_model_stan")[0]
+    ani_id, _, _ = parseSessionID(session_prefix)
+    if ani_id is None:
+        return mount
+    return f"{ani_id}_model_stan"
 
 
 def _load_mount_data_multi_assets(base_dir: Path) -> list[tuple[str, str]]:
@@ -36,9 +51,7 @@ def _load_mount_data_multi_assets(base_dir: Path) -> list[tuple[str, str]]:
 
         for session_id, asset_id in zip(session_ids, curr_ids):
             mount = f"{session_id}_{curr_col}"
-            if curr_col == "model_stan":
-                # Match prior behavior where model assets are mounted per animal.
-                mount = f"{str(session_id).split('_')[0]}_model_stan"
+            mount = _normalize_mount_name(mount)
             pairs.append((asset_id, mount))
 
     # Extra static assets from the original script.
