@@ -511,12 +511,12 @@ def build_nwb_from_session_and_unit_tables(
 
         new_nwb.add_unit(**unit_kwargs)
 
-    if save_file is None:
-        save_file = os.path.join(session_dir['beh_fig_dir'], f'{session_id}_{data_type}_combined.nwb')
+    if save_file is not None:
+        os.makedirs(os.path.dirname(save_file), exist_ok=True)
+        with NWBHDF5IO(save_file, mode='w') as io:
+            io.write(new_nwb)
+        logger.info(f'Generated new NWB from tables: {save_file}')
+    else:
+        logger.info('Generated NWB in memory only (no file written; pass save_file to write).')
 
-    os.makedirs(os.path.dirname(save_file), exist_ok=True)
-    with NWBHDF5IO(save_file, mode='w') as io:
-        io.write(new_nwb)
-
-    logger.info(f'Generated new NWB from tables: {save_file}')
     return save_file, new_nwb

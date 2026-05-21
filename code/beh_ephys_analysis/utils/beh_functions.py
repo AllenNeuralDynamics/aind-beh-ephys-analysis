@@ -1737,7 +1737,7 @@ def transfer_nwb(session_id, hopkins=False, CSplus_only=True):
             kwargs['animal_response'] = choice_side[ind]
             new_nwb.add_trial(**kwargs)
             pre_row = row
-    # add aquisition 
+    # add acquisition 
     from pynwb import TimeSeries
 
     def _materialize_array_like(value):
