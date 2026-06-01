@@ -30,7 +30,7 @@ import matplotlib.colors as mcolors
 from joblib import Parallel, delayed
 from utils.combine_tools import apply_qc
 from scipy.stats import gaussian_kde
-from beh_mertics import cal_beh_metrics
+from ani_session_processing.beh_mertics import cal_beh_metrics
 capsule_dirs = capsule_directories()
 
 
