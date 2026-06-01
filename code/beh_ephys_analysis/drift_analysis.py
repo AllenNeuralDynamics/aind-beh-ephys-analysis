@@ -964,7 +964,7 @@ if __name__ == '__main__':
         if get_unit_tbl(session, 'curated') is not None:
             # try:
             print(session)
-            # plot_session_opto_drift(session, 'curated', update_csv=True, plot=True, update_cut=True)
+            plot_session_opto_drift(session, 'curated', update_csv=True, plot=True, update_cut=True)
             generate_session_opto_drift_trial_table(session, 'curated', opto_only=False, save=True)
             print(f'{session} done')
             # except:
