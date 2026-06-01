@@ -84,7 +84,7 @@ def load_legacy_motion_info(folder):
     return motion_info
 
 # %%
-def plot_session_opto_drift(session, data_type, plot=True, update_csv = False, update_cut = True):
+def plot_session_opto_drift(session, data_type, plot=True, update_csv = False, update_cut = False):
     session_dir = session_dirs(session)
 
     # %%

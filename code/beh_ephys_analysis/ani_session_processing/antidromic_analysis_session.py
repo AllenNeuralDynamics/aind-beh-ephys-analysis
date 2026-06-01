@@ -907,7 +907,7 @@ if __name__ == "__main__":
             print(f"Processing session: {session}")
             # try:
             plot_opto_responses_session(session, data_type=data_type, opto_only=True)
-            # analyze_antidromic_responses(session)
+            analyze_antidromic_responses(session)
             # except:
                 # print(f"Failed to process session: {session}")
             print(f"Finished session: {session}")
