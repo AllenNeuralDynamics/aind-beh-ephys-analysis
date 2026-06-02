@@ -13,12 +13,15 @@ import spikeinterface.preprocessing as spre
 
 from joblib import Parallel, delayed
 
-from utils.beh_functions import session_dirs, get_unit_tbl
+from utils.beh_functions import session_dirs, get_unit_tbl, get_session_tbl
 from utils.plot_utils import combine_pdf_big
 from utils.ephys_functions import load_drift
 
 
 def waveform_check(session, data_type='curated', opto_only=True, units=None):
+    if get_session_tbl(session) is None:
+        print(f'{session}: No session table found, skipping.')
+        return
     sample_num = 10
     session_dir = session_dirs(session)
     analyzer_path = session_dir[f'postprocessed_dir_{data_type}']
@@ -52,7 +55,7 @@ def waveform_check(session, data_type='curated', opto_only=True, units=None):
                 print(f'{session}: No tagged units found.')
                 return
             else:
-                units = unit_tbl[unit_tbl['p_resp_']].unit_id.values
+                units = unit_tbl.query('opto_pass == True')['unit_id'].values
         else:
             units = unit_tbl.unit_id.values
 
@@ -278,6 +281,7 @@ if __name__ == '__main__':
         if session_dir[f'curated_dir_{data_type}'] is not None:
             try:
                 waveform_check(session, data_type=data_type, opto_only=True)
+                # compare_mean_go_cue_waveforms(session, data_type=data_type, versions=['bandpass', 'raw'])
             except Exception as e:
                 print(f'Failed to process session {session}: {e}')
             print(f'Finished session: {session}')
@@ -285,7 +289,7 @@ if __name__ == '__main__':
             print(f'No curated data for session: {session}, skipping.')
 
     # from joblib import Parallel, delayed
-    # Parallel(n_jobs=5)(delayed(process)(session, data_type=data_type) for session in session_list)
-    process('behavior_717121_2024-06-15_10-00-58')
+    Parallel(n_jobs=5)(delayed(process)(session, data_type=data_type) for session in session_list)
+    # process('behavior_717121_2024-06-15_10-00-58')
     # for session in session_list:
     #     process(session)
