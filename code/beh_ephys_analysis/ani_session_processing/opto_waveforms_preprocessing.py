@@ -1617,7 +1617,7 @@ if __name__ == "__main__":
 
     data_type = 'curated'
     target = 'soma'
-    load_sorting_analyzer = False
+    load_sorting_analyzer = True
     session = 'behavior_784803_2025-07-01_13-58-26'
     # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
  
@@ -1632,7 +1632,7 @@ if __name__ == "__main__":
         print(session)
         session_dir = session_dirs(session)
         # if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):   
-        if session_dir['curated_dir_curated'] is not None:
+        if session_dir['curated_dir_curated'] is not None and os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
             data_type = 'curated'
             # outcome = opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = True)
             # outcome = waveform_recompute_session(session, data_type, load_sorting_analyzer= load_sorting_analyzer, opto_only=True, plot=True, save=True)
@@ -1649,14 +1649,15 @@ if __name__ == "__main__":
             #     data_type = 'raw' 
 
             # opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = load_sorting_analyzer)
+            go_cue_waveforms(session, data_type, opto_only = True, load_sorting_analyzer = load_sorting_analyzer)
     
     # Parallel(n_jobs=5)(delayed(process)(session) for session in session_list[-9:]) 
     # session_list = ['behavior_791691_2025-06-24_13-21-29', 'behavior_791691_2025-06-26_13-39-26', 'behavior_784806_2025-06-17_14-59-23']
-    # for session in session_list[45:]:
-    #     process(session)  
+    for session in session_list:
+        process(session)  
     # process('behavior_751004_2024-12-21_13-28-28') 
     # session = 'behavior_751004_2024-12-21_13-28-28'
-    re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
+    # re_filter_opto_waveforms(session, data_type, opto_only=True, load_sorting_analyzer=load_sorting_analyzer)
     # short_isi_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
     # go_cue_waveforms('behavior_754897_2025-03-13_11-20-42', data_type, opto_only = True, load_sorting_analyzer=False)
 

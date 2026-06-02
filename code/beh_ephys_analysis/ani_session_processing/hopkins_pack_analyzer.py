@@ -67,7 +67,7 @@ def make_sorting_analyzer(session):
 
     # %%
     
-    sparsity_params_file = '/root/capsule/code/beh_ephys_analysis/params.json'
+    sparsity_params_file = '/root/capsule/code/beh_ephys_analysis/ani_session_processing/params.json'
     with open(sparsity_params_file, 'r') as f:
         postprocessing_params = json.load(f)
     job_kwargs = postprocessing_params.pop("job_kwargs")
