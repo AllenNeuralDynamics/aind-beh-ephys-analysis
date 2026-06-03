@@ -703,22 +703,25 @@ def plot_unit_pupil_correlation(session, bin_size = 5, step_size = 0.1, opto_onl
 
 # %%
 # parallel processing across sessions
-from joblib import Parallel, delayed
-data_df = pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')
-sessions = data_df['session_id'].values.tolist()
-def safe_plot(session):
-    # try:
-    pupil_analysis_session(session, plot_licks=False, plot=True)
-    # plot_unit_pupil_correlation(session, bin_size=5, step_size=0.1, win_length=20, plot=True)
+if __name__ == '__main__':
+    from joblib import Parallel, delayed
+    data_df = pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')
+    sessions = data_df['session_id'].values.tolist()
 
-    #     print(f'Success {session}')
-    # except Exception as e:
-    #     print(f'Error processing session {session}: {e}')
-# Parallel(n_jobs=-1)(delayed(safe_plot)(session) for session in sessions)
-# pupil_analysis_session('behavior_ZS060_2021-03-29_16-21-37', plot_licks=False, plot=True)
-plot_unit_pupil_correlation('behavior_ZS061_2021-03-31_17-15-48', bin_size=5, step_size=0.1, win_length=20, plot=True) 
-# plot_unit_pupil_correlation('behavior_ZS060_2021-03-29_16-21-37', bin_size=5, step_size=0.1, win_length=20, plot=True)
-# for session in sessions:
-#     print(f'Processing session {session}')
-#     safe_plot(session)
+    def safe_plot(session):
+        # try:
+        pupil_analysis_session(session, plot_licks=False, plot=True)
+        # plot_unit_pupil_correlation(session, bin_size=5, step_size=0.1, win_length=20, plot=True)
+
+        #     print(f'Success {session}')
+        # except Exception as e:
+        #     print(f'Error processing session {session}: {e}')
+
+    # Parallel(n_jobs=-1)(delayed(safe_plot)(session) for session in sessions)
+    # pupil_analysis_session('behavior_ZS060_2021-03-29_16-21-37', plot_licks=False, plot=True)
+    plot_unit_pupil_correlation('behavior_ZS061_2021-03-31_17-15-48', bin_size=5, step_size=0.1, win_length=20, plot=True)
+    # plot_unit_pupil_correlation('behavior_ZS060_2021-03-29_16-21-37', bin_size=5, step_size=0.1, win_length=20, plot=True)
+    # for session in sessions:
+    #     print(f'Processing session {session}')
+    #     safe_plot(session)
  
