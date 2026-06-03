@@ -2,14 +2,14 @@
 import sys
 import os
 # Add repoA to sys.path at the beginning
-curr_path = os.path.dirname(os.path.abspath(__file__))
+curr_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if curr_path not in sys.path:
     sys.path.insert(0, curr_path)
 else:
     # move it to the front if it's already there
     sys.path.remove(curr_path)
     sys.path.insert(0, curr_path)
-
+# %%
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
