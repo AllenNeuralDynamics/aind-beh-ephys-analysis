@@ -88,15 +88,15 @@ from scipy.stats import pearsonr
 
 # %%
 criteria_name = 'basic_ephys_low'
-capsure_dirs = capsule_directories()
+capsule_dirs = capsule_directories()
 # %%
 # load constraints and data
-with open(os.path.join(capsure_dirs["manuscript_fig_prep_dir"], 'combined_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
+with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combined_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
     combined_tagged_units = pickle.load(f)
     
 with open(os.path.join(CAPSULE_ROOT + '/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
     constraints = json.load(f)
-beh_folder = os.path.join(capsure_dirs['manuscript_fig_prep_dir'], 'antidromic_analysis')
+beh_folder = os.path.join(capsule_dirs['manuscript_fig_prep_dir'], 'antidromic_analysis')
 if not os.path.exists(beh_folder):
     os.makedirs(beh_folder)
 # start with a mask of all True

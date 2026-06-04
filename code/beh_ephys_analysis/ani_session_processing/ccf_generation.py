@@ -238,8 +238,8 @@ def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session
 
     plt.suptitle(f'{animal_id} units in CCF space with max(P(spike|laser)) color coding')
     plt.tight_layout()
-    os.makedirs(CAPSULE_ROOT + f'/scratch/combined/ccf_maps/{annotator}', exist_ok=True)
-    plt.savefig(CAPSULE_ROOT + f'/scratch/combined/ccf_maps/{annotator}/{animal_id}_{annotator}_units_ccf_opto_tag.png', dpi=300)
+    os.makedirs(str(capsule_directories()['derived_dir']) + f'/combined/ccf_maps/{annotator}', exist_ok=True)
+    plt.savefig(str(capsule_directories()['derived_dir']) + f'/combined/ccf_maps/{annotator}/{animal_id}_{annotator}_units_ccf_opto_tag.png', dpi=300)
 
 
     colormaps = ['Reds', 'Greens', 'Blues', 'Oranges', 'Greys']
@@ -248,7 +248,7 @@ def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session
 
     if plot_3D:
         # Convert mesh to k3d mesh
-        vertices = mesh_vertices_bi.astype(np.float32)
+        vertices = mesh_vertices_mm_bi.astype(np.float32)
         indices = np.array(mesh.faces, dtype=np.uint32)
 
         plot = k3d.plot(camera_auto_fit=True)
@@ -338,7 +338,7 @@ def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session
             plot += plt_probes
         # save a html file
         # --- Save interactive plot to HTML ---
-        html_file = CAPSULE_ROOT + f'/scratch/combined/ccf_maps/{animal_id}_{annotator}_units_ccf_plot.html'
+        html_file = str(capsule_directories()['derived_dir']) + f'/combined/ccf_maps/{animal_id}_{annotator}_units_ccf_plot.html'
         with open(html_file, 'w') as f:
             f.write(plot.get_snapshot())
 
@@ -696,8 +696,8 @@ def compare_ccf_annotators(
     plt.tight_layout()
 
     if savefig:
-        os.makedirs(name=CAPSULE_ROOT + f"/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/", exist_ok=True)
-        out_png = CAPSULE_ROOT + f"/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/{animal_id}_{annotator_A}_to_{annotator_B}_units_ccf_arrows.png"
+        os.makedirs(name=str(capsule_directories()['derived_dir']) + f"/combined/ccf_maps/{annotator_A}_to_{annotator_B}/", exist_ok=True)
+        out_png = str(capsule_directories()['derived_dir']) + f"/combined/ccf_maps/{annotator_A}_to_{annotator_B}/{animal_id}_{annotator_A}_to_{annotator_B}_units_ccf_arrows.png"
         plt.savefig(out_png, dpi=300)
         print(f"Saved comparison figure to: {out_png}")
 
@@ -844,8 +844,8 @@ def compare_ccf_between_annotators_3D(animal_id, annotator_A="zs", annotator_B="
         for a,b in zip(Apts,Bpts):
             AB = np.vstack([a,b]).astype(np.float32)
             plot3d += k3d.line(AB, color=color_arrow, width=0.002)
-    os.makedirs(name=CAPSULE_ROOT + f"/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/", exist_ok=True)
-    out3d = CAPSULE_ROOT + f"/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/{animal_id}_{annotator_A}_to_{annotator_B}_3D.html"
+    os.makedirs(name=str(capsule_directories()['derived_dir']) + f"/combined/ccf_maps/{annotator_A}_to_{annotator_B}/", exist_ok=True)
+    out3d = str(capsule_directories()['derived_dir']) + f"/combined/ccf_maps/{annotator_A}_to_{annotator_B}/{animal_id}_{annotator_A}_to_{annotator_B}_3D.html"
     with open(out3d, "w") as f:
         f.write(plot3d.get_snapshot())
     print("Saved 3D comparison:", out3d)

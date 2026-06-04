@@ -15,7 +15,7 @@ while _anchor != os.path.dirname(_anchor):
         sys.path.insert(0, _beh_ephys_root)
         break
     _anchor = os.path.dirname(_anchor)
-from utils.capsule_migration import CAPSULE_ROOT
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 import pandas as pd
 import xarray as xr
 import numpy as np
@@ -237,7 +237,7 @@ def plot_raw_psd_corr(recording, start_frames, pre_chunk_size_second = 1, post_c
 def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False):   
     # load data
     session_dir = session_dirs(session)
-    with open(os.path.join(CAPSULE_ROOT + '/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
+    with open(os.path.join(capsule_directories()['manuscript_fig_prep_dir'], 'combined_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
         combined_tagged_units = pickle.load(f)
     stream_name = 'ProbeA'
     recording_zarr = session_dir['raw_rec']
@@ -813,10 +813,10 @@ if __name__ == '__main__':
 # session_list = session_assets['session_id']
 # session_list = [session for session in session_list if isinstance(session, str)]   
 
-# bl_dir = CAPSULE_ROOT + '/scratch/combined/ephys_combined/bl'
-# opto_dir = CAPSULE_ROOT + '/scratch/combined/ephys_combined/opto'
-# cmp_dir = CAPSULE_ROOT + '/scratch/combined/ephys_combined/compare'
-# band_corr_dir = CAPSULE_ROOT + '/scratch/combined/ephys_combined/band_corr'
+# bl_dir = str(capsule_directories()['derived_dir']) + '/combined/ephys_combined/bl'
+# opto_dir = str(capsule_directories()['derived_dir']) + '/combined/ephys_combined/opto'
+# cmp_dir = str(capsule_directories()['derived_dir']) + '/combined/ephys_combined/compare'
+# band_corr_dir = str(capsule_directories()['derived_dir']) + '/combined/ephys_combined/band_corr'
 # shutil.rmtree(path=bl_dir, ignore_errors=True)
 # shutil.rmtree(path=opto_dir, ignore_errors=True)
 # shutil.rmtree(path=cmp_dir, ignore_errors=True)
@@ -851,10 +851,10 @@ if __name__ == '__main__':
         
 
 # # %%
-# combine_pdf_big(opto_dir, os.path.join(CAPSULE_ROOT + '/scratch/combined/ephys_combined', 'opto_combined.pdf'))
-# combine_pdf_big(bl_dir, os.path.join(CAPSULE_ROOT + '/scratch/combined/ephys_combined', 'bl_combined.pdf'))
-# combine_pdf_big(cmp_dir, os.path.join(CAPSULE_ROOT + '/scratch/combined/ephys_combined', 'compare_combined.pdf'))
-# combine_pdf_big(band_corr_dir, os.path.join(CAPSULE_ROOT + '/scratch/combined/ephys_combined', 'band_corr_combined.pdf'))
+# combine_pdf_big(opto_dir, os.path.join(str(capsule_directories()['derived_dir']) + '/combined/ephys_combined', 'opto_combined.pdf'))
+# combine_pdf_big(bl_dir, os.path.join(str(capsule_directories()['derived_dir']) + '/combined/ephys_combined', 'bl_combined.pdf'))
+# combine_pdf_big(cmp_dir, os.path.join(str(capsule_directories()['derived_dir']) + '/combined/ephys_combined', 'compare_combined.pdf'))
+# combine_pdf_big(band_corr_dir, os.path.join(str(capsule_directories()['derived_dir']) + '/combined/ephys_combined', 'band_corr_combined.pdf'))
 
 
 

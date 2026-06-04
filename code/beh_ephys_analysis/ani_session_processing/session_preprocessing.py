@@ -16,7 +16,7 @@ while _anchor != os.path.dirname(_anchor):
         sys.path.insert(0, _beh_ephys_root)
         break
     _anchor = os.path.dirname(_anchor)
-from utils.capsule_migration import CAPSULE_ROOT
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 import pandas as pd
 import xarray as xr
 import numpy as np
@@ -264,8 +264,8 @@ def ephys_opto_preprocessing(session, data_type, target):
     #     laser_times = align_timestamps_to_anchor_points(laser_times, np_event_time, np_global_time)
         # laser_times_ori = laser_times.copy()
         # if session == 'behavior_717121_2024-06-15_10-00-58':
-        #     local_times = np.load(CAPSULE_ROOT + '/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/original_timestamps.npy')
-        #     harp_times = np.load(CAPSULE_ROOT + '/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/timestamps.npy')
+        #     local_times = np.load(str(capsule_directories()['derived_dir']) + '/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/original_timestamps.npy')
+        #     harp_times = np.load(str(capsule_directories()['derived_dir']) + '/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/timestamps.npy')
         # laser_times = align_timestamps_to_anchor_points(laser_times, local_times, harp_times)
 
     # load all laser conditions
