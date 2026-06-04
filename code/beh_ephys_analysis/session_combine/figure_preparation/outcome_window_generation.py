@@ -2,7 +2,20 @@
 # %%
 import sys
 import os
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -74,7 +87,7 @@ def compute_outcome_window(criteria_name, pre_event,post_event):
     combined_tagged_units.drop(columns=['probe'], inplace=True, errors='ignore')
     combined_tagged_units = combined_tagged_units.merge(combined_session_qc, on='session', how='left')
         
-    with open(os.path.join('/root/capsule/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
+    with open(os.path.join(CAPSULE_ROOT + '/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
         constraints = json.load(f)
 
     # start with a mask of all True

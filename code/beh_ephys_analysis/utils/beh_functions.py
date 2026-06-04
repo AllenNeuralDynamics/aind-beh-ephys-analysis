@@ -1,3 +1,4 @@
+from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 from scipy import stats
 import statsmodels.api as sm
@@ -40,7 +41,7 @@ from sklearn.metrics import r2_score
 
 import spikeinterface as si
 
-# save_folder=R'/root/capsule/scratch/check_rwd_licks'
+# save_folder=CAPSULE_ROOT + R'/scratch/check_rwd_licks'
 
 logger = logging.getLogger(__name__)
 
@@ -950,8 +951,12 @@ def session_dirs(session_id, model_name = None, data_dir = None, scratch_dir = N
 
     return dir_dict
 
-def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
-    # parse session_id 
+def session_dirs_hopkins(session_id, model_name = None, data_dir = None, scratch_dir = None):
+    if data_dir is None:
+        data_dir = capsule_directories()['data_dir']
+    if scratch_dir is None:
+        scratch_dir = capsule_directories()['derived_dir']
+    # parse session_id
     aniID, date_obj, raw_id = parseSessionID(session_id)
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
@@ -2045,9 +2050,9 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
 
 def fit_glm_animal(ani_focus, max_lag=5, plot=False):
     capsule_dirs = capsule_directories()
-    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
-            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv'),
-            pd.read_csv('/root/capsule/code/data_management/hopkins_FP_session_assets.csv')]
+    dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
+            pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv'),
+            pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_FP_session_assets.csv')]
     df = pd.concat(dfs)
     session_list = df['session_id'].values.tolist()
     ani_list = [str(session).split('_')[1] for session in session_list if str(session).startswith('behavior')]

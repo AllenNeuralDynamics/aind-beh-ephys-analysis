@@ -3,7 +3,20 @@ import numpy as np
 import pandas as pd
 import sys
 from pathlib import Path
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 from utils.ephys_functions import fitSpikeModelG
 import platform
 import os
@@ -35,7 +48,7 @@ from utils.photometry_combine import population_GLM, plot_tuning_curve, plot_pst
 from contextlib import redirect_stdout
 capsule_dirs = capsule_directories()
 # %%
-session_csv = '/root/capsule/code/data_management/hopkins_FP_session_assets.csv'
+session_csv = CAPSULE_ROOT + '/code/data_management/hopkins_FP_session_assets.csv'
 session_tbl = pd.read_csv(session_csv)
 session_list = session_tbl['session_id'].tolist()
 target_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'photometry_regressions')

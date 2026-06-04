@@ -1,7 +1,20 @@
 # %%
 import sys
 import os
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 from utils.beh_functions import parseSessionID, session_dirs, get_unit_tbl, get_session_tbl
 from utils.plot_utils import shiftedColorMap, template_reorder, get_gradient_colors
 from utils.opto_utils import opto_metrics
@@ -245,8 +258,8 @@ def plot_cross_auto_corr(session, data_type):
 if __name__ == '__main__':
 
 # %%
-    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
-            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')]
+    dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
+            pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv')]
     session_assets = pd.concat(dfs)
     session_list = session_assets['session_id']
     probe_list = session_assets['probe']

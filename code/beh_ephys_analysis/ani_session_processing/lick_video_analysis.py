@@ -1,3 +1,16 @@
+import os, sys
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 # %%
 import sys
 import os
@@ -350,7 +363,7 @@ def classify_with_gmm(
 
 
 def plot_licks_from_video(session, plot=True, cutoff_percentile=0.95):
-    video_data_file = '/root/capsule/data/all_tongue_movements_04022026/all_tongue_movements_04022026.parquet'
+    video_data_file = str(capsule_directories()['data_dir']) + '/all_tongue_movements_04022026/all_tongue_movements_04022026.parquet'
     all_lick_df = pd.read_parquet(video_data_file)
     session_video_list = all_lick_df['session'].unique().tolist()
     # load data
@@ -600,8 +613,8 @@ def plot_licks_from_video(session, plot=True, cutoff_percentile=0.95):
 
 
 if __name__ == "__main__":
-    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
-        pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')]
+    dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
+        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv')]
     df = pd.concat(dfs)
     session_list = df['session_id'].values.tolist()
     session_list = [session for session in session_list if str(session).startswith('behavior') and 'ZS' not in session]

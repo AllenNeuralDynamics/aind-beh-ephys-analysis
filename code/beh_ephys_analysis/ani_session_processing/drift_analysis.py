@@ -4,7 +4,20 @@ import os
 import sys
 
 from scipy.sparse import data
-sys.path.append('/root/capsule/aind-beh-ephys-analysis/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 import pandas as pd
 import xarray as xr
 import numpy as np
@@ -91,7 +104,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False, u
     # ephys_opto_preprocessing(session, 'curated', 'soma')
 
     # %%
-    motion_root = f'/root/capsule/data/{session}_sorted/preprocessed/motion/'
+    motion_root = str(capsule_directories()['data_dir']) + f'/{session}_sorted/preprocessed/motion/'
     if os.path.exists(motion_root):
         # all_files = [file for file in os.listdir(motion_root) if 'recording' in file]
         motion_path = os.path.join(motion_root, session_dir['stream_name'])
@@ -828,7 +841,7 @@ def generate_session_opto_drift_trial_table(session, data_type, opto_only = True
     with open(qm_file) as f:
         qm_dict = json.load(f)
     # load motion  
-    motion_root = f'/root/capsule/data/{session}_sorted/preprocessed/motion/'
+    motion_root = str(capsule_directories()['data_dir']) + f'/{session}_sorted/preprocessed/motion/'
     if os.path.exists(motion_root):
         # all_files = [file for file in os.listdir(motion_root) if 'recording' in file]
         motion_path = os.path.join(motion_root, session_dir['stream_name'])
@@ -952,8 +965,8 @@ def update_unit_tbl_by_drift(session, data_type):
     return unit_tbl
 
 if __name__ == '__main__':
-    # session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
-    session_assets = pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')
+    # session_assets = pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv')
+    session_assets = pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv')
     session_list = session_assets['session_id'].values
     session_list = [session for session in session_list if isinstance(session, str)]
     # session = 'behavior_716325_2024-05-31_10-31-14'

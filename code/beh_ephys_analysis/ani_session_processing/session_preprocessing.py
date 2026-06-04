@@ -3,7 +3,20 @@
 # %%
 import os
 import sys
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 import pandas as pd
 import xarray as xr
 import numpy as np
@@ -251,8 +264,8 @@ def ephys_opto_preprocessing(session, data_type, target):
     #     laser_times = align_timestamps_to_anchor_points(laser_times, np_event_time, np_global_time)
         # laser_times_ori = laser_times.copy()
         # if session == 'behavior_717121_2024-06-15_10-00-58':
-        #     local_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/original_timestamps.npy')
-        #     harp_times = np.load('/root/capsule/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/timestamps.npy')
+        #     local_times = np.load(CAPSULE_ROOT + '/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/original_timestamps.npy')
+        #     harp_times = np.load(CAPSULE_ROOT + '/scratch/717121/behavior_717121_2024-06-15_10-00-58/alignment/events/Neuropix-PXI-100.ProbeA/TTL/timestamps.npy')
         # laser_times = align_timestamps_to_anchor_points(laser_times, local_times, harp_times)
 
     # load all laser conditions
@@ -550,7 +563,7 @@ if __name__ == "__main__":
     data_type = 'curated'
     target = 'soma'
     # ephys_opto_preprocessing(session, data_type, target)
-    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_assets = pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv')
     session_list = session_assets['session_id']
     session_list = [session for session in session_list if isinstance(session, str)]
     import warnings

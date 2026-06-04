@@ -1,3 +1,16 @@
+import os, sys
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 def extract_trial_df(session, unit_id, roi_site):
     import os
     import pickle
@@ -28,14 +41,14 @@ def extract_trial_df(session, unit_id, roi_site):
     subject_id = session.split('_')[1]
     session_id = '_'.join(session.split('_')[1:3])
 
-    root_folder = '/root/capsule/data/LC-NE_scratch_data_06-14-2025'
+    root_folder = str(capsule_directories()['data_dir']) + '/LC-NE_scratch_data_06-14-2025'
     spike_times_folder = rf'{root_folder}/{subject_id}/{session}/ephys/{data_type}/processed'
     with open(os.path.join(spike_times_folder, 'spiketimes.pkl'), 'rb') as f:
         spiketimes = pickle.load(f)
     unit_spike_times = spiketimes[unit_id]
     print("unit_spike_times loaded")
 
-    event_csv = f'/root/capsule/data/LC-NE_scratch_data_06-14-2025/{subject_id}/{session}/ephys/opto/curated/{session}_opto_session.csv'
+    event_csv = str(capsule_directories()['data_dir']) + f'/LC-NE_scratch_data_06-14-2025/{subject_id}/{session}/ephys/opto/curated/{session}_opto_session.csv'
     event_ids = pd.read_csv(event_csv)
     print('event_csv_file loaded')
 

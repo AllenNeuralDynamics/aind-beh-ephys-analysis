@@ -1,3 +1,16 @@
+import os, sys
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 # %%
 import sys
 import os
@@ -159,8 +172,8 @@ def plot_unit_licks(session, unit_ids = None, opto_only=True, data_type='curated
 if __name__ == "__main__":
     session = 'behavior_782394_2025-04-24_12-07-34'
     opto_only = True
-    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
-            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')]
+    dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
+            pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv')]
     df = pd.concat(dfs)
     session_list = df['session_id'].values.tolist()
     # test

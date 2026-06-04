@@ -3,7 +3,20 @@ import sys
 import os
 
 from pandas.core.apply import com
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -77,7 +90,7 @@ combined_tagged_units['tier_1_long'].fillna(False, inplace=True)
 combined_tagged_units['tier_2_long'].fillna(False, inplace=True)
 
 
-with open(os.path.join('/root/capsule/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
+with open(os.path.join(CAPSULE_ROOT + '/code/beh_ephys_analysis/session_combine/metrics', f'{criteria_name}.json'), 'r') as f:
     constraints = json.load(f)
 beh_folder = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'outcome_regressions')
 if not os.path.exists(beh_folder):
@@ -337,11 +350,11 @@ for ind, row in combined_tagged_units_filtered.iterrows():
         loaded_session = session
         # load window from file
         if session_dir['aniID'].startswith('ZS'):
-            window_file = '/root/capsule/code/beh_ephys_analysis/session_combine/metrics/beh_all_TT/auc_windows.json'
-            indi_window_file = '/root/capsule/code/beh_ephys_analysis/session_combine/metrics/beh_all_TT/auc_max_lag_indi.csv'
+            window_file = CAPSULE_ROOT + '/code/beh_ephys_analysis/session_combine/metrics/beh_all_TT/auc_windows.json'
+            indi_window_file = CAPSULE_ROOT + '/code/beh_ephys_analysis/session_combine/metrics/beh_all_TT/auc_max_lag_indi.csv'
         else:
-            window_file = '/root/capsule/code/beh_ephys_analysis/session_combine/metrics/beh_all_NP/auc_windows.json'
-            indi_window_file = '/root/capsule/code/beh_ephys_analysis/session_combine/metrics/beh_all_NP/auc_max_lag_indi.csv'
+            window_file = CAPSULE_ROOT + '/code/beh_ephys_analysis/session_combine/metrics/beh_all_NP/auc_windows.json'
+            indi_window_file = CAPSULE_ROOT + '/code/beh_ephys_analysis/session_combine/metrics/beh_all_NP/auc_max_lag_indi.csv'
         with open(window_file, "r") as f:
             window_dict = json.load(f)
         indi_window_df = pd.read_csv(indi_window_file)

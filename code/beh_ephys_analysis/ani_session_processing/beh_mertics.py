@@ -1,6 +1,19 @@
 import sys
 import os
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -61,7 +74,7 @@ def cal_beh_metrics(session, model_name='stan_qLearning_5params', save = False):
     # check if ci is too big (>1000)
     if np.abs(coeff_dict['ci-bands_reward'][0][1]-coeff_dict['ci-bands_reward'][0][0]) > 1000:
         _, session, coeff_dict = plot_session_glm(session, tMax=1, model_name= model_name)
-    # fig.savefig('/root/capsule/test.png')
+    # fig.savefig(CAPSULE_ROOT + '/test.png')
     plt.close('all')
     coeff_dict['diff_1'] = coeff_dict['coeff_reward'][0] - coeff_dict['coeff_no-reward'][0]
     coeff_dict['nrwd_1'] = coeff_dict['coeff_no-reward'][0]
@@ -128,9 +141,9 @@ def cal_beh_metrics(session, model_name='stan_qLearning_5params', save = False):
 
 
 if __name__ == "__main__":
-    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
-        pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv'),
-        pd.read_csv('/root/capsule/code/data_management/hopkins_FP_session_assets.csv')]
+    dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
+        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv'),
+        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_FP_session_assets.csv')]
     df = pd.concat(dfs)
     session_ids = df['session_id'].values
     session_ids = [session_id for session_id in session_ids if isinstance(session_id, str)]  # filter only behavior sessions

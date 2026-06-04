@@ -2,7 +2,20 @@
 # %%
 import os
 import sys
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 import pandas as pd
 import xarray as xr
 import numpy as np
@@ -224,7 +237,7 @@ def plot_raw_psd_corr(recording, start_frames, pre_chunk_size_second = 1, post_c
 def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False):   
     # load data
     session_dir = session_dirs(session)
-    with open(os.path.join('/root/capsule/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
+    with open(os.path.join(CAPSULE_ROOT + '/scratch/combined/combine_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
         combined_tagged_units = pickle.load(f)
     stream_name = 'ProbeA'
     recording_zarr = session_dir['raw_rec']
@@ -746,7 +759,7 @@ def plot_ephys_corr_band(session,
 # %%
 if __name__ == '__main__':
 
-    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_assets = pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv')
     session_list = session_assets['session_id']
     probe_list = session_assets['probe']
     probe_list = [probe for probe, session in zip(probe_list, session_list) if isinstance(session, str)]
@@ -796,14 +809,14 @@ if __name__ == '__main__':
 
 # # %%
 # # move all psd mean and opto to ephys_combined folder's subfolders mean and opto
-# session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+# session_assets = pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv')
 # session_list = session_assets['session_id']
 # session_list = [session for session in session_list if isinstance(session, str)]   
 
-# bl_dir = '/root/capsule/scratch/combined/ephys_combined/bl'
-# opto_dir = '/root/capsule/scratch/combined/ephys_combined/opto'
-# cmp_dir = '/root/capsule/scratch/combined/ephys_combined/compare'
-# band_corr_dir = '/root/capsule/scratch/combined/ephys_combined/band_corr'
+# bl_dir = CAPSULE_ROOT + '/scratch/combined/ephys_combined/bl'
+# opto_dir = CAPSULE_ROOT + '/scratch/combined/ephys_combined/opto'
+# cmp_dir = CAPSULE_ROOT + '/scratch/combined/ephys_combined/compare'
+# band_corr_dir = CAPSULE_ROOT + '/scratch/combined/ephys_combined/band_corr'
 # shutil.rmtree(path=bl_dir, ignore_errors=True)
 # shutil.rmtree(path=opto_dir, ignore_errors=True)
 # shutil.rmtree(path=cmp_dir, ignore_errors=True)
@@ -838,10 +851,10 @@ if __name__ == '__main__':
         
 
 # # %%
-# combine_pdf_big(opto_dir, os.path.join('/root/capsule/scratch/combined/ephys_combined', 'opto_combined.pdf'))
-# combine_pdf_big(bl_dir, os.path.join('/root/capsule/scratch/combined/ephys_combined', 'bl_combined.pdf'))
-# combine_pdf_big(cmp_dir, os.path.join('/root/capsule/scratch/combined/ephys_combined', 'compare_combined.pdf'))
-# combine_pdf_big(band_corr_dir, os.path.join('/root/capsule/scratch/combined/ephys_combined', 'band_corr_combined.pdf'))
+# combine_pdf_big(opto_dir, os.path.join(CAPSULE_ROOT + '/scratch/combined/ephys_combined', 'opto_combined.pdf'))
+# combine_pdf_big(bl_dir, os.path.join(CAPSULE_ROOT + '/scratch/combined/ephys_combined', 'bl_combined.pdf'))
+# combine_pdf_big(cmp_dir, os.path.join(CAPSULE_ROOT + '/scratch/combined/ephys_combined', 'compare_combined.pdf'))
+# combine_pdf_big(band_corr_dir, os.path.join(CAPSULE_ROOT + '/scratch/combined/ephys_combined', 'band_corr_combined.pdf'))
 
 
 

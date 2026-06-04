@@ -1,3 +1,16 @@
+import os, sys
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 from json import load
 from scipy.stats import wilcoxon
 # Scientific libraries
@@ -897,7 +910,7 @@ if __name__ == "__main__":
 
 
     data_type = 'curated'  # 'raw' or 'curated'
-    session_df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_df = pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv')
     # remove opto sessions
     session_list = session_df[session_df['probe'] == '2']['session_id'].to_list()
     def process(session, data_type='curated'):

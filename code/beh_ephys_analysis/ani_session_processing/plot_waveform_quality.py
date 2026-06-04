@@ -1,6 +1,19 @@
 import os
 import sys
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT
 
 import numpy as np
 import matplotlib
@@ -272,7 +285,7 @@ def compare_mean_go_cue_waveforms(session, data_type='curated', versions=('bandp
 
 if __name__ == '__main__':
     data_type = 'curated'  # 'raw' or 'curated'
-    session_df = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_df = pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv')
     session_list = session_df['session_id'].dropna().tolist()
 
     def process(session, data_type='curated'):

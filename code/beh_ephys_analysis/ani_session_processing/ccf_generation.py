@@ -1,3 +1,16 @@
+import os, sys
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 
 """
 CCF (Common Coordinate Framework) generation and comparison functions for opto-ephys analysis.
@@ -21,10 +34,10 @@ from utils.ccf_utils import pir_to_lps, project_to_plane
 
 
 def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session=True, plot_3D=True):
-    annotation_dir = f'/root/capsule/data/alignment_{annotator}/{animal_id}'
+    annotation_dir = str(capsule_directories()['data_dir']) + f'/alignment_{annotator}/{animal_id}'
     if os.path.exists(annotation_dir) == False:
         print('No annotation directory found')
-    dorsal_edge_json = f'/root/capsule/data/dorsal_edges/{animal_id}_dorsal_edge_ccf_fix.json'
+    dorsal_edge_json = str(capsule_directories()['data_dir']) + f'/dorsal_edges/{animal_id}_dorsal_edge_ccf_fix.json'
     if os.path.exists(dorsal_edge_json):
         with open(dorsal_edge_json, 'r') as f:
             dorsal_edge_dict = json.load(f)
@@ -40,7 +53,7 @@ def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session
     # grab all session ids for this animal
     session_list_annotation = os.listdir(annotation_dir)
     date_list_annotation = [parseSessionID(session)[1] for session in session_list_annotation]
-    session_assets = pd.read_csv('/root/capsule/code/data_management/session_assets.csv')
+    session_assets = pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv')
     session_list_all = session_assets['session_id']
     session_list_animal = [session for session in session_list_all if isinstance(session, str)]
     session_list_animal = [session for session in session_list_animal if animal_id in session]
@@ -120,7 +133,7 @@ def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session
     planes = {'sag': [ap, dv], 'hor': [ml, ap], 'cor': [ml, dv]}
 
 
-    mesh_file = '/root/capsule/data/LC_percentile_meshes/new_core_mesh.obj' 
+    mesh_file = str(capsule_directories()['data_dir']) + '/LC_percentile_meshes/new_core_mesh.obj' 
     mesh = load_mesh(mesh_file)
     bregma_LPS_mm = np.array([-5.7, 5.4, -0.45])  # mm
     mesh_vertices = np.array(mesh.vertices)
@@ -225,8 +238,8 @@ def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session
 
     plt.suptitle(f'{animal_id} units in CCF space with max(P(spike|laser)) color coding')
     plt.tight_layout()
-    os.makedirs(f'/root/capsule/scratch/combined/ccf_maps/{annotator}', exist_ok=True)
-    plt.savefig(f'/root/capsule/scratch/combined/ccf_maps/{annotator}/{animal_id}_{annotator}_units_ccf_opto_tag.png', dpi=300)
+    os.makedirs(CAPSULE_ROOT + f'/scratch/combined/ccf_maps/{annotator}', exist_ok=True)
+    plt.savefig(CAPSULE_ROOT + f'/scratch/combined/ccf_maps/{annotator}/{animal_id}_{annotator}_units_ccf_opto_tag.png', dpi=300)
 
 
     colormaps = ['Reds', 'Greens', 'Blues', 'Oranges', 'Greys']
@@ -325,7 +338,7 @@ def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session
             plot += plt_probes
         # save a html file
         # --- Save interactive plot to HTML ---
-        html_file = f'/root/capsule/scratch/combined/ccf_maps/{animal_id}_{annotator}_units_ccf_plot.html'
+        html_file = CAPSULE_ROOT + f'/scratch/combined/ccf_maps/{animal_id}_{annotator}_units_ccf_plot.html'
         with open(html_file, 'w') as f:
             f.write(plot.get_snapshot())
 
@@ -341,7 +354,7 @@ def _collect_ccf_for_annotator(
     Do the same work as make_ccf_tbl but only up to generating
     per-session unit CCF tables. Returns dicts keyed by session_id.
     """
-    annotation_dir = f"/root/capsule/data/alignment_{annotator}/{animal_id}"
+    annotation_dir = str(capsule_directories()['data_dir']) + f"/alignment_{annotator}/{animal_id}"
     if not os.path.exists(annotation_dir):
         print(f"[{annotator}] No annotation directory found at {annotation_dir}")
         return {}, {}
@@ -351,7 +364,7 @@ def _collect_ccf_for_annotator(
     date_list_annotation = [parseSessionID(session)[1] for session in session_list_annotation]
 
     # All sessions from session_assets, filter to this animal
-    session_assets = pd.read_csv("/root/capsule/code/data_management/session_assets.csv")
+    session_assets = pd.read_csv(CAPSULE_ROOT + "/code/data_management/session_assets.csv")
     session_list_all = session_assets["session_id"]
     session_list_animal = [session for session in session_list_all if isinstance(session, str)]
     session_list_animal = [session for session in session_list_animal if animal_id in session]
@@ -490,7 +503,7 @@ def compare_ccf_annotators(
     print(f"Common sessions: {common_sessions}")
 
     # --- dorsal edge (same for both annotators) ---
-    dorsal_edge_json = f"/root/capsule/data/dorsal_edges/{animal_id}_dorsal_edge_ccf_fix.json"
+    dorsal_edge_json = str(capsule_directories()['data_dir']) + f"/dorsal_edges/{animal_id}_dorsal_edge_ccf_fix.json"
     dorsal_edge_mat = None
     if os.path.exists(dorsal_edge_json):
         with open(dorsal_edge_json, "r") as f:
@@ -503,7 +516,7 @@ def compare_ccf_annotators(
         # dorsal_edge_mat[:, 0] = dorsal_edge_mat[:, 0] - 0.04  # your original shift
 
     # --- load CCF mesh ---
-    mesh_file = '/root/capsule/data/LC_percentile_meshes/new_core_mesh.obj' 
+    mesh_file = str(capsule_directories()['data_dir']) + '/LC_percentile_meshes/new_core_mesh.obj' 
     bregma_LPS_mm = np.array([-5.7, 5.4, -0.45])  # mm
     mesh = load_mesh(mesh_file)
     mesh_vertices = np.array(mesh.vertices)
@@ -683,8 +696,8 @@ def compare_ccf_annotators(
     plt.tight_layout()
 
     if savefig:
-        os.makedirs(name=f"/root/capsule/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/", exist_ok=True)
-        out_png = f"/root/capsule/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/{animal_id}_{annotator_A}_to_{annotator_B}_units_ccf_arrows.png"
+        os.makedirs(name=CAPSULE_ROOT + f"/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/", exist_ok=True)
+        out_png = CAPSULE_ROOT + f"/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/{animal_id}_{annotator_A}_to_{annotator_B}_units_ccf_arrows.png"
         plt.savefig(out_png, dpi=300)
         print(f"Saved comparison figure to: {out_png}")
 
@@ -715,7 +728,7 @@ def compare_ccf_between_annotators_3D(animal_id, annotator_A="zs", annotator_B="
     print("Common sessions:", common_sessions)
 
     # Load dorsal edge
-    dorsal_edge_json = f"/root/capsule/data/dorsal_edges/{animal_id}_dorsal_edge_ccf_fix.json"
+    dorsal_edge_json = str(capsule_directories()['data_dir']) + f"/dorsal_edges/{animal_id}_dorsal_edge_ccf_fix.json"
     dorsal_edge = None
     if os.path.exists(dorsal_edge_json):
         df = pd.DataFrame(json.load(open(dorsal_edge_json))["xyz_picks"],
@@ -727,7 +740,7 @@ def compare_ccf_between_annotators_3D(animal_id, annotator_A="zs", annotator_B="
         # dorsal_edge[:,0] -= 0.04
 
     # Load CCF mesh
-    mesh_file = '/root/capsule/data/LC_percentile_meshes/new_core_mesh.obj' 
+    mesh_file = str(capsule_directories()['data_dir']) + '/LC_percentile_meshes/new_core_mesh.obj' 
     mesh = load_mesh(mesh_file)
     bregma_LPS_mm = np.array([-5.7, 5.4, -0.45])  # mm
     mesh_vertices = np.array(mesh.vertices)
@@ -831,8 +844,8 @@ def compare_ccf_between_annotators_3D(animal_id, annotator_A="zs", annotator_B="
         for a,b in zip(Apts,Bpts):
             AB = np.vstack([a,b]).astype(np.float32)
             plot3d += k3d.line(AB, color=color_arrow, width=0.002)
-    os.makedirs(name=f"/root/capsule/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/", exist_ok=True)
-    out3d = f"/root/capsule/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/{animal_id}_{annotator_A}_to_{annotator_B}_3D.html"
+    os.makedirs(name=CAPSULE_ROOT + f"/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/", exist_ok=True)
+    out3d = CAPSULE_ROOT + f"/scratch/combined/ccf_maps/{annotator_A}_to_{annotator_B}/{animal_id}_{annotator_A}_to_{annotator_B}_3D.html"
     with open(out3d, "w") as f:
         f.write(plot3d.get_snapshot())
     print("Saved 3D comparison:", out3d)

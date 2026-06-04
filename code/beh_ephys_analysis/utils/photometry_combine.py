@@ -1,3 +1,4 @@
+from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -58,7 +59,7 @@ def process_session(session, region, channel='G_tri-exp_mc', formula='spikes ~ 1
     session_dir = session_dirs(session)
     model = 'stan_qLearning_5params'
     # load animal metadata
-    ani_meta_file = os.path.join('/root/capsule/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
+    ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
     if not os.path.exists(ani_meta_file):
         print(f'Animal metadata file not found for session {session}.')
         return None, None, None, None, session
@@ -159,7 +160,7 @@ def process_session_ani(session_list, region, channel='G_tri-exp_mc', formula='s
     session_dir = session_dirs(session_list[0])
     model = 'stan_qLearning_5params'
     # load animal metadata
-    ani_meta_file = os.path.join('/root/capsule/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
+    ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
     if not os.path.exists(ani_meta_file):
         print(f'Animal metadata file not found for session {session_dir["aniID"]}.')
         return None, None, None, None, None, session_dir["aniID"]
@@ -472,7 +473,7 @@ def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-e
     model = 'stan_qLearning_5params'
     def process_session_for_tuning(session):
         session_dir = session_dirs(session)
-        ani_meta_file = os.path.join('/root/capsule/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
+        ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
         with open(ani_meta_file, 'r') as f:
             ani_meta = json.load(f)
         if region not in ani_meta.keys():
@@ -556,7 +557,7 @@ def plot_psth(
     model = 'stan_qLearning_5params'
     def process_session_for_psth(session):
         session_dir = session_dirs(session)
-        ani_meta_file = os.path.join('/root/capsule/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
+        ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
         if not os.path.exists(ani_meta_file):
             print(f'{session} Metadata file not found.')
             return None, None

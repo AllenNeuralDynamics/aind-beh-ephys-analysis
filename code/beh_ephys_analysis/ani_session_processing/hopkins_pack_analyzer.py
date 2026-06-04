@@ -4,7 +4,20 @@ import os
 import numpy as np
 import json
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+import sys
+_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
+while _anchor != os.path.dirname(_anchor):
+    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
+    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
+        if _beh_ephys_root in sys.path:
+            sys.path.remove(_beh_ephys_root)
+        sys.path.insert(0, _beh_ephys_root)
+        break
+    _anchor = os.path.dirname(_anchor)
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 import spikeinterface as si
 import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
@@ -23,7 +36,7 @@ def make_sorting_analyzer(session):
     rec_file = session_dir['raw_rec']
     nwb_file = session_dir['nwb_dir_raw']
     sorted_data_dir = session_dir['session_dir']
-    # 'session_dir': '/root/capsule/data/behavior_ZS061_2021-03-28_16-35-51_raw_data/ecephys/neuralynx/session'
+    # 'session_dir': str(capsule_directories()['data_dir']) + '/behavior_ZS061_2021-03-28_16-35-51_raw_data/ecephys/neuralynx/session'
 
     # %%
     rec = read_hdf5(rec_file)
@@ -67,7 +80,7 @@ def make_sorting_analyzer(session):
 
     # %%
     
-    sparsity_params_file = '/root/capsule/code/beh_ephys_analysis/ani_session_processing/params.json'
+    sparsity_params_file = CAPSULE_ROOT + '/code/beh_ephys_analysis/ani_session_processing/params.json'
     with open(sparsity_params_file, 'r') as f:
         postprocessing_params = json.load(f)
     job_kwargs = postprocessing_params.pop("job_kwargs")
@@ -193,7 +206,7 @@ def append_raw_wf(session, clip_win=(-2,4)):
 
 if __name__ == "__main__":
     import pandas as pd
-    session_list = pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv')
+    session_list = pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv')
     session_list = session_list['session_id'].tolist()
     # make_sorting_analyzer('behavior_ZS059_2021-03-27_16-03-00')
     for session in session_list:
