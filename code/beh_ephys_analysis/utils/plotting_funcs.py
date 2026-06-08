@@ -2,8 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors
 
-import utils.analysis_funcs as af
-import utils.plotting_funcs as pf
+try:
+    from . import analysis_funcs as af
+    from . import plotting_funcs as pf
+except ImportError:
+    import analysis_funcs as af
+    import plotting_funcs as pf
 
 import seaborn as sns
 
