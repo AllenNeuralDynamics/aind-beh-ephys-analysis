@@ -63,7 +63,21 @@ import numbers
 
 # %%
 def plot_raw_psd_corr(recording, start_frames, pre_chunk_size_second = 1, post_chunk_size_second=3, plot=True, freq_cut = [None, 300]):
-        
+    """
+    Calculate and plot power spectral density (PSD) and channel correlation for raw electrophysiology data.
+
+    Parameters:
+        recording: SpikeInterface recording object.
+        start_frames (np.ndarray): Array of frame indices indicating where to extract data chunks.
+        pre_chunk_size_second (float): Duration in seconds before each start frame to include.
+        post_chunk_size_second (float): Duration in seconds after each start frame to include.
+        plot (bool): If True, generate and display plots.
+        freq_cut (list): Frequency range [min, max] in Hz for PSD plots.
+
+    Returns:
+        tuple: (fig, mean_signal, mean_psd, mean_corr, frequencys) containing the figure, averaged signal,
+               power spectral density, correlation matrix, and frequency array.
+    """
     # each power level, select 5 random start times, calculate mean power spectrum
     fig = plt.figure(figsize=(15, 15))
     gs_psd = gs(nrows=4, ncols=len(start_frames)+1,  height_ratios=[2, 1, 2, 2], width_ratios=[1] * (len(start_frames)+1))
@@ -234,7 +248,22 @@ def plot_raw_psd_corr(recording, start_frames, pre_chunk_size_second = 1, post_c
 
 
 # %%
-def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False):   
+def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False):
+    """
+    Generate comprehensive electrophysiology probe analysis plots including PSD, correlations, and unit features.
+
+    Creates plots comparing baseline and optogenetic stimulation periods across frequency bands,
+    along with unit-level features like firing rate, amplitude, and behavioral responses.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        probe (str): Probe identifier ('2' for main probe, 'opto' for optogenetic probe).
+        plot_raw (bool): If True, plot individual raw data chunks in addition to averages.
+
+    Returns:
+        None: Saves analysis plots to PNG files in the session directory.
+    """
     # load data
     session_dir = session_dirs(session)
     with open(os.path.join(capsule_directories()['manuscript_fig_prep_dir'], 'combined_unit_tbl', 'combined_unit_tbl.pkl'), 'rb') as f:
@@ -593,9 +622,23 @@ def plot_ephys_probe(session, data_type='curated', probe = '2', plot_raw = False
 
 
 # %%
-def plot_ephys_corr_band(session, 
-                    data_type='curated', 
+def plot_ephys_corr_band(session,
+                    data_type='curated',
                     probe = '2'):
+    """
+    Compute and plot cross-channel correlation matrices across different frequency bands.
+
+    Analyzes correlations in delta (0.5-4 Hz), theta (4-12 Hz), alpha (12-30 Hz),
+    beta (30-100 Hz), and gamma (100-300 Hz) bands, comparing baseline vs optogenetic stimulation.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        probe (str): Probe identifier ('2' for main probe, 'opto' for optogenetic probe).
+
+    Returns:
+        None: Saves band correlation matrices as .npy files and plots as PNG in the session directory.
+    """
     session_dir = session_dirs(session)
     if session_dir['surface_rec'] is not None:
         surface = True

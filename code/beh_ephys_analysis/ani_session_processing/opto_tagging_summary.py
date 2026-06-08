@@ -55,6 +55,41 @@ import matplotlib.cm as cm
 from matplotlib.backends.backend_pdf import PdfPages
 
 def opto_summary(session, data_type, target, save=True):
+    """
+    Generate a comprehensive summary of optogenetic tagging results and unit properties for a session.
+
+    Processes opto-tagging metrics from opto_metrics and combines with unit waveform features
+    to create summary tables and visualizations. Computes:
+
+    Opto-tagging metrics:
+    - p_max: Maximum baseline-corrected response probability across all conditions
+    - p_mean: Mean response probability at max-p condition
+    - lat_max_p: Minimum response latency at max-p condition (earliest reliable response)
+    - lat_mean: Average response latency across all conditions
+    - euc_max_p: Euclidean distance between baseline and response PSTH at max-p
+    - corr_max_p: Correlation between baseline and response PSTH at max-p
+    - bl_max_p: Raw response probability minus baseline-corrected at max-p
+    - pass_count: Maximum number of sites passing threshold (p >= 0.3) for same power/duration
+
+    Waveform features:
+    - amp: Peak-to-trough amplitude of mean waveform
+    - peak: Waveform value at peak channel
+    - peak_wf: Mean waveform segment around peak
+    - peak_wf_aligned: Peak-aligned waveform for cross-unit comparison
+    - wf_2d: 2D waveform representation (time × nearby channels)
+
+    Creates pairplot of opto metrics and probe view plots color-coded by metrics.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        target (str): Target brain region for analysis (used for labeling/filtering).
+        save (bool): If True, save summary table and plots to files; if False, return DataFrame.
+
+    Returns:
+        pd.DataFrame or None: Summary DataFrame with all metrics if save=False.
+                             None if save=True (results saved to session opto directory).
+    """
     session_dir = session_dirs(session)
     we = si.load(session_dir[f'postprocessed_dir_{data_type}'], load_extensions=False)
     y_loc = we.get_extension('unit_locations').get_data()[:,1]

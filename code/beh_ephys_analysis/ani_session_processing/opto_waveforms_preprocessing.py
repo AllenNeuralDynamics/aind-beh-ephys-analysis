@@ -51,6 +51,18 @@ from utils.beh_functions import get_unit_tbl
 from joblib import Parallel, delayed
 
 def load_and_preprocess_recording(rec_folder, segment_id = 0):
+    """
+    Load and preprocess a SpikeInterface recording from zarr format.
+
+    Applies phase shift, highpass filtering, and common reference.
+
+    Parameters:
+        rec_folder (str): Path to the zarr recording folder.
+        segment_id (int): Recording segment ID to select (default: 0).
+
+    Returns:
+        BaseRecording: Preprocessed SpikeInterface recording object.
+    """
     si.set_global_job_kwargs(n_jobs=8, progress_bar=True)
     # ephys_path = os.path.dirname(session_folder)
     # compressed_folder = os.path.join(ephys_path, 'ecephys_compressed')
@@ -66,6 +78,35 @@ def load_and_preprocess_recording(rec_folder, segment_id = 0):
     return recording_processed
 # %%
 def opto_wf_preprocessing(session, data_type, target, load_sorting_analyzer = True):
+    """
+    Compare spike waveforms between spontaneous and optogenetically-evoked spikes.
+
+    Extracts and compares waveform characteristics between spontaneous spikes (randomly sampled)
+    and optogenetically-evoked spikes (during laser stimulation) to assess waveform similarity.
+    This is a critical validation step for opto-tagging - genuine cell responses should have
+    similar waveforms regardless of how the spike was triggered.
+
+    Analysis includes:
+    - Waveform extraction from raw recording for both spike types
+    - Waveform feature computation: amplitude, half-width, peak-to-trough, repolarization slope
+    - Statistical comparison (Euclidean distance, correlation) between waveform types
+    - Visualization showing spontaneous vs evoked waveform overlays
+
+    Waveform similarity criteria:
+    - High correlation (>0.9) suggests same neuron
+    - Low Euclidean distance suggests waveform consistency
+    - Large differences may indicate artifacts or over-merged clusters
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        target (str): Target brain region for opto stimulation.
+        load_sorting_analyzer (bool): If True, load existing sorting analyzer; if False, create new one.
+
+    Returns:
+        None: Saves waveform comparison results (correlations, distances, features) to pickle file
+              and plots to session opto directory.
+    """
     max_spikes_per_unit_spontaneous = 250
     # %%
     session_dir = session_dirs(session)

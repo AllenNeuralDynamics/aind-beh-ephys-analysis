@@ -36,13 +36,34 @@ from scipy.stats import binomtest as binom_test
 
 
 
-def remove_spikes_during_laser_pulse(int_event_locked_timestamps, duration):    
+def remove_spikes_during_laser_pulse(int_event_locked_timestamps, duration):
+    """
+    Remove spikes that occur during the laser pulse period.
+
+    Parameters:
+        int_event_locked_timestamps (list of np.ndarray): Event-locked spike times for each trial.
+        duration (float): Duration of the laser pulse in milliseconds.
+
+    Returns:
+        list of np.ndarray: Spike times with laser pulse period spikes removed.
+    """
     for i, arr in enumerate(int_event_locked_timestamps):
-        # Remove spikes during the laser pulse        
-        int_event_locked_timestamps[i] = arr[(arr < 0) | (arr > (duration / 1000))]        
+        # Remove spikes during the laser pulse
+        int_event_locked_timestamps[i] = arr[(arr < 0) | (arr > (duration / 1000))]
     return int_event_locked_timestamps
 
 def opto_tagging_response(int_event_locked_timestamps, base_window, roi_window):
+    """
+    Test whether a unit has a significant response to optogenetic stimulation using Wilcoxon test.
+
+    Parameters:
+        int_event_locked_timestamps (list of np.ndarray): Event-locked spike times for each trial.
+        base_window (tuple): Time window (start, end) in seconds for baseline period.
+        roi_window (tuple): Time window (start, end) in seconds for response region of interest.
+
+    Returns:
+        float: P-value from Wilcoxon signed-rank test, or np.nan if insufficient data.
+    """
     base_counts = []
     roi_counts = []
     for spike_times in int_event_locked_timestamps:
@@ -66,6 +87,16 @@ def opto_tagging_response(int_event_locked_timestamps, base_window, roi_window):
         return np.nan
 
 def antidromic_latency_jitter(int_event_locked_timestamps):
+    """
+    Calculate antidromic response latency and jitter from spike times.
+
+    Parameters:
+        int_event_locked_timestamps (list of np.ndarray): Event-locked spike times for each trial.
+
+    Returns:
+        tuple: (antidromic_latency, antidromic_jitter) in seconds. Latency is the peak time of the
+               smoothed PSTH, and jitter is the full width at half maximum (FWHM).
+    """
     from scipy.ndimage import gaussian_filter1d
     pulse_duration = 0.005 # ms    
     first_spikes_after_light = np.array([arr[arr > pulse_duration][0] for arr in int_event_locked_timestamps if np.any(arr > pulse_duration)])
@@ -91,7 +122,15 @@ def antidromic_latency_jitter(int_event_locked_timestamps):
 
 def plot_opto_responses(unit_tbl, event_ids):
     """
-    Find antidromic units based on opto stimulation data.
+    Plot optogenetic responses for units across different stimulation sites.
+
+    Parameters:
+        unit_tbl (pd.DataFrame): Table containing unit information including unit_id and spike_times.
+        event_ids (pd.DataFrame): Table containing optogenetic stimulation events with columns for
+                                  emission_location, power, type, time, duration, num_pulses, pulse_interval.
+
+    Returns:
+        matplotlib.figure.Figure: Figure containing raster plots, PSTHs, and antidromic analysis for all units.
     """
     # Filter for opto tagged units
     # opto_criteria = (unit_tbl['opto_pass'] == True) & (unit_tbl['default_qc'] == True)
@@ -331,6 +370,18 @@ def plot_opto_responses(unit_tbl, event_ids):
     return fig
 
 def compute_opto_responses(unit_tbl, event_ids, spiketimes, session_id):
+    """
+    Compute optogenetic response statistics for opto-tagged units.
+
+    Parameters:
+        unit_tbl (pd.DataFrame): Table containing unit information with opto_pass and default_qc columns.
+        event_ids (pd.DataFrame): Table containing optogenetic stimulation events.
+        spiketimes (dict): Dictionary mapping unit_id to spike times array.
+        session_id (str): Session identifier.
+
+    Returns:
+        list of dict: List of dictionaries containing unit_id, site, and p_value for each unit-site combination.
+    """
     results = []
 
     # Filter for opto tagged units
@@ -438,12 +489,41 @@ def analyze_antidromic_responses(session_id, data_type ='curated', plot=False, t
     """
     Analyze antidromic responses for a given set of opto-tagged units.
 
+    Performs comprehensive antidromic identification analysis including:
+    - Optogenetic response significance testing (Wilcoxon)
+    - Latency and jitter calculation from smoothed PSTH
+    - Collision test to verify antidromic spikes (Fisher's exact and binomial tests)
+    - Regression analysis for auto-inhibition, collision, and antidromic effects
+    - Tier categorization (Tier 1: confirmed antidromic, Tier 2: likely antidromic, Tier 3: responsive)
+
+    Analysis windows:
+    - For surface_LC: baseline [-20, 0]ms, response [0, 20]ms
+    - For other sites: baseline [-20, 0]ms, response [20, 60]ms
+
     Parameters:
-        session_id (str): session id
-        plot (bool): Whether to plot collision raster for each unit and site.
+        session_id (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        plot (bool): If True, plot collision raster for each unit and site (default: False).
+        tier_cat (bool): If True, perform tier categorization based on antidromic criteria (default: False).
 
     Returns:
-        pd.DataFrame: DataFrame containing antidromic response metrics and tier categorization.
+        pd.DataFrame: Pivoted DataFrame with columns for each site containing:
+            - opto_p_val: P-value for optogenetic response
+            - antidromic_latency: Peak latency of first spike after stimulus
+            - jitter: Full width at half maximum of latency distribution
+            - median_first_spike_latency: Median latency of first spike
+            - collision_pvalue: P-value from Fisher's exact test for collision
+            - collision_pbinom: P-value from binomial test
+            - pre_boundary_prob: Probability of antidromic spike before collision boundary
+            - post_boundary_prob: Probability of antidromic spike after collision boundary
+            - p_auto_inhi, t_auto_inhi: Auto-inhibition regression statistics
+            - p_collision, t_collision: Collision interaction regression statistics
+            - p_antidromic, t_antidromic: Direct antidromic effect regression statistics
+            - int_event_locked_timestamps: Raw event-locked spike times
+            - table, oddsratio, collision_boundary, Avg, edges: Collision test details
+            - last_orthodromic_spike_time: Times of last orthodromic spikes
+        If tier_cat=True, also includes tier columns per site.
+        Returns None if no opto units found or analysis fails.
     """
     session_dir = session_dirs(session_id)
     opto_data_folder = session_dir[f'opto_dir_{data_type}']
@@ -623,6 +703,19 @@ def analyze_antidromic_responses(session_id, data_type ='curated', plot=False, t
 
 
 def antidromic_tier_categorization(antidromic_pivot):
+    """
+    Categorize units into tiers based on antidromic response criteria.
+
+    Tier 1: Antidromic units with low jitter (<7ms) and passing collision test.
+    Tier 2: Units with low jitter but failing or not tested for collision.
+    Tier 3: Units with significant opto response but high jitter.
+
+    Parameters:
+        antidromic_pivot (pd.DataFrame): Pivoted DataFrame with antidromic analysis results.
+
+    Returns:
+        pd.DataFrame: DataFrame with columns unit_id, tier, and site_for_tier.
+    """
     if isinstance(antidromic_pivot.columns, pd.MultiIndex):
         antidromic_pivot.columns = ['_'.join([str(i) for i in col if i]) for col in antidromic_pivot.columns.values]
 
@@ -784,13 +877,20 @@ def collision_test(int_event_locked_timestamps, antidromic_latency, bin_size=10,
 def antidromic_regression_analysis(int_event_locked_timestamps, int_event_locked_timestamps_sham, antidromic_latency, antidromic_jitter):
     """
     Perform regression analysis to assess the relationship between orthodromic spikes and antidromic spikes.
+
+    Uses linear regression to test three effects:
+    - Auto-inhibition: spontaneous spikes suppress laser-evoked spikes
+    - Collision: interaction between trigger and spontaneous spikes
+    - Antidromic: direct effect of laser trigger on spike probability
+
     Parameters:
-        int_event_locked_timestamps (list of np.ndarray): Event-locked spike times for actual trials.
-        int_event_locked_timestamps_sham (list of np.ndarray): Event-locked spike times for sham trials.
-        antidromic_latency (float): Median first spike latency after light onset.
+        int_event_locked_timestamps (list of np.ndarray): Event-locked spike times for actual laser trials.
+        int_event_locked_timestamps_sham (list of np.ndarray): Event-locked spike times for sham (no laser) trials.
+        antidromic_latency (float): Median first spike latency after light onset in seconds.
         antidromic_jitter (float): Jitter window in seconds.
+
     Returns:
-        tuple: p-values for auto-inhibition, collision, and antidromic effects.
+        dict: Dictionary with p-values and t-statistics for auto-inhibition, collision, and antidromic effects.
     """
     # import logistic regression
     from statsmodels.formula.api import logit
@@ -872,6 +972,17 @@ def antidromic_regression_analysis(int_event_locked_timestamps, int_event_locked
     }
 
 def plot_opto_responses_session(session, data_type='curated', opto_only=True):
+    """
+    Generate and save optogenetic response plots for all units in a session.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        opto_only (bool): If True, only plot units that pass opto criteria and QC.
+
+    Returns:
+        None: Saves individual PDF/SVG files and a combined PDF to the session directory.
+    """
     session_dir = session_dirs(session)
     unit_tbl = get_unit_tbl(session, data_type=data_type)
     opto_csv_file = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_session.csv')

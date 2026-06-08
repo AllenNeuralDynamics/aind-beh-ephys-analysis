@@ -30,6 +30,18 @@ from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 
 # %%
 def make_sorting_analyzer(session):
+    """
+    Create a SpikeInterface sorting analyzer from Hopkins lab packed data format.
+
+    Reads spike times from text files and aligns them with the recording, then creates
+    a SpikeInterface sorting analyzer for downstream analysis.
+
+    Parameters:
+        session (str): Session identifier for Hopkins lab data.
+
+    Returns:
+        SortingAnalyzer: SpikeInterface sorting analyzer object with computed extensions.
+    """
     session_dir = session_dirs(session)
 
     # %%

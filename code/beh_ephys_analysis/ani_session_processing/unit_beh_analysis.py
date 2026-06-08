@@ -66,11 +66,33 @@ import shutil
 from aind_ephys_utils import align
 
 def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue', curate_time=True, opto_only=False,
-                        model_name = 'stan_qLearning_5params', 
+                        model_name = 'stan_qLearning_5params',
                         formula = 'spikes ~ 1 + outcome + choice + Qchosen',
                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
                         units  = None):
-    # %%
+    """
+    Generate comprehensive behavioral analysis plots for all units in a session.
+
+    Creates plots showing firing rates aligned to behavioral events, split by trial conditions
+    (choice, outcome, value), and fits regression models relating neural activity to behavior.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        align_name (str): Event to align to ('go_cue', 'choice', 'reward', etc.).
+        curate_time (bool): If True, apply drift-based temporal curation to units.
+        opto_only (bool): If True, only analyze opto-tagged units.
+        model_name (str): Name of the behavioral model to use for value estimates.
+        formula (str): Regression formula for modeling neural activity.
+        pre_event (float): Time before alignment event in seconds.
+        post_event (float): Time after alignment event in seconds.
+        binSize (float): Bin size for firing rate calculation in seconds.
+        stepSize (float): Step size for sliding window in seconds.
+        units (list or None): Specific unit IDs to analyze. If None, analyze all qualifying units.
+
+    Returns:
+        None: Saves unit-behavior analysis plots as PDF files in session directory.
+    """
     # load behavior data
     session_dir = session_dirs(session, model_name = model_name) 
     session_df = makeSessionDF(session, model_name = model_name)

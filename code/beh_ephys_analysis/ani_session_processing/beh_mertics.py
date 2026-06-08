@@ -42,7 +42,17 @@ from utils.combine_tools import apply_qc
 from scipy.stats import gaussian_kde
 
 def kde_peak(x, bw_method='scott', step_size = 0.01):
-    """Return the peak (mode) estimated from a KDE."""
+    """
+    Return the peak (mode) estimated from a kernel density estimate (KDE).
+
+    Parameters:
+        x (np.ndarray): Data array for which to find the mode.
+        bw_method (str): Bandwidth selection method for KDE ('scott' or 'silverman').
+        step_size (float): Step size for evaluating the KDE curve.
+
+    Returns:
+        float: X-value at the peak of the KDE, or np.nan if insufficient data.
+    """
     x = x[np.isfinite(x)]  # remove NaNs
     if len(x) < 2:
         return np.nan
@@ -54,13 +64,53 @@ def kde_peak(x, bw_method='scott', step_size = 0.01):
 def cal_beh_metrics(session, model_name='stan_qLearning_5params', save = False):
     """
     Calculate behavioral metrics for a given session and model.
-    
+
+    Computed metrics include:
+
+    **Switch/Stay Probabilities:**
+    - p_sw: Overall probability of switching choice
+    - p_sw_L: Probability of switching after loss (unrewarded trial)
+    - p_sw_L_L: Probability of switching after loss on left choice
+    - p_sw_L_R: Probability of switching after loss on right choice
+    - p_st_w: Probability of staying after win (rewarded trial)
+    - p_st_w_L: Probability of staying after win on left choice
+    - p_st_w_R: Probability of staying after win on right choice
+
+    **Session Metrics:**
+    - finish_rate: Proportion of trials where animal responded (not omission)
+    - session_len: Total number of completed choice trials
+
+    **Model Parameters (from fitted Q-learning model):**
+    - Model-specific parameters (e.g., alpha_pos, alpha_neg, beta, etc.)
+    - Parameters depend on model_name specified
+
+    **GLM Regression Coefficients:**
+    - diff_1: Difference between reward and no-reward coefficients at lag 1
+    - nrwd_1: Coefficient for no-reward trials at lag 1
+    - rwd_1: Coefficient for reward trials at lag 1
+    - Additional GLM coefficients and confidence intervals
+
+    **Lick Latency Statistics (from go cue to first lick):**
+    - mean_lick_lat_L: Mean latency for left licks
+    - mean_lick_lat_R: Mean latency for right licks
+    - mode_lick_lat_L: Mode (KDE peak) latency for left licks
+    - mode_lick_lat_R: Mode (KDE peak) latency for right licks
+    - var_lick_lat_L: Variance of left lick latencies
+    - var_lick_lat_R: Variance of right lick latencies
+    - var_lick_lat_L_mode: Variance around mode for left licks
+    - var_lick_lat_R_mode: Variance around mode for right licks
+    - lick_lat_diff: Normalized difference (R-L)/(R+L) of mean latencies
+    - lick_lat_diff_mode: Normalized difference of mode latencies
+    - var_lat_diff: Log difference of latency variances
+    - var_lat_diff_mode: Log difference of mode-based variances
+
     Parameters:
-    session (str): The session identifier.
-    model_name (str): The name of the model to use for calculations.
-    
+        session (str): The session identifier.
+        model_name (str): The name of the model to use for calculations (default: 'stan_qLearning_5params').
+        save (bool): If True, save metrics to JSON file; if False, return as dict.
+
     Returns:
-    None
+        dict or None: Dictionary of behavioral metrics if save=False, None if save=True.
     """
     
     # Load the session directory
