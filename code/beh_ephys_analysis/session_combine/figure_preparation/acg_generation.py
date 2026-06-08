@@ -1,3 +1,51 @@
+"""
+Step 7 of figure preparation pipeline: Generate auto-correlogram (ACG) features for all units.
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    Data requirements:
+    - combined_unit_tbl.pkl from Step 1 (contains spike times)
+    - Per-session spike trains for computing auto-correlograms
+    - Quality metrics for filtering units
+
+Pipeline Position:
+    Script #7 in sequence.txt (line 7)
+    Can run IN PARALLEL with:
+    - antidromic_generation.py
+    - waveform_generation_np.py
+    - waveform_generation_tt.py
+    - basic_ephys_generation.py
+    - response_tstats_generation.py
+    - outcome_window_generation_parallel.py
+    (All these scripts only need combined_unit_tbl.pkl from Step 1)
+
+Purpose:
+    Computes auto-correlogram (ACG) features and fits multi-component models to characterize
+    unit firing patterns:
+    - Short timescale inhibition (negative exponential decay, refractory period)
+    - Mid timescale excitation (gamma distribution, burst propensity)
+    - Long timescale inhibition (gamma distribution with fixed k, adaptation)
+
+    ACG features distinguish cell types and firing modes:
+    - Fast-spiking interneurons show narrow ACGs with short refractory periods
+    - Bursting neurons show mid-range peaks
+    - Regular-spiking neurons show broader ACGs
+
+Input:
+    - Combined unit table from Step 1 (with spike times)
+    - Per-session unit tables with spike trains
+
+Output:
+    - combined_acg_tbl.pkl: DataFrame with ACG features and fitted parameters per unit
+    - Includes: ACG curves, fitted component parameters (amplitudes, time constants),
+      burst indices, refractory period estimates
+
+Usage:
+    Run after behavior_metrics_generation.py. Fits multiple exponential/gamma components
+    to each unit's ACG to extract interpretable firing pattern features.
+"""
 # Fit multiple components to ACF: short inhibition (negative exponential), mid excitation (gamma with free k), long inhibition (gamma with fixed k)
 
 # %%

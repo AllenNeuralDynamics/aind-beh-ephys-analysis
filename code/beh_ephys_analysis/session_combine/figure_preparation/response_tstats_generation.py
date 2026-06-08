@@ -1,3 +1,51 @@
+"""
+Step 8 of figure preparation pipeline: Generate trial-aligned response t-statistics for all units.
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    Data requirements:
+    - combined_unit_tbl.pkl from Step 1 (contains spike times)
+    - Per-session trial tables (goCue times, choice times, reward times)
+    - Session tables for trial-by-trial behavioral events
+    - Quality metrics and drift information for stable recording periods
+
+Pipeline Position:
+    Script #8 in sequence.txt (line 8)
+    Can run IN PARALLEL with:
+    - antidromic_generation.py
+    - waveform_generation_np.py
+    - waveform_generation_tt.py
+    - basic_ephys_generation.py
+    - acg_generation.py
+    - outcome_window_generation_parallel.py
+    (All these scripts only need combined_unit_tbl.pkl from Step 1)
+
+Purpose:
+    Computes trial-aligned t-statistics comparing firing rates across behavioral conditions:
+    - Peri-stimulus time histograms (PSTHs) around key trial events
+    - T-statistics comparing firing rates between conditions (e.g., left vs right choice)
+    - Response selectivity for choice, outcome, stimulus side
+    - Temporal dynamics of task-related modulation
+    - Baseline vs task-period activity comparisons
+
+    Identifies task-responsive neurons and their preferred conditions across multiple
+    trial epochs (stimulus, delay, choice, outcome).
+
+Input:
+    - Combined unit table from Step 1
+    - Per-session trial tables with event times
+    - Session behavior tables with trial-by-trial conditions
+
+Output:
+    - combined_response_tstats_tbl.pkl: DataFrame with t-statistics per unit per condition
+    - Includes: t-values, p-values, effect sizes for multiple behavioral contrasts,
+      time-resolved response profiles, preferred conditions
+
+Usage:
+    Run after acg_generation.py. Parallelized across units for efficient computation.
+"""
 # %%
 import sys
 import os

@@ -1,3 +1,46 @@
+"""
+Step 5 of figure preparation pipeline: Generate basic electrophysiology features for all units.
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    Data requirements:
+    - combined_unit_tbl.pkl from Step 1
+    - Per-session quality metrics (*_qm.json) in processed_dir/
+    - Per-session spike times and unit tables from NWB files
+
+Pipeline Position:
+    Script #5 in sequence.txt (line 5)
+    Can run IN PARALLEL with:
+    - antidromic_generation.py
+    - waveform_generation_np.py
+    - waveform_generation_tt.py
+    - acg_generation.py
+    - response_tstats_generation.py
+    - outcome_window_generation_parallel.py
+    (All these scripts only need combined_unit_tbl.pkl from Step 1)
+
+Purpose:
+    Computes fundamental electrophysiological features for all units across sessions:
+    - Spike waveform characteristics (peak-to-trough width, amplitude, half-width)
+    - Firing statistics (firing rate, ISI distributions, burst properties)
+    - Quality control metrics (ISI violations, SNR, amplitude cutoff, presence ratio)
+    - Recording stability (spike amplitude drift over time)
+    - Anatomical locations (CCF coordinates, recording depth)
+
+Input:
+    - combined_unit_tbl.pkl from Step 1
+    - Per-session NWB files with spike times
+    - Quality metrics JSON files
+
+Output:
+    - combined_basic_ephys_tbl.pkl: DataFrame with basic electrophysiology features per unit
+    - Includes: waveform metrics, firing statistics, QC measures, anatomical coordinates
+
+Usage:
+    Run after Step 1 completes. Can run in parallel with other scripts that only need Step 1.
+"""
 # %%
 import sys
 import os

@@ -1,3 +1,54 @@
+"""
+Step 10 of figure preparation pipeline: Combine outcome-window results with behavioral data.
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    ALSO NEEDS:
+    - combined_beh_sessions.pkl (behavioral session metrics)
+    - Outcome window CSV files from Step 9 (if using individual files)
+
+    Data requirements:
+    - combined_unit_tbl.pkl from Step 1
+    - combined_beh_sessions.pkl (session-level behavioral metrics)
+    - Outcome window analysis results (auc_max_lag_indi.csv or individual unit files)
+
+Pipeline Position:
+    Script #10 in sequence.txt (line 10)
+    Must run AFTER:
+    - make_combined_unit_tbl.py (Step 1)
+    - outcome_window_generation_parallel.py (Step 9)
+
+    Cannot run in parallel - needs outputs from other scripts.
+    This is one of the FINAL integration steps before photometry data.
+
+Purpose:
+    Merges outcome-related neural features with session-level behavioral metrics:
+    - Links unit-level outcome responses to session-level performance
+    - Correlates outcome selectivity with behavioral measures (accuracy, bias, lick latency)
+    - Combines reward-coding features with switch/stay probabilities
+    - Integrates model parameters with neural outcome representations
+    - Creates unified table for behavior-neural relationship analyses
+
+    Enables analysis of how neural outcome coding relates to behavioral performance
+    and decision-making strategies across sessions.
+
+Input:
+    - combined_unit_tbl.pkl from Step 1 (for session-unit mapping)
+    - combined_beh_sessions.pkl (session behavioral metrics)
+    - Outcome window results from Step 9
+
+Output:
+    - combined_beh_outcome_tbl.pkl: Merged DataFrame with both behavioral metrics
+      and neural outcome features per unit
+    - Includes: outcome firing rates, ROC scores, selectivity indices joined with
+      session accuracy, bias, switch probabilities, model parameters, lick statistics
+
+Usage:
+    Run after outcome_window_generation_parallel.py completes. Merges tables on session ID
+    to create comprehensive behavior-neural dataset for cross-correlation and regression analyses.
+"""
 # %%
 import sys
 import os

@@ -1,3 +1,51 @@
+"""
+Step 11 of figure preparation pipeline: Generate fiber photometry features for analysis.
+
+Prerequisites:
+    NONE - This script is COMPLETELY INDEPENDENT.
+
+    Data requirements:
+    - hopkins_FP_session_assets.csv (photometry session metadata)
+    - Per-session fiber photometry data files (if available)
+    - Raw photometry signals (GCaMP/isosbestic channels)
+    - Harp clock alignment for temporal synchronization
+    - Trial event times for trial-aligned photometry
+    - Session behavior tables for linking photometry to task events
+
+Pipeline Position:
+    Script #11 in sequence.txt (line 11) - FINAL step of the figure preparation pipeline.
+    COMPLETELY INDEPENDENT - can run IN PARALLEL with ALL other scripts!
+    Does NOT depend on any other figure_preparation script.
+
+Purpose:
+    Processes and extracts fiber photometry features for sessions with photometry recordings:
+    - Baseline correction and normalization (ΔF/F calculation)
+    - Motion artifact removal using isosbestic control channel
+    - Temporal alignment with behavioral events using Harp clock
+    - Trial-aligned photometry responses (stimulus, choice, outcome)
+    - Peak detection and response latencies
+    - Correlation with behavioral performance metrics
+    - Exponential fitting to photometry decay kinetics
+
+    Provides population-level DA/ACh/NE dynamics to complement single-unit recordings.
+
+Input:
+    - Per-session raw photometry data files
+    - Behavioral trial tables with event timestamps
+    - Session tables for trial-by-trial conditions
+    - Harp clock data for temporal alignment
+
+Output:
+    - combined_photometry_tbl.pkl: DataFrame with photometry features per session
+    - Includes: trial-aligned ΔF/F traces, peak amplitudes, response latencies,
+      baseline-corrected signals, correlations with behavior
+    - Per-session photometry plots and quality metrics
+
+Usage:
+    Run after all electrophysiology and behavioral pipelines complete. Only processes
+    sessions with available photometry data. Can run in parallel with joblib for
+    efficiency across multiple sessions.
+"""
 # %%
 import numpy as np
 import pandas as pd
