@@ -40,6 +40,26 @@ from utils.hdf5_extractor import HDF5Recording
 
 # %%
 def beh_and_time_alignment(session, ephys_cut = [0, 0]):
+    """
+    Process behavioral data and verify temporal alignment with electrophysiology.
+
+    Converts behavioral JSON to NWB format, generates diagnostic plots for behavioral
+    metrics, and validates temporal alignment between behavioral events (licks, go cues)
+    and electrophysiology recordings via Harp clock synchronization.
+
+    Parameters
+    ----------
+    session : str
+        Session identifier (e.g., 'ecephys_123456_2024-01-01_10-00-00')
+    ephys_cut : list of int, optional
+        Time length (seconds) for ephys data trimming (default: [0, 0]) at beginning and end of session.
+
+    Returns
+    -------
+    None
+        Saves NWB file, diagnostic plots, and process log to session directories.
+        Updates qm_dict with synchronization quality metrics.
+    """
     session_dir = session_dirs(session)
     print(session)
     qm_dict = {'soundcard_sync': True, 'ephys_sync': True}

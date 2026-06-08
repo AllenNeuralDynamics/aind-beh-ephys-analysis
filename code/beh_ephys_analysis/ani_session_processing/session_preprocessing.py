@@ -45,6 +45,30 @@ import datetime
 from joblib import Parallel, delayed
 
 def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = None):
+    """
+    Compute cross-correlograms for neural units during laser and no-laser periods.
+
+    Separates spike data into laser-on and laser-off periods based on optogenetics
+    stimulation times, then computes cross-correlograms for all unit pairs in each condition.
+
+    Parameters
+    ----------
+    session : str
+        Session identifier
+    data_type : str
+        Type of data ('raw' or 'curated')
+    window_ms : float, optional
+        Cross-correlogram window size in milliseconds (default: 100)
+    bin_ms : float, optional
+        Bin size for cross-correlogram in milliseconds (default: 1)
+    post_fix : str, optional
+        Optional suffix for output filename (default: None)
+
+    Returns
+    -------
+    None
+        Saves cross-correlograms to pickle file in opto directory
+    """
     # loading info
     session_dir = session_dirs(session)
     if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):

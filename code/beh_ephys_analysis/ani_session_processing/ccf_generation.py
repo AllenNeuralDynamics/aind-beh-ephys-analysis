@@ -34,6 +34,36 @@ from utils.ccf_utils import pir_to_lps, project_to_plane
 
 
 def make_ccf_tbl(animal_id, annotator='zs', data_type='curated', save_to_session=True, plot_3D=True):
+    """
+    Generate CCF (Common Coordinate Framework) coordinate tables for neural units.
+
+    Maps recorded unit locations along the probe to CCF brain atlas coordinates
+    using manual annotations and probe geometry information.
+
+    Parameters
+    ----------
+    animal_id : str
+        Animal identifier
+    annotator : str, optional
+        Initials of person who annotated CCF locations (default: 'zs')
+    data_type : str, optional
+        Type of sorted data to use, 'raw' or 'curated' (default: 'curated')
+    save_to_session : bool, optional
+        Whether to save CCF table to individual session directories (default: True)
+    plot_3D : bool, optional
+        Whether to generate 3D visualization of unit locations (default: True)
+
+    Returns
+    -------
+    unit_tbls : list
+        List of DataFrames with CCF coordinates for each session
+    probe_tbls : list
+        List of DataFrames with probe trajectory information
+
+    Notes
+    -----
+    Requires manual CCF annotations in data/alignment_{annotator}/{animal_id}/
+    """
     annotation_dir = str(capsule_directories()['data_dir']) + f'/alignment_{annotator}/{animal_id}'
     if os.path.exists(annotation_dir) == False:
         print('No annotation directory found')

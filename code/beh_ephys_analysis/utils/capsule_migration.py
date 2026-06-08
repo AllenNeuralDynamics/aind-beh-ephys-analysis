@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 def capsule_root():
-    """Resolve the Code Ocean capsule root in a portable way.
+    """Resolve repo root in a portable way.
 
     Resolution order:
       1. ``$CAPSULE_ROOT`` environment variable, if set.
@@ -27,6 +27,22 @@ CAPSULE_ROOT = str(capsule_root())
 
 
 def capsule_directories():
+    """
+    Get standard capsule directory paths and ensure they exist.
+
+    Creates a dictionary of commonly used paths within the capsule
+    and creates any missing directories.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys:
+        - output_dir: Main output directory
+        - manuscript_fig_dir: Manuscript figures directory
+        - manuscript_fig_prep_dir: Manuscript prep directory
+        - derived_dir: Derived data directory
+        - data_dir: Raw data directory
+    """
     root = capsule_root()
     output_dir = root / 'scratch' / 'results'
     dirs = {
