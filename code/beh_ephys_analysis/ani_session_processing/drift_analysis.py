@@ -72,6 +72,25 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 
 def load_legacy_motion_info(folder):
+    """
+    Load motion correction information from legacy format directory.
+
+    Parameters
+    ----------
+    folder : str or Path
+        Path to folder containing motion correction files
+        (spatial_bins.npy, motion.npy, temporal_bins.npy, parameters.json, etc.)
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+        - motion: Motion object with displacement data
+        - parameters: motion correction parameters
+        - run_times: computation timing information
+        - peaks: detected motion peaks
+        - peak_locations: spatial locations of peaks
+    """
     folder = Path(folder)
     spatial_bins_um = np.load(folder / "spatial_bins.npy")
     displacement = [np.load(folder / "motion.npy")]
@@ -98,6 +117,30 @@ def load_legacy_motion_info(folder):
 
 # %%
 def plot_session_opto_drift(session, data_type, plot=True, update_csv = False, update_cut = False):
+    """
+    Analyze and plot probe drift during optogenetic stimulation sessions.
+
+    Loads motion correction data, aligns with optogenetic stimulation times,
+    and generates diagnostic plots showing drift patterns across the recording.
+
+    Parameters
+    ----------
+    session : str
+        Session identifier
+    data_type : str
+        Type of data ('raw' or 'curated')
+    plot : bool, optional
+        Whether to generate diagnostic plots (default: True)
+    update_csv : bool, optional
+        Whether to update the drift CSV file (default: False)
+    update_cut : bool, optional
+        Whether to update session cut indices (default: False)
+
+    Returns
+    -------
+    None
+        Saves drift plots and CSV files to session directories
+    """
     session_dir = session_dirs(session)
 
     # %%

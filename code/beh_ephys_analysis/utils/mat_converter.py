@@ -11,6 +11,26 @@ from scipy.stats import zscore
 from scipy.stats import mode
 
 def load_df_from_mat(file_path):
+    """
+    Load behavioral session data from MATLAB .mat file.
+
+    Extracts behavioral data and lick times from a MATLAB session file
+    and converts them into pandas DataFrame format.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to .mat file containing behavioral session data
+
+    Returns
+    -------
+    beh_df : pd.DataFrame
+        DataFrame containing behavioral trial data
+    licks_L : list
+        List of left lick times
+    licks_R : list
+        List of right lick times
+    """
     # initialization
     beh_df = pd.DataFrame()
     licks_L = []
