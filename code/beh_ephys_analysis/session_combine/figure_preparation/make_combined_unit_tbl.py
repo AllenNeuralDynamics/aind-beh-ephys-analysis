@@ -1,3 +1,35 @@
+"""
+Step 1 of figure preparation pipeline: Create combined unit table across all sessions.
+
+Prerequisites:
+    NONE - This is the FIRST script in the pipeline.
+
+    Before running, ensure:
+    - All per-session preprocessing is complete (session_preprocessing.py)
+    - Optogenetic tagging analysis finished for all sessions (opto_tagging.py)
+    - Antidromic analysis complete if applicable (antidromic_analysis_session.py)
+    - Session metadata up-to-date in session_assets.csv and hopkins_session_assets.csv
+    - sessions_to_exclude.txt contains any sessions to skip
+
+Pipeline Position:
+    This is script #1 in sequence.txt - Run this FIRST before all other figure preparation scripts.
+
+Purpose:
+    Combines per-session unit tables with:
+    - Basic unit properties (spike times, waveforms, locations)
+    - Optogenetic tagging metrics (p_max, response latency, antidromic tier)
+    - Quality control metrics (ISI violations, firing rate, amplitude)
+    - Behavioral recording metadata (animal, date, recording side, sex)
+    - Cross-correlation and auto-correlation data
+
+Output:
+    Saves combined_unit_tbl.pkl to manuscript_fig_prep_dir/combined_unit_tbl/
+    This table serves as the foundation for all subsequent figure generation scripts.
+
+Usage:
+    Run as standalone script. Processes all sessions in session_assets.csv
+    (excluding those in sessions_to_exclude.txt) and combines their unit data.
+"""
 # %%
 import sys
 import os
@@ -86,6 +118,25 @@ df = df.reset_index(drop=True)
 # behs = list(behs)
 # %%
 def process_session(session, beh, rec_side, probe, sex, target='soma'):
+    """
+    Extract and compile all unit-level data from a single session.
+
+    Aggregates unit properties, opto-tagging metrics, quality control measures,
+    cross-correlograms, and antidromic analysis results into a standardized format
+    for inclusion in the combined unit table.
+
+    Parameters:
+        session (str): Session identifier.
+        beh (str): Behavioral task type.
+        rec_side (str): Recording hemisphere ('left' or 'right').
+        probe (str): Probe identifier.
+        sex (str): Animal sex ('M' or 'F').
+        target (str): Optogenetic target region (default: 'soma').
+
+    Returns:
+        pd.DataFrame or None: DataFrame with one row per unit containing all compiled metrics.
+                             Returns None if session has no valid data or should be skipped.
+    """
     session_dir = session_dirs(session)
     bin_short = 100
     bin_long = 300
