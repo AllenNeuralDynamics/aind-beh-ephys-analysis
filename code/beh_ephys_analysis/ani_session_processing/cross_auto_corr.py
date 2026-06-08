@@ -28,6 +28,19 @@ import matplotlib.gridspec as gs
 
 # %%
 def cross_auto_corr(session, data_type):
+    """
+    Compute cross-correlation and auto-correlation for all unit pairs in a session.
+
+    Calculates both long-timescale (50ms bins, 2s window) and short-timescale (2ms bins, 80ms window)
+    correlations, as well as correlations excluding go-cue periods (nogo).
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+
+    Returns:
+        None: Saves cross-correlation and auto-correlation DataFrames to pickle files in the session directory.
+    """
     bin_long = 0.05
     win_long = 2
     bin_short = 0.002
@@ -169,6 +182,19 @@ def cross_auto_corr(session, data_type):
         pickle.dump(auto_corr_df, f)
 
 def plot_cross_auto_corr(session, data_type):
+    """
+    Plot cross-correlation and auto-correlation matrices for all units in a session.
+
+    Creates two figures (long and short timescales) showing correlations between all unit pairs,
+    with opto-tagged units highlighted in red.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+
+    Returns:
+        None: Saves correlation matrix plots to PNG files in the session directory.
+    """
     unit_tbl = get_unit_tbl(session, data_type)
     if unit_tbl['LC_range_top'].unique()[0] is None and 'ZS' not in session:
         print(f'LC range not inferred, probably no opto units in {session}. Exiting.')

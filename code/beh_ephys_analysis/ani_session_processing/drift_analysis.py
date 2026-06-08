@@ -134,7 +134,7 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False, u
     update_csv : bool, optional
         Whether to update the drift CSV file (default: False)
     update_cut : bool, optional
-        Whether to update session cut indices (default: False)
+        Whether to update session cut indices and recompute drift parameters (default: False)
 
     Returns
     -------
@@ -878,6 +878,21 @@ def mode_by_bins(data, bins):
 
 
 def generate_session_opto_drift_trial_table(session, data_type, opto_only = True, save = True):
+    """
+    Generate table analyzing probe drift relative to opto-tagged units and trial structure.
+
+    Computes drift metrics by comparing unit firing properties across recording time,
+    aligned to behavioral trials and optogenetic stimulation periods.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        opto_only (bool): If True, only analyze opto-tagged units (default: True).
+        save (bool): If True, save drift table to CSV file (default: True).
+
+    Returns:
+        pd.DataFrame or None: Drift analysis table if save=False, None if save=True.
+    """
     session_dir = session_dirs(session)
     # load qm
     qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
@@ -996,7 +1011,20 @@ def generate_session_opto_drift_trial_table(session, data_type, opto_only = True
         drift_data.to_csv(os.path.join(session_dir[f'ephys_dir_{data_type}'], f'{session}_drift_trial_table.csv'), index=False)
         
 
-def update_unit_tbl_by_drift(session, data_type): 
+def update_unit_tbl_by_drift(session, data_type):
+    """
+    Update unit table with drift-based temporal cuts for each unit.
+
+    Reads drift analysis results and updates unit table with ephys_cut timestamps
+    for units showing significant drift (r_squared_diff_abs_slow_rf > 0.1).
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+
+    Returns:
+        pd.DataFrame: Updated unit table with drift_unit flag and ephys_cut timestamps.
+    """
     session_dir = session_dirs(session)
     opto_drift_tbl = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_drift_tbl.csv'))
     unit_tbl = pd.read_csv(os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_metrics.pkl'))

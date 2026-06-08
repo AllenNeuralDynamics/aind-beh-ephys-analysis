@@ -62,6 +62,23 @@ from aind_ephys_utils import align
 # %%
 
 def plot_unit_licks(session, unit_ids = None, opto_only=True, data_type='curated', plot_licks=False, video = False):
+    """
+    Analyze and plot unit firing rates aligned to lick events.
+
+    Creates raster plots and PSTHs showing neural responses to lick trains,
+    separated by left vs right licks and early vs late in session.
+
+    Parameters:
+        session (str): Session identifier.
+        unit_ids (list or None): Specific unit IDs to analyze. If None, analyze qualifying units.
+        opto_only (bool): If True, only analyze opto-tagged units.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        plot_licks (bool): If True, generate diagnostic lick detection plots.
+        video (bool): If True, use licks detected from video; otherwise use behavior licks.
+
+    Returns:
+        None: Saves lick-aligned neural activity plots as PDF files in session directory.
+    """
     session_tbl = get_session_tbl(session)
     if session_tbl is None or len(session_tbl) == 0:
         print(f'No session table found for session {session}.')

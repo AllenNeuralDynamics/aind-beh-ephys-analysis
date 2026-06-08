@@ -174,7 +174,45 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
         pickle.dump(data_to_save, f)
 
 def ephys_opto_preprocessing(session, data_type, target):
+    """
+    Comprehensive preprocessing pipeline for electrophysiology sessions with optogenetic tagging.
 
+    **CRITICAL FUNCTION**: Performs temporal alignment between ephys and behavior timestamps.
+    Uses Harp clock synchronization to detect and correct misalignments between neural recordings
+    and behavioral data. If misalignment is detected (mean time difference > 20% of session duration),
+    automatically realigns timestamps and regenerates NWB file with corrected timestamps.
+
+    Orchestrates multiple analysis steps:
+    1. **Temporal alignment verification and correction**:
+       - Detects Harp clock line from Open Ephys recording
+       - Compares lick/spike timestamps between ephys and behavior
+       - Threshold: |mean(licks_ephys) - mean(licks_behavior)| > 0.2 * session_duration
+       - If misaligned, realigns spike times to behavior timestamps using Harp clock
+       - Regenerates NWB file with corrected alignment
+    2. Optogenetic event detection and categorization by power/site/frequency
+    3. Per-unit response analysis (PSTH, response probability, latency)
+    4. Waveform extraction with 2D spatial reordering
+    5. Quality metric computation (sync status, alignment validation)
+
+    Generated files saved to session directories:
+    - {session}_opto_session.csv: All opto stimulation events with timestamps
+    - {session}_opto_session_{target}.csv: Target-specific opto events
+    - {session}_opto_info.json, {session}_opto_info_{target}.json: Stimulation parameters
+    - {session}_opto_response.pkl: Per-unit response probabilities and latencies
+    - {session}_waveform_params.json: Waveform extraction parameters
+    - {session}_opto_waveforms.pkl: Extracted waveforms for all units
+    - {session}_qm.json: Quality metrics (soundcard_sync, ephys_sync status)
+    - {session}_timestamps.pdf, {session}_timestamps_corrected.pdf, {session}_laser_times.pdf: Alignment diagnostic plots
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        target (str): Target brain region for optogenetic stimulation (e.g., 'soma', 'LC').
+
+    Returns:
+        None: All results saved to session opto_dir_{data_type} and alignment_dir.
+              Corrected NWB file saved to beh_fig_dir if realignment was performed.
+    """
     # Create a white-to-bright red colormap
     colors = [(1, 1, 1), (1, 0, 0)]  # white to red
     my_red = LinearSegmentedColormap.from_list("white_to_red", colors)

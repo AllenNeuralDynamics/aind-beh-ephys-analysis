@@ -219,6 +219,19 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
     log_file.close()
 
 def beh_and_time_alignment_hopkins(session, ephys_cut = [0, 0]):
+    """
+    Perform behavioral and temporal alignment for Hopkins lab data format.
+
+    Aligns behavioral data from NWB with electrophysiology timestamps using Harp clock
+    synchronization. Validates sound card synchronization and saves quality metrics.
+
+    Parameters:
+        session (str): Session identifier for Hopkins lab data.
+        ephys_cut (list): Optional [start, end] timestamps to restrict ephys recording period.
+
+    Returns:
+        None: Saves quality metrics JSON file to session processed directory.
+    """
     session_dir = session_dirs(session)
     print(session)
     qm_dict = {'soundcard_sync': True, 'ephys_sync': None}
