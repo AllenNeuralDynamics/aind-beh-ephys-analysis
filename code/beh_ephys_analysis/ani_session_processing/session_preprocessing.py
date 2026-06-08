@@ -615,6 +615,20 @@ def ephys_opto_preprocessing(session, data_type, target):
     log_file.close()
 
 def ephys_opto_crosscorr(session, data_type):
+    """
+    Compute cross-correlograms at both short and long timescales.
+
+    Wrapper function that calls session_crosscorr twice with different parameters
+    to generate both fine-timescale (100ms window, 1ms bins) and coarse-timescale
+    (1000ms window, 10ms bins) cross-correlograms.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+
+    Returns:
+        None: Saves cross-correlograms with 'short' and 'long' suffixes to pickle files.
+    """
     session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
     session_crosscorr(session, data_type, window_ms=1000, bin_ms=10, post_fix = 'long')
     # print(f"Cross-correlation saved to {session_dir[f'opto_dir_{data_type}']}")

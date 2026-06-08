@@ -150,6 +150,19 @@ def make_sorting_analyzer(session):
 
 # append raw waveform to opto tag summary
 def append_raw_wf(session, clip_win=(-2,4)):
+    """
+    Extract and append raw waveforms from sorting analyzer to unit table.
+
+    Extracts template waveforms around the peak channel for each unit and clips them
+    to a specified time window. Used for Hopkins lab data format.
+
+    Parameters:
+        session (str): Session identifier.
+        clip_win (tuple): Time window (start, end) in milliseconds around peak to clip waveforms (default: (-2, 4)).
+
+    Returns:
+        None: Updates unit table with peak waveforms and saves to session directory.
+    """
     session_dir = session_dirs(session)
     sorting_analyzer_file = os.path.join(session_dir['ephys_dir_curated'], 'analyzer.zarr')
     if os.path.exists(sorting_analyzer_file):

@@ -528,6 +528,27 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     plt.close('all')
 
 def burst_analysis(session, data_type, units = None):
+    """
+    Analyze burst patterns and spike timing in relation to go-cue and choice events.
+
+    Similar to goCue_burst.burst_analysis but:
+    - Filters for units with tagged_loc==True instead of p_max >= 0.5
+    - Uses 2x6 grid layout (vs 2x8 in goCue_burst)
+    - Saves with "opto_" prefix in filename
+
+    Creates plots showing:
+    - Raster plots aligned to go-cue and choice, sorted by lick latency
+    - Raster plots sorted by first spike time
+    - ISI distributions
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        units (list or None): List of unit IDs to analyze. If None, analyze all units with tagged_loc=True.
+
+    Returns:
+        None: Saves burst analysis plots as opto_{session}{unit_id}_burst_selected.pdf in ephys_fig_dir/burst.
+    """
     print(f'Processing session {session} for data type {data_type}')
     unit_tbl = get_unit_tbl(session, data_type)
     session_df = get_session_tbl(session)
@@ -773,6 +794,21 @@ def burst_analysis(session, data_type, units = None):
 
 
 def plot_alignments(session, data_type='curated', unit_ids=None, win_len = 0.5):
+    """
+    Plot unit firing rates aligned to multiple behavioral events in a grid layout.
+
+    Creates comprehensive visualization showing unit responses aligned to go-cue, choice,
+    and reward events, with trials sorted by lick latency and separated by outcome.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        unit_ids (list or None): Specific unit IDs to plot. If None, plot all opto-tagged units passing QC.
+        win_len (float): Smoothing window length in seconds for firing rate calculation (default: 0.5).
+
+    Returns:
+        None: Saves multi-alignment plots as PDF files in session directory.
+    """
     bin_len = 0.01
     time_constant = 100
     time_window = [-1, 1.5]
