@@ -1574,9 +1574,12 @@ def longest_zero_chunk(binary_list):
 
     return longest_start, longest_end, longest_len
 
-def get_session_tbl(session, cut_interruptions = False):
+def get_session_tbl(session, cut_interruptions = False, load_raw = False):
     session_dir = session_dirs(session)
-    nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
+    if load_raw:
+        nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '_all_trials.nwb')
+    else:
+        nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
     if os.path.exists(nwb_file):
         nwb = load_nwb_from_filename(nwb_file)
         tbl = nwb.trials.to_dataframe()
