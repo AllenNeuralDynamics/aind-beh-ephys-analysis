@@ -1,5 +1,5 @@
 metadata_version: 1
-name: aind-beh-physiology-publication
-description: Basic structure of a capsule to be customized as needed.
+name: aind-beh-physiology-pre-publication
+description: Analysis capsule for behavior and physiology data for LC NE manuscript.
 authors:
-- name: AIND
+- name: Sue (Zhixiao) Su
