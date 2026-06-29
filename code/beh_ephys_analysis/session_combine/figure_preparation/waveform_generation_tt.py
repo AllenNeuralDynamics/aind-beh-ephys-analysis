@@ -214,8 +214,22 @@ slope_sum = []  # Combined slope metric: post_slope + pre_slope
 
 wf_norm = combined_tagged_units_filtered[f'wf{waveform_version}']/np.abs(combined_tagged_units_filtered[f'peak{waveform_version}'])
 # wf_2D_norm = combined_tagged_units_filtered['wf_2d']/np.abs(combined_tagged_units_filtered['peak'])
+
+# Progress tracking
+total_units = len(combined_tagged_units_filtered)
+processed_count = 0
+last_reported_pct = -10
+print(f"Processing {total_units} units for waveform analysis...", flush=True)
+
 for rows in combined_tagged_units_filtered.iterrows():
-    print(f'Processing unit {rows[1]["unit"]} of session {rows[1]["session"]}')
+    # Removed per-unit print
+    # Report progress at 10% intervals
+    processed_count += 1
+    current_pct = int((processed_count / total_units) * 100)
+    if current_pct >= last_reported_pct + 10:
+        last_reported_pct = (current_pct // 10) * 10
+        print(f"  Progress: {last_reported_pct}% ({processed_count}/{total_units} units)", flush=True)
+
     # wf = rows[1]['wf']
     # peak = rows[1]['peak']
     # print(rows[1]['session'])
@@ -363,4 +377,5 @@ wf_features['symmetry_inte_div_log'] = np.log(wf_features['symmetry_inte_div'] +
 wf_features['symmetry_slope_div_log'] = np.log(wf_features['symmetry_slope_div'] + 1e-6)
 wf_features['symmetry_half_div_log'] = np.log(wf_features['symmetry_half_div'] + 1e-6)
 
+print(f"  Progress: 100% ({total_units}/{total_units} units) - Complete!", flush=True)
 wf_features.to_csv(os.path.join(target_folder, f'combined_features.csv'), index=False)

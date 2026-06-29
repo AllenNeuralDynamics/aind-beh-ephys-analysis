@@ -257,7 +257,7 @@ def process_session_unit_pair(
         }
 
     except Exception as exc:
-        print(f'[Error] session {session}, unit {unit_id}: {exc}')
+        print(f'[Error] session {session}, unit {unit_id}: {exc}', flush=True)
         return _nan_result(session, unit_id, slide_times_auc, labels, error=str(exc))
 
 

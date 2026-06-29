@@ -141,14 +141,14 @@ combined_tagged_units_filtered, combined_tagged_units, fig, axes = apply_qc(comb
 # %%
 session_list = combined_tagged_units_filtered[combined_tagged_units_filtered['probe']=='2']['session'].unique().tolist()
 file = os.path.join(beh_folder, 'combined_antidromic_results.pkl')
-re_compute = True
-# if os.path.exists(file):
-#     print(f'Loading antidromic results from {file}')
-#     with open(file, 'rb') as f:
-#         concatenate_antidromic_results = pickle.load(f)
-# else:
-#     print('Collecting antidromic analysis for sessions:')
-#     re_compute = True
+if os.path.exists(file):
+    print(f'Loading antidromic results from {file}')
+    with open(file, 'rb') as f:
+        concatenate_antidromic_results = pickle.load(f)
+    re_compute = False
+else:
+    print('Collecting antidromic analysis for sessions:')
+    re_compute = True
 
 # %%
 if re_compute:
@@ -166,6 +166,14 @@ if re_compute:
     file = os.path.join(beh_folder, 'combined_antidromic_results.pkl')
     with open(file, 'wb') as f:
         pickle.dump(concatenate_antidromic_results, f)
+else:
+    if os.path.exists(file):
+        print(f'Loading antidromic results from {file}')
+        with open(file, 'rb') as f:
+            concatenate_antidromic_results = pickle.load(f)
+    else:
+        print('Target file does not exist.')
+
 
 # %% [markdown]
 # # Process target region

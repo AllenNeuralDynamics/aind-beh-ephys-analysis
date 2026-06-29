@@ -399,7 +399,7 @@ def fit_acf(acf, dt, ftol=1e-12, xtol=1e-12, gtol=1e-12, verbose=0, p0=None):
             0.70                                   # peak3
         ], dtype=float)
 
-    print("Initial parameter guesses:", p0)
+    # Removed print - no need to print initial guesses for every unit
 
     # ---------- Bounds ----------
     # [A1, tau1, A2, peak2,  k2,  A3, peak3]
@@ -517,13 +517,13 @@ fit_sample = (0, int(np.round(1.5/dt)))
 def _fit_one_unit(unit_ind, unit_id, session_id,
                   auto_corr_mat_denoised, auto_corr_mat,
                   fit_sample, dt, x, fit_folder):
-    print(f"Fitting unit {unit_id} from session {session_id} (index {unit_ind})...")
+    # Removed per-unit print - progress reported by joblib verbose
 
     params, fig, axes = fit_acf(
         auto_corr_mat_denoised[unit_ind][fit_sample[0]:fit_sample[1]],
         dt,
-        ftol=10**-17,
-        xtol=10**-50,
+        ftol=1e-12,
+        xtol=1e-12,
         verbose=verbose,
     )
 

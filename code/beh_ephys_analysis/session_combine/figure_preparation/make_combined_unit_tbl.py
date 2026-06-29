@@ -98,9 +98,12 @@ from joblib import Parallel, delayed
 # %%
 # Make combined session-unit table
 capsule_dirs = capsule_directories()
-dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
-        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv')]
+# Read CSVs with probe as string to match working pickle at scratch/combined/
+# Working file has dtype:object with values '2', 'tt', 'opto' (all strings)
+dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv', dtype={'probe': str}),
+        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv', dtype={'probe': str})]
 df = pd.concat(dfs).reset_index(drop=True)
+
 session_exclude_file = CAPSULE_ROOT + '/code/data_management/sessions_to_exclude.txt'
 with open(session_exclude_file, 'r') as f:
     exclude = [line.strip() for line in f.readlines()]
@@ -143,12 +146,12 @@ def process_session(session, beh, rec_side, probe, sex, target='soma'):
     # --- skip missing or invalid sessions ---
     if 'ZS' in session:
         if (not os.path.exists(session_dir['nwb_dir_raw'])) or (get_unit_tbl(session, 'curated') is None):
-            print(f'Skipping {session} due to no neuron data')
+            # Silently skip - summary will be reported
             return None
     if session_dir['curated_dir_curated'] is None:
         return None
 
-    print(f'Processing {session}')
+    # No per-session print - progress reported at intervals
     data_type = 'curated'
     qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
     with open(qm_file) as f:
@@ -320,7 +323,7 @@ def process_session(session, beh, rec_side, probe, sex, target='soma'):
                 if np.nanmean(spike_counts_slow) > 0:
                     sd = np.std(spike_counts_slow[np.where(~np.isnan(spike_counts_slow))[0]])/np.nanmean(spike_counts_slow)
                 else:
-                    print(f'{session}_{unit_id} spike_count_slow weird.\n')
+                    # print(f'{session}_{unit_id} spike_count_slow weird.\n')
                     sd = np.nan
 
 
@@ -398,13 +401,18 @@ def safe_process(session, beh, rec_side, probe, sex):
 #     result = safe_process(row['session_id'], row['behavior'], row['side'], row['probe'], row['sex'])
 #     if result is not None:
 #         results.append(result)
+
+print(f"Processing {len(df)} sessions with parallelization...", flush=True)
 results = Parallel(n_jobs=-1)(
     delayed(safe_process)(row['session_id'], row['behavior'], row['side'], row['probe'], row['sex'])
     for _, row in df.iterrows()
 )
 # %%
 # remove all None results
-results = [res for res in results if res is not None]
+valid_results = [res for res in results if res is not None]
+skipped = len(results) - len(valid_results)
+print(f"  Completed: {len(valid_results)} sessions processed, {skipped} skipped", flush=True)
+results = valid_results
 
 # %%
 # sort by the sequence of session_ids in df

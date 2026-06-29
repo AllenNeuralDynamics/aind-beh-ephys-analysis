@@ -687,11 +687,10 @@ all_p_regressors = merge_df_with_suffix([all_p_regressors_ori.copy(), all_p_regr
 # compare regressors in early and late
 fig, axes = plt.subplots(1, len(regressors_focus), figsize=(15, 5))
 probes = combined_tagged_units_filtered['probe']
-if probes.dtype == 'O' or not np.issubdtype(probes.dtype, np.number):
-    # Convert string labels to integers for coloring
-    _, cvals = np.unique(probes, return_inverse=True)
-else:
-    cvals = probes.values
+
+# Convert to string to handle mixed types (float 2.0 and string 'tt')
+probes_str = probes.astype(str)
+_, cvals = np.unique(probes_str, return_inverse=True)
 
 for ind_reg, regressor in enumerate(regressors_focus):
     axes[ind_reg].scatter(t_regressors_e[regressor][probes.values == '2'], t_regressors_l[regressor][probes.values == '2'], alpha=0.5, edgecolors='none', s=20, label = '2')

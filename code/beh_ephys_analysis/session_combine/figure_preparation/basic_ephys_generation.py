@@ -490,14 +490,22 @@ window_length = 2
 
 # %%
 all_results = []
+
+# Progress tracking variables
+_total_units = 0
+_processed_units = 0
+_last_reported_pct = -10
+
 def safe_process(row):
     """Wrapper to safely call process() and catch errors."""
+    global _processed_units, _last_reported_pct, _total_units
+
     try:
-        print(f"Processing session {row['session']}, unit {row['unit']}...")
-        return process(row['session'], row['unit'], row['in_df'])
+        result = process(row['session'], row['unit'], row['in_df'])
     except Exception as e:
-        print(f"[Error] session {row['session']}, unit {row['unit']}: {e}")
-        return {'session': row['session'],
+        # Only print errors, not every unit
+        print(f"[Error] session {row['session']}, unit {row['unit']}: {e}", flush=True)
+        result = {'session': row['session'],
                 'unit_id': row['unit'],
                 'bl_mean': np.nan,
                 'response_rate': np.nan,
@@ -522,6 +530,16 @@ def safe_process(row):
                 'response_isi': np.nan,
                 }
 
+    # Report progress at 10% intervals
+    _processed_units += 1
+    if _total_units > 0:
+        current_pct = int((_processed_units / _total_units) * 100)
+        if current_pct >= _last_reported_pct + 10:
+            _last_reported_pct = (current_pct // 10) * 10
+            print(f"  Progress: {_last_reported_pct}% ({_processed_units}/{_total_units} units)", flush=True)
+
+    return result
+
 # results = []
 # for ind, row in combined_tagged_units_filtered.iterrows():
 #     session = row['session']
@@ -531,8 +549,12 @@ def safe_process(row):
 #     result = process(session, unit_id, df)
 #     results.append(result)
 #
-print(f"Processing {len(combined_tagged_units_filtered)} units with parallelization...")
+_total_units = len(combined_tagged_units_filtered)
+_processed_units = 0
+_last_reported_pct = 0
+print(f"Processing {_total_units} units with parallelization...")
 results = Parallel(n_jobs=-1)(delayed(safe_process)(row) for ind, row in combined_tagged_units_filtered.iterrows())
+print(f"  Progress: 100% ({_total_units}/{_total_units} units) - Complete!", flush=True)
 
 # %%
 basic_ephys_df = pd.DataFrame(results)

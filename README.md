@@ -121,6 +121,21 @@ These shared inputs are generated from the preparation scripts in `/root/capsule
 
 > **Important:** Before running any notebook in `code/beh_ephys_analysis/session_combine/manuscript_figures/`, make sure the generation files in `figure_preparation` have been run first, in the exact order listed in `sequence`.
 
+**Estimated run time for each script:**
+1. `make_combined_unit_tbl.py` - 10 min
+2. `antidromic_generation.py` - < 1 min
+3. `waveform_generation_np.py` - < 1 min
+4. `waveform_generation_tt.py` - < 1 min
+5. `basic_ephys_generation.py` - 8 min
+6. `behavior_metrics_generation.py` - 4 min
+7. `acg_generation.py` - 2 min
+8. `response_tstats_generation.py` - 3 min
+9. `outcome_window_generation_parallel.py` - 4 min
+10. `beh_combined_outcome_generation.py` - 12 min
+11. `photometry_generation.py` - 10 min
+
+**Total estimated time: ~55 min**
+
 ## Experiments and Derived Data Used
 
 ### Electrophysiology Recordings with and without behavior

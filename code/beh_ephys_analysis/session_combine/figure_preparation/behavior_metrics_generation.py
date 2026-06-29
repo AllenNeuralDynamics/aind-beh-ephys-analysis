@@ -93,9 +93,10 @@ capsule_dirs = capsule_directories()
 
 recompute_metrics = False
 # %%
-dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
-        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv'),
-        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_FP_session_assets.csv')]
+# Read CSVs with probe as string to ensure '2' not 2.0
+dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv', dtype={'probe': str}),
+        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv', dtype={'probe': str}),
+        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_FP_session_assets.csv', dtype={'probe': str})]
 df = pd.concat(dfs)
 session_ids = df['session_id'].values
 session_ids = [session_id for session_id in session_ids if isinstance(session_id, str)]  # filter only behavior sessions
@@ -104,7 +105,7 @@ session_ids = [session_id for session_id in session_ids if isinstance(session_id
 def process_session(session):
     """
     """
-    print(session)
+    # Removed per-session print
     session_dir = session_dirs(session)
     if os.path.exists(os.path.join(session_dir['beh_fig_dir'], f'{session}.nwb')):
         try:
@@ -112,16 +113,19 @@ def process_session(session):
             session_data['session'] = session
             session_data['ani_id'] = session_dir['aniID']
             session_data['probe'] = df[df['session_id'] == session]['probe'].values[0] if 'probe' in df.columns else None
-        except:
-            print(f"Error processing session {session}")
+        except Exception as e:
+            print(f"Error processing session {session}: {e}", flush=True)
             session_data = None
-        
+
     return session_data
 
 
 if recompute_metrics:
     # Use Parallel to process sessions in parallel
+    print(f"Processing {len(session_ids)} sessions with parallelization...", flush=True)
     combined_beh_sessions = Parallel(n_jobs=-4)(delayed(process_session)(session) for session in session_ids)
+    valid_count = sum(1 for s in combined_beh_sessions if s is not None)
+    print(f"  Completed: {valid_count}/{len(session_ids)} sessions processed successfully", flush=True)
     combined_beh_sessions = [session for session in combined_beh_sessions if session is not None]
 else:
     # Load precomputed metrics from JSON files

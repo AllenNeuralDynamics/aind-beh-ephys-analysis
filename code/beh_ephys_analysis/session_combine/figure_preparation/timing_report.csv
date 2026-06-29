@@ -1,0 +1,13 @@
+filename,duration_seconds,duration_minutes,category,timestamp
+outcome_window_generation_parallel.py,264.40,4.41,prep_script,2026-06-27 21:29:18
+beh_combined_outcome_generation.py,696.99,11.62,prep_script,2026-06-27 21:29:18
+photometry_generation.py,621.15,10.35,prep_script,2026-06-27 21:29:18
+make_combined_unit_tbl.py,578.75,9.65,prep_script,2026-06-27 21:29:18
+antidromic_generation.py,37.77,0.63,prep_script,2026-06-27 21:29:18
+waveform_generation_np.py,34.59,0.58,prep_script,2026-06-27 21:29:18
+waveform_generation_tt.py,34.55,0.58,prep_script,2026-06-27 21:29:18
+basic_ephys_generation.py,496.30,8.27,prep_script,2026-06-27 21:29:18
+behavior_metrics_generation.py,255.29,4.25,prep_script,2026-06-27 21:29:18
+acg_generation.py,101.33,1.69,prep_script,2026-06-27 21:29:18
+response_tstats_generation.py,206.93,3.45,prep_script,2026-06-27 21:29:18
+TOTAL,3328.05,55.47,prep_script,2026-06-27 21:29:18

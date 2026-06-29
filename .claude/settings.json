@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(python code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py)",
+      "Bash(python -m json.tool)"
+    ]
+  }
+}
