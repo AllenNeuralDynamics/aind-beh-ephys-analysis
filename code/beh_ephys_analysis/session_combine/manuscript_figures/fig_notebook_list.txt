@@ -1,8 +1,8 @@
-F_antidromic_combined.ipynb
-F_basic_ephys.ipynb
-F_behavior.ipynb
-F_waveform_space.ipynb
-F_waveform_space_tetrode.ipynb
+#F_antidromic_combined.ipynb
+#F_basic_ephys.ipynb
+#F_behavior.ipynb
+#F_waveform_space.ipynb
+#F_waveform_space_tetrode.ipynb
 F_cross_correlation.ipynb
 F_photometry_tuning_psth.ipynb
 F_ephys_behavior_action&outcome.ipynb

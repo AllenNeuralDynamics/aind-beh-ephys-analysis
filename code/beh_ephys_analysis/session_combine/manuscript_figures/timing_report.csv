@@ -1,5 +1,11 @@
 filename,duration_seconds,duration_minutes,category,timestamp
-F_antidromic_combined.ipynb,52.28,0.87,manuscript_figure,2026-06-29 17:05:00
-F_basic_ephys.ipynb,590.03,9.83,manuscript_figure,2026-06-29 17:05:00
-F_behavior.ipynb,334.50,5.58,manuscript_figure,2026-06-29 17:05:00
-TOTAL,976.81,16.28,manuscript_figure,2026-06-29 17:05:00
+F_antidromic_combined.ipynb,59.95,1.00,manuscript_figure,2026-06-29 19:39:35
+F_basic_ephys.ipynb,644.82,10.75,manuscript_figure,2026-06-29 19:39:35
+F_behavior.ipynb,324.50,5.41,manuscript_figure,2026-06-29 19:39:35
+F_waveform_space.ipynb,498.76,8.31,manuscript_figure,2026-06-29 19:39:35
+F_waveform_space_tetrode.ipynb,77.12,1.29,manuscript_figure,2026-06-29 19:39:35
+F_cross_correlation.ipynb,437.90,7.30,manuscript_figure,2026-06-29 20:26:16
+F_photometry_tuning_psth.ipynb,290.15,4.84,manuscript_figure,2026-06-29 20:26:16
+F_ephys_behavior_action&outcome.ipynb,1317.38,21.96,manuscript_figure,2026-06-29 20:26:16
+F_ephys_behavior_examples.ipynb,204.96,3.42,manuscript_figure,2026-06-29 20:26:16
+TOTAL,3855.54,64.26,manuscript_figure,2026-06-29 20:26:16
