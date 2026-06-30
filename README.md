@@ -22,6 +22,8 @@ Characterizes animal behavior across all recording sessions. Fits a multi-lag lo
 **Prerequisites:**
 - `combined_beh_sessions.pkl` (from [`behavior_metrics_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/behavior_metrics_generation.py))
 
+**Run time:** ~5 min
+
 **Manuscript figure panels**
 - Panel(s): Fig4 b-c, Fig5 a,e, Fig6 b-c, FigA14 a-e, k-m
 
@@ -31,6 +33,8 @@ Analyzes behavioral and neural factors underlying hit vs. miss responses to the 
 
 **Prerequisites:**
 - `combined_beh_sessions.pkl` (from [`behavior_metrics_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/behavior_metrics_generation.py))
+
+**Run time:** ~4 min
 
 **Manuscript figure panels**
 - Panel(s): Fig5
@@ -46,6 +50,8 @@ The primary neural coding notebook. Analyzes how single neurons encode action (s
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_outcome_window_responses.pkl` (from [`outcome_window_generation_parallel.py`](code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py))
 
+**Run time:** ~22 min
+
 **Manuscript figure panels**
 - Panel(s): Fig4 d-g, Fig5 b-d, f-h, k, Fig6 a,d-h, FigA15 a-f, FigA15 t, FigA17 i
 
@@ -55,6 +61,8 @@ Generates single-unit example raster + PSTH figures for a curated set of represe
 
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
+
+**Run time:** ~3 min
 
 **Manuscript figure panels**
 - Panel(s): Fig6 d
@@ -81,6 +89,8 @@ Comprehensive characterization of electrophysiological unit properties across al
 - `combined_basic_ephys.pkl` (from [`basic_ephys_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/basic_ephys_generation.py))
 - `combined_acg.pkl` (from [`acg_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/acg_generation.py))
 
+**Run time:** ~11 min
+
 **Manuscript figure panels**
 - Panel(s): FigA15 d-f
 
@@ -92,6 +102,8 @@ Analyzes spike train temporal structure using auto-correlations and cross-correl
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - Per-session spike data
 
+**Run time:** ~7 min
+
 **Manuscript figure panels**
 - Panel(s): FigA15 r-t
 
@@ -102,6 +114,8 @@ Identifies and characterizes antidromically-activated projection neurons across 
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_antidromic_tbl.pkl` (from [`antidromic_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/antidromic_generation.py))
+
+**Run time:** ~1 min
 
 **Manuscript figure panels**
 - Panel(s): FigA12
@@ -118,6 +132,8 @@ Characterizes action potential waveform morphology across the unit population (s
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_waveform_NP.pkl` (from [`waveform_generation_np.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_np.py))
 
+**Run time:** ~8 min
+
 **Manuscript figure panels**
 - Panel(s): FigA13 a-f
 
@@ -129,6 +145,8 @@ Identical waveform analysis applied exclusively to tetrode-recorded units, produ
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_waveform_TT.pkl` (from [`waveform_generation_tt.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_tt.py))
 
+**Run time:** ~1 min
+
 **Manuscript figure panels**
 - Panel(s): FigA13 g-i
 
@@ -138,6 +156,8 @@ Integrates three datasets to compare cellular organization axes: electrophysiolo
 
 **Prerequisites:**
 - `combined_waveform_NP.pkl` (from [`waveform_generation_np.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_np.py))
+
+**Run time:** ~11 min
 
 **Manuscript figure panels**
 - Panel(s): Fig3e, FigA18
@@ -154,6 +174,8 @@ Computes tuning curves and PSTHs for fiber photometry signals by binning the sig
 **Prerequisites:**
 - Photometry GLM results (from [`photometry_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/photometry_generation.py))
 - Per-session photometry data
+
+**Run time:** ~5 min
 
 **Manuscript figure panels**
 - Panel(s): Fig5i-k, Fig6i-l, FigA17
