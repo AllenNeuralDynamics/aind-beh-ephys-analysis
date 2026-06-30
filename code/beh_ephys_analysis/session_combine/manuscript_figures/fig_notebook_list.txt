@@ -11,5 +11,5 @@ F_hit_miss.ipynb
 F_pupil_beh_ephys.ipynb
 F_spatial-axis-comparison.ipynb
 F_spont_choice_lick_neuron.ipynb
-F_spatial_cross
+F_spatial_crosscorrelation.ipynb
 

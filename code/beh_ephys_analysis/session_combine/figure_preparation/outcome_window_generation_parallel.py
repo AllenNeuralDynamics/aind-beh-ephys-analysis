@@ -322,7 +322,7 @@ def compute_outcome_window_parallel(criteria_name, pre_event, post_event, n_jobs
     bin_size = 1.5
     step_size = 0.1
     labels = ['outcome', 'hit', 'svs']
-    align = 'go_cue_time'
+    align = 'outcome_time'
     data_type = 'curated'
     model_name = 'stan_qLearning_5params'
     slide_times_auc = _expected_slide_times(pre_event, post_event, step_size)
@@ -484,8 +484,8 @@ def main():
             compute_outcome_window_parallel(criteria_name, args.pre_event, args.post_event, n_jobs=args.n_jobs)
     else:
         default_runs = [
-            ('beh_all_TT', 0, 2),
-            ('beh_all_NP', 0, 2.5),
+            ('beh_all_TT', -1, 1.75),
+            ('beh_all_NP', -1, 2.0),
         ]
         for criteria_name, pre_event, post_event in default_runs:
             compute_outcome_window_parallel(criteria_name, pre_event, post_event, n_jobs=args.n_jobs)
