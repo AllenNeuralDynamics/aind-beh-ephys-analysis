@@ -213,10 +213,10 @@ def run(check_only: bool = False) -> int:
 
     prep_csv_path = FIG_PREP_DIR / "timing_report.csv"
 
-    # for idx, script_name in enumerate(scripts, start=1):
-    #     print(f"\n[prep {idx}/{len(scripts)}] {script_name}", flush=True)
-    #     duration = run_script(script_name, check_only=check_only)
-    #     script_timings.append((script_name, duration))
+    for idx, script_name in enumerate(scripts, start=1):
+        print(f"\n[prep {idx}/{len(scripts)}] {script_name}", flush=True)
+        duration = run_script(script_name, check_only=check_only)
+        script_timings.append((script_name, duration))
 
     #     # Save timing after each script completes
     #     if not check_only:
@@ -231,9 +231,9 @@ def run(check_only: bool = False) -> int:
         notebook_timings.append((notebook_name, duration))
     
         # Save timing after each notebook completes
-        if not check_only:
-            save_timing_csv(notebook_timings, notebook_csv_path, "manuscript_figure")
-            print(f"  → Updated timing report: {notebook_csv_path}", flush=True)
+        # if not check_only:
+        #     save_timing_csv(notebook_timings, notebook_csv_path, "manuscript_figure")
+        #     print(f"  → Updated timing report: {notebook_csv_path}", flush=True)
 
     # Print timing summary and save CSV files
     if not check_only:
