@@ -472,6 +472,7 @@ def population_GLM_ani(
 def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-exp_mc', align='CSon', pre_time=-5, post_time=2.5, num_bins=5, thresh=0.5, quantiles=True):
     model = 'stan_qLearning_5params'
     def process_session_for_tuning(session):
+        print(f'Processing session {session} for tuning curve...')
         session_dir = session_dirs(session)
         ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
         with open(ani_meta_file, 'r') as f:
@@ -492,13 +493,21 @@ def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-e
         if target_var not in trial_data.columns:
             print(f'{target_var} not found in trial data for session {session}.')
             return None, None, None
+        if session == 'behavior_754896_2025-01-08_16-03-27':
+            print('STOP')
         _, mean_psth, time, _ = align_signal_to_events(
                                                     curr_signal, 
                                                     signal['time_in_beh'], 
                                                     trial_data['goCue_start_time'].values, 
                                                     pre_event_time=1, post_event_time=1, window_size=0.2, step_size=0.1
                                                     );
-        go_resp_G = np.mean(mean_psth[time>100]) - np.mean(mean_psth[time<-100])
+        # Calculate go response with empty array checks
+        late_mask = time > 0.1
+        early_mask = time < -0.1
+        if np.sum(late_mask) > 0 and np.sum(early_mask) > 0:
+            go_resp_G = np.mean(mean_psth[late_mask]) - np.mean(mean_psth[early_mask])
+        else:
+            go_resp_G = np.nan
         if go_resp_G < thresh:
             return None, None, None
         aligned_matrix, _, time_bins, _ = align_signal_to_events(
@@ -534,6 +543,10 @@ def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-e
         return curr_bin_means, curr_signal_means, session
     
     results = Parallel(n_jobs=8)(delayed(process_session_for_tuning)(session) for session in session_list)
+    # results = []
+    # for session in session_list:
+    #     result = process_session_for_tuning(session)
+    #     results.append(result)
     all_bin_means, all_signal_means, processed_sessions = zip(*[res for res in results if res[0] is not None])
     all_bin_means = np.array(all_bin_means)
     all_signal_means = np.array(all_signal_means)
