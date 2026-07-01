@@ -65,8 +65,7 @@ Before running any analysis notebook, the **figure preparation scripts** in [`co
 
 ## Behavior Analysis
 
-### Notebook
-[`F_behavior.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_behavior.ipynb)
+**Notebook:** [`F_behavior.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_behavior.ipynb)
 
 Characterizes animal behavior across all recording sessions. Fits a multi-lag logistic regression GLM (up to 10 reward-history lags) predicting choice switching using. Summarizes session-level metrics including reward rate, hit rate, model prediction accuracy, and post-outcome lick counts.
 
@@ -75,8 +74,7 @@ Characterizes animal behavior across all recording sessions. Fits a multi-lag lo
 
 **Run time:** ~5 min
 
-**Manuscript figure panels**
-- Panel(s): Fig4 b-c, Fig5 a,e, Fig6 b-c, FigA14 a-e, k-m
+**Manuscript figure panels: ** Fig4 b-c, Fig5 a,e, Fig6 b-c, FigA14 a-e, k-m
 
 **Notebook:** [`F_hit_miss.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_hit_miss.ipynb)
 
@@ -87,8 +85,7 @@ Analyzes behavioral and neural factors underlying hit vs. miss responses to the 
 
 **Run time:** ~4 min
 
-**Manuscript figure panels**
-- Panel(s): Fig5
+**Manuscript figure panels:** Fig5
 
 ## Behavior and Electrophysiology Analysis
 
