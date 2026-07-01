@@ -1,33 +1,56 @@
 # aind-beh-physiology-analysis
 
+### Table of Contents
+- aind-beh-physiology-analysis
+    - Table of Contents
+    - Overview
+- Code
+    - Data Preparation Pipeline
+    - Analysis Notebooks
+        - Behavior
+        - Behavior and Electrophysiology
+        - Electrophysiology
+        - Waveform and Spatial Organization
+        - Behavior and Photometry
+- Instructions for running locally
+
+
+
 ### Overview
 
 This capsule contains analysis code for a study of physiology of LC NE neurons and behavior in a dynamic foraging task, focusing on the distribution of neuron properties across space. 
 
-**Manuscript**: https://www.biorxiv.org/content/10.64898/2026.04.10.717727v1
-
-**Github Repository**: https://github.com/AllenNeuralDynamics/aind-beh-ephys-analysis
-
-**Code Ocean Capsule**: NEED TO ADD
+- **Manuscript**: https://www.biorxiv.org/content/10.64898/2026.04.10.717727v1
+- **Github Repository**: https://github.com/AllenNeuralDynamics/aind-beh-ephys-analysis
+- **Code Ocean Capsule**: NEED TO ADD
 
 The code is organized into two sections, a data preparation pipeline, and then dedicated notebooks for each analysis. The data preparation pipeline aggregates and preprocesses data and generates combined tables and metrics. The analysis notebooks in `code/beh_ephys_analysis/session_combine/manuscript_figures/` use those aggregated results to produce the figures in the manuscript. 
-
-### Table of Contents
-- aind-beh-physiology-analysis
-    - Overview
-    - Table of Contents
-- Code
-    - Data Preparation Pipeline
-    - Analysis Notebooks
-- Instructions for running locally
 
 # Code
 
 ## Data Preparation Pipeline
 
-Before running any analysis notebook, the **figure preparation scripts** in [`code/beh_ephys_analysis/session_combine/figure_preparation`](code/beh_ephys_analysis/session_combine/figure_preparation) must be executed first. These scripts aggregate and preprocess data across all sessions and animals, generating combined tables and derived metrics that the notebooks depend on. The scripts must be run **in the exact order** specified in the [`sequence`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence) file, as later steps depend on outputs from earlier ones. See the [preparation scripts section](#generated-files-used-across-the-manuscript-notebooks-and-figure-preparation-dependency) below for the complete workflow and timing estimates (~55 min total).
+Before running any analysis notebook, the **figure preparation scripts** in [`code/beh_ephys_analysis/session_combine/figure_preparation`](code/beh_ephys_analysis/session_combine/figure_preparation) must be executed first. These scripts aggregate and preprocess data across all sessions and animals, generating combined tables and derived metrics that the analysis notebooks depend on. 
 
----
+> **Important** The scripts must be run **in the exact order** specified in the [`sequence`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence) file, as later steps depend on outputs from earlier ones. These scripts must be run before any analysis notebook. 
+
+
+**Estimated run time for each script:**
+1. [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py) - 10 min
+2. [`antidromic_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/antidromic_generation.py) - < 1 min
+3. [`waveform_generation_np.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_np.py) - < 1 min
+4. [`waveform_generation_tt.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_tt.py) - < 1 min
+5. [`basic_ephys_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/basic_ephys_generation.py) - 8 min
+6. [`behavior_metrics_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/behavior_metrics_generation.py) - 4 min
+7. [`acg_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/acg_generation.py) - 2 min
+8. [`response_tstats_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/response_tstats_generation.py) - 3 min
+9. [`outcome_window_generation_parallel.py`](code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py) - 4 min
+10. [`beh_combined_outcome_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/beh_combined_outcome_generation.py) - 12 min
+11. [`photometry_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/photometry_generation.py) - 10 min
+
+**Total estimated time: ~55 min**
+
+
 
 ## 1. Behavior Analysis
 
@@ -195,33 +218,6 @@ Computes tuning curves and PSTHs for fiber photometry signals by binning the sig
 
 **Manuscript figure panels**
 - Panel(s): Fig5i-k, Fig6i-l, FigA17
-
----
-
-
-### Generated files used across the manuscript notebooks and figure preparation dependency
-
-The notebooks in [`code/beh_ephys_analysis/session_combine/manuscript_figures/`](code/beh_ephys_analysis/session_combine/manuscript_figures/) call shared and pre-generated input files in data_preparation folder.
-
-These shared inputs are generated from the preparation scripts in [`code/beh_ephys_analysis/session_combine/figure_preparation`](code/beh_ephys_analysis/session_combine/figure_preparation), following the order specified in the [`sequence`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence) file in that folder.
-
-> **Important:** Before running any notebook in [`code/beh_ephys_analysis/session_combine/manuscript_figures/`](code/beh_ephys_analysis/session_combine/manuscript_figures/), make sure the generation files in [`figure_preparation`](code/beh_ephys_analysis/session_combine/figure_preparation) have been run first, in the exact order listed in [`sequence`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence).
-
-**Estimated run time for each script:**
-1. [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py) - 10 min
-2. [`antidromic_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/antidromic_generation.py) - < 1 min
-3. [`waveform_generation_np.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_np.py) - < 1 min
-4. [`waveform_generation_tt.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_tt.py) - < 1 min
-5. [`basic_ephys_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/basic_ephys_generation.py) - 8 min
-6. [`behavior_metrics_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/behavior_metrics_generation.py) - 4 min
-7. [`acg_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/acg_generation.py) - 2 min
-8. [`response_tstats_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/response_tstats_generation.py) - 3 min
-9. [`outcome_window_generation_parallel.py`](code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py) - 4 min
-10. [`beh_combined_outcome_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/beh_combined_outcome_generation.py) - 12 min
-11. [`photometry_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/photometry_generation.py) - 10 min
-
-**Total estimated time: ~55 min**
-
 ## Experiments and Derived Data Used
 
 ### Electrophysiology Recordings with and without behavior
