@@ -67,8 +67,7 @@ Before running any analysis notebook, the **figure preparation scripts** in [`co
 
 ### Choice prediction
 **Notebook:** [`F_behavior.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_behavior.ipynb)\
-Characterizes animal behavior across all recording sessions. Fits a multi-lag logistic regression GLM (up to 10 reward-history lags) predicting choice switching using. Summarizes session-level metrics including reward rate, hit rate, model prediction accuracy, and post-outcome lick counts.
-
+Characterizes animal behavior across all recording sessions. Fits a multi-lag logistic regression GLM (up to 10 reward-history lags) predicting choice switching using. Summarizes session-level metrics including reward rate, hit rate, model prediction accuracy, and post-outcome lick counts.\
 **Run time:** ~5 min\
 **Manuscript figure panels:** Fig4 b-c, Fig5 a,e, Fig6 b-c, FigA14 a-e, k-m \
 **Prerequisites:**
@@ -76,8 +75,7 @@ Characterizes animal behavior across all recording sessions. Fits a multi-lag lo
 
 ### Hit and Miss
 **Notebook:** [`F_hit_miss.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_hit_miss.ipynb)\
-Analyzes behavioral and neural factors underlying hit vs. miss responses to the go cue. Fits a logistic regression GLM predicting upcoming hit/miss from reward history across multiple lags, both per-session and per-animal.
-
+Analyzes behavioral and neural factors underlying hit vs. miss responses to the go cue. Fits a logistic regression GLM predicting upcoming hit/miss from reward history across multiple lags, both per-session and per-animal.\
 **Run time:** ~4 min\
 **Manuscript figure panels:** Fig5\
 **Prerequisites:**
@@ -88,8 +86,7 @@ Analyzes behavioral and neural factors underlying hit vs. miss responses to the 
 
 ### Single Neuron encoding
 **Notebook:** [`F_ephys_behavior_action&outcome.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_action&outcome.ipynb)\
-The primary neural coding notebook. Analyzes how single neurons encode action (stay vs. switch) and outcome (reward vs. no reward) across the population. Computes population PSTHs split by behavioral condition, extracts per-unit T-statistics for outcome and action coding dimensions, and maps neural selectivity in CCF brain atlas space.
-
+The primary neural coding notebook. Analyzes how single neurons encode action (stay vs. switch) and outcome (reward vs. no reward) across the population. Computes population PSTHs split by behavioral condition, extracts per-unit T-statistics for outcome and action coding dimensions, and maps neural selectivity in CCF brain atlas space.\
 **Run time:** ~22 min\
 **Manuscript figure panels:** Fig4 d-g, Fig5 b-d, f-h, k, Fig6 a,d-h, FigA15 a-f, FigA15 t, FigA17 i\
 **Prerequisites:**
@@ -98,8 +95,7 @@ The primary neural coding notebook. Analyzes how single neurons encode action (s
 
 ### Single Unit Examples
 **Notebook:** [`F_ephys_behavior_examples.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_examples.ipynb)\
-Generates single-unit example raster + PSTH figures for a curated set of representative neurons (13 examples from both silicon probe and tetrode recordings), plotted for stay-vs-switch and hit-vs-miss behavioral splits.
-
+Generates single-unit example raster + PSTH figures for a curated set of representative neurons (13 examples from both silicon probe and tetrode recordings), plotted for stay-vs-switch and hit-vs-miss behavioral splits.\
 **Run time:** ~3 min\
 **Manuscript figure panels:** Fig6 d\
 **Prerequisites:**
@@ -108,8 +104,7 @@ Generates single-unit example raster + PSTH figures for a curated set of represe
 
 ### Neural discriminability of behavioral variables
 **Notebook:** [`F_auc_psth.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_auc_psth.ipynb)\
-Quantifies neural discriminability of behavioral variables (reward outcome, hit/miss, stay-vs-switch) over time using a sliding-window ROC-AUC analysis per neuron. Produces population-level AUC heatmaps (sorted by peak discriminability) and histograms.
-
+Quantifies neural discriminability of behavioral variables (reward outcome, hit/miss, stay-vs-switch) over time using a sliding-window ROC-AUC analysis per neuron. Produces population-level AUC heatmaps (sorted by peak discriminability) and histograms.\
 **Run time:** ?\
 **Manuscript figure panels:** FigA15 a-c\
 **Prerequisites:**
