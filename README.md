@@ -12,7 +12,15 @@
         - Electrophysiology
         - Waveform and Spatial Organization
         - Behavior and Photometry
+- Data
+    - Electrophysiology Recordings with and without behavior
+    - Anatomical Registration and Spatial Mapping
+    - Behavior Video Tracking
+    - MERFISH Spatial Transcriptomics
+    - Retrograde Tracing
 - Instructions for running locally
+    - Getting Started
+    - Customizing Directory Paths
 
 
 
@@ -25,6 +33,8 @@ This capsule contains analysis code for a study of physiology of LC NE neurons a
 - **Code Ocean Capsule**: NEED TO ADD
 
 The code is organized into two sections, a data preparation pipeline, and then dedicated notebooks for each analysis. The data preparation pipeline aggregates and preprocesses data and generates combined tables and metrics. The analysis notebooks in `code/beh_ephys_analysis/session_combine/manuscript_figures/` use those aggregated results to produce the figures in the manuscript. 
+
+---
 
 # Code
 
@@ -217,8 +227,9 @@ Computes tuning curves and PSTHs for fiber photometry signals by binning the sig
 **Manuscript figure panels**
 - Panel(s): Fig5i-k, Fig6i-l, FigA17
 
+---
+
 # Data Organization
-## Experiments and Derived Data Used
 
 ### Electrophysiology Recordings with and without behavior
 - `all 'raw' data`: raw electrophysiology data with and without behavior，include high speed video for bottom and side of the face and whole body. 
@@ -252,7 +263,7 @@ Computes tuning curves and PSTHs for fiber photometry signals by binning the sig
 
 This codebase is designed to run both on Code Ocean and on local machines. The import structure ensures that all functions can be properly imported regardless of where the repository root is located.
 
-### Getting Started
+## Getting Started
 
 To run this analysis pipeline on your local machine:
 
@@ -288,7 +299,7 @@ To run this analysis pipeline on your local machine:
 
 **Note:** The code automatically detects the repository root, so you can run notebooks from any working directory within the repository.
 
-### Import System Design
+## Customizing Directory Paths
 
 The code uses a robust import resolution system that works across different environments:
 
