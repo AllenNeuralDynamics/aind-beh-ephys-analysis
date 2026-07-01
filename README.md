@@ -86,40 +86,34 @@ Analyzes behavioral and neural factors underlying hit vs. miss responses to the 
 
 ## Behavior and Electrophysiology Analysis
 
-**Notebook:** [`F_ephys_behavior_action&outcome.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_action&outcome.ipynb)
-
+### Single Neuron encoding
+**Notebook:** [`F_ephys_behavior_action&outcome.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_action&outcome.ipynb)\
 The primary neural coding notebook. Analyzes how single neurons encode action (stay vs. switch) and outcome (reward vs. no reward) across the population. Computes population PSTHs split by behavioral condition, extracts per-unit T-statistics for outcome and action coding dimensions, and maps neural selectivity in CCF brain atlas space.
 
+**Run time:** ~22 min\
+**Manuscript figure panels:** Fig4 d-g, Fig5 b-d, f-h, k, Fig6 a,d-h, FigA15 a-f, FigA15 t, FigA17 i\
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_outcome_window_responses.pkl` (from [`outcome_window_generation_parallel.py`](code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py))
 
-**Run time:** ~22 min
-
-**Manuscript figure panels**
-- Panel(s): Fig4 d-g, Fig5 b-d, f-h, k, Fig6 a,d-h, FigA15 a-f, FigA15 t, FigA17 i
-
-**Notebook:** [`F_ephys_behavior_examples.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_examples.ipynb)
-
+### Single Unit Examples
+**Notebook:** [`F_ephys_behavior_examples.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_examples.ipynb)\
 Generates single-unit example raster + PSTH figures for a curated set of representative neurons (13 examples from both silicon probe and tetrode recordings), plotted for stay-vs-switch and hit-vs-miss behavioral splits.
 
+**Run time:** ~3 min\
+**Manuscript figure panels:** Fig6 d\
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 
-**Run time:** ~3 min
 
-**Manuscript figure panels**
-- Panel(s): Fig6 d
-
-**Notebook:** [`F_auc_psth.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_auc_psth.ipynb)
-
+### Neural discriminability of behavioral variables
+**Notebook:** [`F_auc_psth.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_auc_psth.ipynb)\
 Quantifies neural discriminability of behavioral variables (reward outcome, hit/miss, stay-vs-switch) over time using a sliding-window ROC-AUC analysis per neuron. Produces population-level AUC heatmaps (sorted by peak discriminability) and histograms.
 
+**Run time:** ?\
+**Manuscript figure panels:** FigA15 a-c\
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
-
-**Manuscript figure panels**
-- Panel(s): FigA15 a-c
 
 
 ## Electrophysiology Analysis
