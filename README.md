@@ -66,8 +66,7 @@ Before running any analysis notebook, the **figure preparation scripts** in [`co
 ## Behavior Analysis
 
 ### Choice prediction
-**Notebook:** [`F_behavior.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_behavior.ipynb)
-
+**Notebook:** [`F_behavior.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_behavior.ipynb)\
 Characterizes animal behavior across all recording sessions. Fits a multi-lag logistic regression GLM (up to 10 reward-history lags) predicting choice switching using. Summarizes session-level metrics including reward rate, hit rate, model prediction accuracy, and post-outcome lick counts.
 
 **Run time:** ~5 min\
@@ -76,8 +75,7 @@ Characterizes animal behavior across all recording sessions. Fits a multi-lag lo
 - `combined_beh_sessions.pkl` (from [`behavior_metrics_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/behavior_metrics_generation.py))
 
 ### Hit and Miss
-**Notebook:** [`F_hit_miss.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_hit_miss.ipynb)
-
+**Notebook:** [`F_hit_miss.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_hit_miss.ipynb)\
 Analyzes behavioral and neural factors underlying hit vs. miss responses to the go cue. Fits a logistic regression GLM predicting upcoming hit/miss from reward history across multiple lags, both per-session and per-animal.
 
 **Run time:** ~4 min\
