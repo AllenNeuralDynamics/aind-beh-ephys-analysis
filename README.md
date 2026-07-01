@@ -1,16 +1,29 @@
 # aind-beh-physiology-analysis
 
+### Overview
+
 This capsule contains analysis code for a study of physiology of LC NE neurons and behavior in a dynamic foraging task, focusing on the distribution of neuron properties across space. 
 
-Link to manuscript: https://www.biorxiv.org/content/10.64898/2026.04.10.717727v1
+**Manuscript**: https://www.biorxiv.org/content/10.64898/2026.04.10.717727v1
 
-Link to git repo: https://github.com/AllenNeuralDynamics/aind-beh-ephys-analysis
+**Github Repository**: https://github.com/AllenNeuralDynamics/aind-beh-ephys-analysis
 
-Link to released capsule: NEED TO ADD
+**Code Ocean Capsule**: NEED TO ADD
 
-Analysis is organized into the following topics, each covered by a dedicated notebook in `code/beh_ephys_analysis/session_combine/manuscript_figures/`:
+The code is organized into two sections, a data preparation pipeline, and then dedicated notebooks for each analysis. The data preparation pipeline aggregates and preprocesses data and generates combined tables and metrics. The analysis notebooks in `code/beh_ephys_analysis/session_combine/manuscript_figures/` use those aggregated results to produce the figures in the manuscript. 
 
-### Data Preparation Pipeline
+### Table of Contents
+- aind-beh-physiology-analysis
+    - Overview
+    - Table of Contents
+- Code
+    - Data Preparation Pipeline
+    - Analysis Notebooks
+- Instructions for running locally
+
+# Code
+
+## Data Preparation Pipeline
 
 Before running any analysis notebook, the **figure preparation scripts** in [`code/beh_ephys_analysis/session_combine/figure_preparation`](code/beh_ephys_analysis/session_combine/figure_preparation) must be executed first. These scripts aggregate and preprocess data across all sessions and animals, generating combined tables and derived metrics that the notebooks depend on. The scripts must be run **in the exact order** specified in the [`sequence`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence) file, as later steps depend on outputs from earlier ones. See the [preparation scripts section](#generated-files-used-across-the-manuscript-notebooks-and-figure-preparation-dependency) below for the complete workflow and timing estimates (~55 min total).
 
