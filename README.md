@@ -1,9 +1,12 @@
 # aind-beh-physiology-analysis
 
 This capsule contains analysis code for a study of physiology of LC NE neurons and behavior in a dynamic foraging task, focusing on the distribution of neuron properties across space. 
-Link to manuscript:https://www.biorxiv.org/content/10.64898/2026.04.10.717727v1
-Link to git repo:https://github.com/AllenNeuralDynamics/aind-beh-ephys-analysis
-Link to released capsule:
+
+Link to manuscript: https://www.biorxiv.org/content/10.64898/2026.04.10.717727v1
+
+Link to git repo: https://github.com/AllenNeuralDynamics/aind-beh-ephys-analysis
+
+Link to released capsule: NEED TO ADD
 
 Analysis is organized into the following topics, each covered by a dedicated notebook in `code/beh_ephys_analysis/session_combine/manuscript_figures/`:
 
