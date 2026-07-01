@@ -32,11 +32,11 @@ This capsule contains analysis code for a study of physiology of LC NE neurons a
 - **Github Repository**: https://github.com/AllenNeuralDynamics/aind-beh-ephys-analysis
 - **Code Ocean Capsule**: NEED TO ADD
 
-The code is organized into two sections, a data preparation pipeline, and then dedicated notebooks for each analysis. The data preparation pipeline aggregates and preprocesses data and generates combined tables and metrics. The analysis notebooks in `code/beh_ephys_analysis/session_combine/manuscript_figures/` use those aggregated results to produce the figures in the manuscript. 
-
 ---
 
 # Code
+
+The code is organized into two sections, a data preparation pipeline, and then dedicated notebooks for each analysis. The data preparation pipeline aggregates and preprocesses data and generates combined tables and metrics. The analysis notebooks in `code/beh_ephys_analysis/session_combine/manuscript_figures/` use those aggregated results to produce the figures in the manuscript.
 
 ## Data Preparation Pipeline
 
@@ -65,7 +65,8 @@ Before running any analysis notebook, the **figure preparation scripts** in [`co
 
 ## Behavior Analysis
 
-**Notebook:** [`F_behavior.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_behavior.ipynb)
+### Notebook
+[`F_behavior.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_behavior.ipynb)
 
 Characterizes animal behavior across all recording sessions. Fits a multi-lag logistic regression GLM (up to 10 reward-history lags) predicting choice switching using. Summarizes session-level metrics including reward rate, hit rate, model prediction accuracy, and post-outcome lick counts.
 
@@ -301,6 +302,7 @@ To run this analysis pipeline on your local machine:
 
 ## Customizing Directory Paths
 
+### Import System Design
 The code uses a robust import resolution system that works across different environments:
 
 1. **Notebooks use automatic root detection**: Each notebook includes an automatic root-finding snippet at the top that walks up the directory tree to locate `code/beh_ephys_analysis/`. This ensures imports work whether you're running from Jupyter, VS Code, or any other environment.
