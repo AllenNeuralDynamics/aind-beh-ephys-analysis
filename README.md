@@ -113,103 +113,74 @@ Quantifies neural discriminability of behavioral variables (reward outcome, hit/
 
 ## Electrophysiology Analysis
 
-**Notebook:** [`F_basic_ephys.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_basic_ephys.ipynb)
-
-Comprehensive characterization of electrophysiological unit properties across all recorded neurons. Analyzes baseline and response firing rates, burst properties (ACG fit parameters), waveform features, and opto-tagging quality. Fits OLS models examining how intrinsic properties predict the degree of outcome vs. action coding.
-
+### Comprehensive characterization of single units
+**Notebook:** [`F_basic_ephys.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_basic_ephys.ipynb)\
+Comprehensive characterization of electrophysiological unit properties across all recorded neurons. Analyzes baseline and response firing rates, burst properties (ACG fit parameters), waveform features, and opto-tagging quality. Fits OLS models examining how intrinsic properties predict the degree of outcome vs. action coding.\
+**Run time:** ~11 min\
+**Manuscript figure panels:** FigA15 d-f\
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_basic_ephys.pkl` (from [`basic_ephys_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/basic_ephys_generation.py))
 - `combined_acg.pkl` (from [`acg_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/acg_generation.py))
 
-**Run time:** ~11 min
 
-**Manuscript figure panels**
-- Panel(s): FigA15 d-f
-
-**Notebook:** [`F_cross_correlation.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_cross_correlation.ipynb)
-
-Analyzes spike train temporal structure using auto-correlations and cross-correlations. Computes pairwise cross-correlations between neurons (including across PrL and S1) to assess functional connectivity, and visualizes correlation structure mapped to CCF coordinates.
-
+### Cross-Correlation
+**Notebook:** [`F_cross_correlation.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_cross_correlation.ipynb)\
+Analyzes spike train temporal structure using auto-correlations and cross-correlations. Computes pairwise cross-correlations between neurons (including across PrL and S1) to assess functional connectivity, and visualizes correlation structure mapped to CCF coordinates.\
+**Run time:** ~7 min\
+**Manuscript figure panels:** FigA15 r-t\
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - Per-session spike data
 
-**Run time:** ~7 min
-
-**Manuscript figure panels**
-- Panel(s): FigA15 r-t
-
-**Notebook:** [`F_antidromic_combined.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_antidromic_combined.ipynb)
-
-Identifies and characterizes antidromically-activated projection neurons across sessions. Applies a tiered classification system (tier 1: jitter, collision test, and antidromic response criteria; tier 2: looser thresholds) to classify PrL → subcortical projection neurons.
-
+### Antidromic stimulation
+**Notebook:** [`F_antidromic_combined.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_antidromic_combined.ipynb)\
+Identifies and characterizes antidromically-activated projection neurons across sessions. Applies a tiered classification system (tier 1: jitter, collision test, and antidromic response criteria; tier 2: looser thresholds) to classify PrL → subcortical projection neurons.\
+**Run time:** ~1 min\
+**Manuscript figure panels **: FigA12\
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_antidromic_tbl.pkl` (from [`antidromic_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/antidromic_generation.py))
 
-**Run time:** ~1 min
-
-**Manuscript figure panels**
-- Panel(s): FigA12
-
 
 ## Waveform and Spatial Organization
 
-**Notebook:** [`F_waveform_space.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_waveform_space.ipynb)
-
-Characterizes action potential waveform morphology across the unit population (silicon probe recordings). Extracts waveform shape features, reduces via PCA, maps onto CCF coordinates with brain mesh overlays, and tests spatial dependence statistics. Opto-tagged units are overlaid to reveal waveform-type identity.
-
+### Action Potential Waveforms
+**Notebook:** [`F_waveform_space.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_waveform_space.ipynb)\
+Characterizes action potential waveform morphology across the unit population (silicon probe recordings). Extracts waveform shape features, reduces via PCA, maps onto CCF coordinates with brain mesh overlays, and tests spatial dependence statistics. Opto-tagged units are overlaid to reveal waveform-type identity.\
+**Run time:** ~8 min\
+**Manuscript figure panels:** FigA13 a-f\
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_waveform_NP.pkl` (from [`waveform_generation_np.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_np.py))
 
-**Run time:** ~8 min
-
-**Manuscript figure panels**
-- Panel(s): FigA13 a-f
-
-**Notebook:** [`F_waveform_space_tetrode.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_waveform_space_tetrode.ipynb)
-
-Identical waveform analysis applied exclusively to tetrode-recorded units, producing the same spatial feature maps for the tetrode recording subset.
-
+### Tetrode recorded units 
+**Notebook:** [`F_waveform_space_tetrode.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_waveform_space_tetrode.ipynb)\
+Identical waveform analysis applied exclusively to tetrode-recorded units, producing the same spatial feature maps for the tetrode recording subset.\
+**Run time:** ~1 min\
+**Manuscript figure panels:** FigA13 g-i\
 **Prerequisites:**
 - `combined_unit_tbl.pkl` (from [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py))
 - `combined_waveform_TT.pkl` (from [`waveform_generation_tt.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_tt.py))
 
-**Run time:** ~1 min
-
-**Manuscript figure panels**
-- Panel(s): FigA13 g-i
-
-**Notebook:** [`F_spatial-axis-comparison.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_spatial-axis-comparison.ipynb)
-
-Integrates three datasets to compare cellular organization axes: electrophysiology waveform features, MERFISH spatial transcriptomics (~2,200 cells), and retrograde tracing from 18 brains. Fits a linear spatial axis to each dataset and compares principal spatial gradients across data modalities.
-
+### Spatial Axis
+**Notebook:** [`F_spatial-axis-comparison.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_spatial-axis-comparison.ipynb)\
+Integrates three datasets to compare cellular organization axes: electrophysiology waveform features, MERFISH spatial transcriptomics (~2,200 cells), and retrograde tracing from 18 brains. Fits a linear spatial axis to each dataset and compares principal spatial gradients across data modalities.\
+**Run time:** ~11 min\
+**Manuscript figure panels:** Fig3e, FigA18\
 **Prerequisites:**
 - `combined_waveform_NP.pkl` (from [`waveform_generation_np.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_np.py))
 
-**Run time:** ~11 min
-
-**Manuscript figure panels**
-- Panel(s): Fig3e, FigA18
-
-
 ## Behavior and Photometry Analysis
 
-
-**Notebook:** [`F_photometry_tuning_psth.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_photometry_tuning_psth.ipynb)
-
-Computes tuning curves and PSTHs for fiber photometry signals by binning the signal into 6 prediction error (PE) levels aligned to choice time. Reveals how the PrL photometry signal scales as a function of reward prediction error.
-
+### Photometry PSTHs
+**Notebook:** [`F_photometry_tuning_psth.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_photometry_tuning_psth.ipynb)\
+Computes tuning curves and PSTHs for fiber photometry signals by binning the signal into 6 prediction error (PE) levels aligned to choice time. Reveals how the PrL photometry signal scales as a function of reward prediction error.\
+**Run time:** ~5 min\
+**Manuscript figure panels:** Fig5i-k, Fig6i-l, FigA17\
 **Prerequisites:**
 - Photometry GLM results (from [`photometry_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/photometry_generation.py))
 - Per-session photometry data
-
-**Run time:** ~5 min
-
-**Manuscript figure panels**
-- Panel(s): Fig5i-k, Fig6i-l, FigA17
 
 ---
 
