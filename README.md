@@ -49,12 +49,11 @@ Before running any analysis notebook, the **figure preparation scripts** in [`co
 10. [`beh_combined_outcome_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/beh_combined_outcome_generation.py) - 12 min
 11. [`photometry_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/photometry_generation.py) - 10 min
 
-> [!NOTE] 
-> Total estimated time: ~55 min
+**Total estimated time:** ~55 min
 
 
 
-## 1. Behavior Analysis
+## Behavior Analysis
 
 **Notebook:** [`F_behavior.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_behavior.ipynb)
 
@@ -79,9 +78,8 @@ Analyzes behavioral and neural factors underlying hit vs. miss responses to the 
 
 **Manuscript figure panels**
 - Panel(s): Fig5
----
 
-## 2. Behavior and Electrophysiology Analysis
+## Behavior and Electrophysiology Analysis
 
 **Notebook:** [`F_ephys_behavior_action&outcome.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_action&outcome.ipynb)
 
@@ -117,9 +115,9 @@ Quantifies neural discriminability of behavioral variables (reward outcome, hit/
 
 **Manuscript figure panels**
 - Panel(s): FigA15 a-c
----
 
-## 3. Electrophysiology Analysis
+
+## Electrophysiology Analysis
 
 **Notebook:** [`F_basic_ephys.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_basic_ephys.ipynb)
 
@@ -161,9 +159,8 @@ Identifies and characterizes antidromically-activated projection neurons across 
 **Manuscript figure panels**
 - Panel(s): FigA12
 
----
 
-## 4. Waveform and Spatial Organization
+## Waveform and Spatial Organization
 
 **Notebook:** [`F_waveform_space.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_waveform_space.ipynb)
 
@@ -203,9 +200,8 @@ Integrates three datasets to compare cellular organization axes: electrophysiolo
 **Manuscript figure panels**
 - Panel(s): Fig3e, FigA18
 
----
 
-## 5. Behavior and Photometry Analysis
+## Behavior and Photometry Analysis
 
 
 **Notebook:** [`F_photometry_tuning_psth.ipynb`](code/beh_ephys_analysis/session_combine/manuscript_figures/F_photometry_tuning_psth.ipynb)
@@ -220,6 +216,8 @@ Computes tuning curves and PSTHs for fiber photometry signals by binning the sig
 
 **Manuscript figure panels**
 - Panel(s): Fig5i-k, Fig6i-l, FigA17
+
+# Data Organization
 ## Experiments and Derived Data Used
 
 ### Electrophysiology Recordings with and without behavior
@@ -250,7 +248,7 @@ Computes tuning curves and PSTHs for fiber photometry signals by binning the sig
 
 ---
 
-## Running This Code Locally
+# Running This Code Locally
 
 This codebase is designed to run both on Code Ocean and on local machines. The import structure ensures that all functions can be properly imported regardless of where the repository root is located.
 
