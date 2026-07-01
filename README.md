@@ -32,7 +32,7 @@ The code is organized into two sections, a data preparation pipeline, and then d
 
 Before running any analysis notebook, the **figure preparation scripts** in [`code/beh_ephys_analysis/session_combine/figure_preparation`](code/beh_ephys_analysis/session_combine/figure_preparation) must be executed first. These scripts aggregate and preprocess data across all sessions and animals, generating combined tables and derived metrics that the analysis notebooks depend on. 
 
-> **Important** The scripts must be run **in the exact order** specified in the [`sequence`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence) file, as later steps depend on outputs from earlier ones. These scripts must be run before any analysis notebook. 
+> [!CAUTION] The scripts must be run **in the exact order** specified in the [`sequence`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence) file, as later steps depend on outputs from earlier ones. These scripts must be run before any analysis notebook. 
 
 
 **Estimated run time for each script:**
@@ -48,7 +48,7 @@ Before running any analysis notebook, the **figure preparation scripts** in [`co
 10. [`beh_combined_outcome_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/beh_combined_outcome_generation.py) - 12 min
 11. [`photometry_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/photometry_generation.py) - 10 min
 
-**Total estimated time: ~55 min**
+> [!NOTE] Total estimated time: ~55 min
 
 
 
