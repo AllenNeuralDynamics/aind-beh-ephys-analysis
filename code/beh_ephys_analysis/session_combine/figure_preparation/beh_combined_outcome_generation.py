@@ -58,15 +58,9 @@ from pandas.core.apply import com
 # file's location, so imports work no matter where the repo is checked out.
 import os
 import sys
-_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
-while _anchor != os.path.dirname(_anchor):
-    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
-    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
-        if _beh_ephys_root in sys.path:
-            sys.path.remove(_beh_ephys_root)
-        sys.path.insert(0, _beh_ephys_root)
-        break
-    _anchor = os.path.dirname(_anchor)
+_beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+if _beh_ephys_root not in sys.path:
+    sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import matplotlib.pyplot as plt
