@@ -275,13 +275,13 @@ To run this analysis pipeline on your local machine:
    - The automatic import system will resolve paths correctly
    - Notebooks can be run in any order after preparation scripts complete
 
-**Note:** The code automatically detects the repository root, so you can run notebooks from any working directory within the repository.
+**Note:** Notebooks resolve imports relative to their own location, so they work as long as the repository structure is intact.
 
 ### Import System Design
 
 The code uses a robust import resolution system that works across different environments:
 
-1. **Notebooks use automatic root detection**: Each notebook includes an automatic root-finding snippet at the top that walks up the directory tree to locate `code/beh_ephys_analysis/`. This ensures imports work whether you're running from Jupyter, VS Code, or any other environment.
+1. **Notebooks use relative path imports**: Each notebook resolves `code/beh_ephys_analysis/` (the folder containing `utils/`) using its own location — two directories up from `manuscript_figures/` or `figure_preparation/`. No directory-tree search is performed.
 
 2. **Centralized path management**: The [`code/beh_ephys_analysis/utils/capsule_migration.py`](code/beh_ephys_analysis/utils/capsule_migration.py) module provides the `capsule_root()` function that resolves the repository root in the following order:
    - `$CAPSULE_ROOT` environment variable (if set)
