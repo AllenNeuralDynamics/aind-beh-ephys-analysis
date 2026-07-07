@@ -104,16 +104,16 @@ dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv', dt
         pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv', dtype={'probe': str})]
 df = pd.concat(dfs).reset_index(drop=True)
 
-session_exclude_file = CAPSULE_ROOT + '/code/data_management/sessions_to_exclude.txt'
-with open(session_exclude_file, 'r') as f:
-    exclude = [line.strip() for line in f.readlines()]
+# session_exclude_file = CAPSULE_ROOT + '/code/data_management/sessions_to_exclude.txt'
+# with open(session_exclude_file, 'r') as f:
+#     exclude = [line.strip() for line in f.readlines()]
 # session_ids, behs = zip(*[
 #     (session, beh)
 #     for session, beh in zip(session_ids, behs)
 #     if isinstance(session, str) and session not in exclude
 # ])
 # exclude sessions
-df = df[~df['session_id'].isin(exclude)]
+# df = df[~df['session_id'].isin(exclude)]
 # remove those are not strings
 df = df[df['session_id'].apply(lambda x: isinstance(x, str))]
 df = df.reset_index(drop=True)
