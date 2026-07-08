@@ -1,38 +1,6 @@
 {
-  "Figure1": {
-    "a_left": "Dbh+ LC-NE cell bodies, coronal projection (microscopy image)",
-    "a_right": "LC-NE boundary in CCF space (anatomical map/cartoon)",
-    "b": "LC location in pons with 90% Dbh+ cell region (brain map/cartoon)",
-    "c": "Brain-wide LC-NE axon projection from one hemisphere (whole-brain projection image)",
-    "d": "Coronal slabs of LC-NE axonal innervation across brain (microscopy montage)",
-    "e": "Zoomed examples of labeled axons from regions in 1d (microscopy image montage)"
-  },
-  "Figure2": {
-    "ai": "LC-NE axons in frontal cortex (microscopy image)",
-    "aii": "LC-NE axons in medulla (microscopy image)",
-    "b": "Six fully reconstructed LC-NE neuron morphologies (anatomical reconstruction/cartoon)",
-    "c_left": "Fraction of each neuron’s axons across brain regions (heatmap)",
-    "c_right": "Rank correlation of regional projection patterns (correlation heatmap)",
-    "d": "Superimposed single-neuron projections colored by soma dorsal-ventral location (3D anatomical reconstruction)",
-    "e_left": "Reconstructed-neuron soma locations by primary projection target, coronal plane (scatter/anatomical map)",
-    "e_middle": "Dendritic arbors from example neurons (anatomical reconstruction inset)",
-    "e_right": "Reconstructed-neuron soma locations by primary projection target, sagittal plane (scatter/anatomical map)",
-    "f_left": "Retrogradely labeled cortex- and spinal-cord-projecting LC-NE neurons, coronal plane (scatter/anatomical map)",
-    "f_middle": "Retrogradely labeled cortex- and spinal-cord-projecting LC-NE neurons, sagittal plane (scatter/anatomical map)",
-    "f_right": "Density profiles of retrogradely labeled LC-NE neurons (line/histogram)"
-  },
-  "Figure3": {
-    "a": "LC-NE snRNAseq PCs colored by pseudospace (scatter)",
-    "b": "Differential gene expression along pseudospace (heatmap)",
-    "c_left": "MERFISH LC-NE neurons colored by imputed pseudospace, coronal plane (scatter/anatomical map)",
-    "c_right": "MERFISH LC-NE neurons colored by imputed pseudospace, sagittal plane (scatter/anatomical map)",
-    "d_left": "snRNAseq cells colored by distance to pseudospace (scatter)",
-    "d_right": "Imputed projection-target density along pseudospace (histogram)",
-    "e_left": "Primary axonal-projection axis in LC space (anatomical vector plot)",
-    "e_right": "Primary gene-expression axis in LC space (anatomical vector plot)"
-  },
   "Figure4": {
-    "a_top": "Dynamic foraging task structure (behavioral cartoon)",
+    "a": "Dynamic foraging task structure",
     "b": "Example session: mouse choices, rewards, and changing reward probabilities over trials (combined plot)",
     "c": "Choice-history logistic regression coefficients (errorbar plot)",
     "d": "LC-NE optotagging recording strategy",
@@ -73,85 +41,6 @@
     "j": "Chosen-value versus outcome effects on axonal activity (scatter)",
     "k": "Regression coefficient angle distribution for cortical axonal activity (polar histogram)",
     "l": "Frontal-cortex LC-NE axonal activity versus RPE (errorbar plot)"
-  },
-  "FigureS1": {
-    "a": "H2B+ LC-NE neurons in coronal projection (microscopy image)",
-    "b": "Localized H2B+ neurons from S1a (cell-location map)",
-    "c_left": "CCF-localized Dbh+ cell bodies, coronal projection (density map)",
-    "c_right": "CCF-localized Dbh+ cell bodies, sagittal projection (density map)",
-    "d": "LC atlas in pons across three planes (anatomical atlas/cartoon)"
-  },
-  "FigureS2": {
-    "a": "Dense right-hemisphere LC-NE labeling with LC mesh, coronal view (3D rendering)",
-    "b": "Dense right-hemisphere LC-NE labeling with LC mesh, sagittal view (3D rendering)",
-    "c": "Serial coronal slabs of brain-wide LC-NE innervation (microscopy montage)"
-  },
-  "FigureS3": {
-    "": "Examples of individual reconstructed LC-NE morphologies across projection targets (anatomical reconstruction montage)"
-  },
-  "FigureS4": {
-    "a": "Axon branches versus total axon length (scatter)",
-    "b": "Cortical axonal density and fraction per neuron (flatmap/heatmap)",
-    "c_left": "Observed projection correlations across regions (heatmap)",
-    "c_right": "Model projection correlations from axonal growth assumptions (heatmap/model comparison)",
-    "d": "Cortical-region axon-length correlation profiles (correlation plot)",
-    "e": "Cortical projection correlation versus centroid distance (scatter/line plot)",
-    "f": "Rank correlation among cortical regions (clustered heatmap)",
-    "g": "Correlation between cortical and cerebellar regions (heatmap)"
-  },
-  "FigureS5": {
-    "a": "MAPseq/BARseq experimental schema (cartoon)",
-    "b": "MAPseq dissection boundaries (anatomical map)",
-    "c": "LC-NE marker gene expression in MAPseq/BARseq cells (gene-expression plot)",
-    "d_left": "Locations of barcoded LC-NE neurons by brain (scatter/anatomical map)",
-    "d_right": "Locations of NE neurons present in each sample (scatter/anatomical map)",
-    "e": "Ipsilateral and contralateral projection strengths by region (heatmap)",
-    "f": "Fraction of barcodes detected across CNS regions (heatmap/bar-style summary)",
-    "g": "Shared-projection rank correlation (correlation heatmap)",
-    "h": "Somata of neurons with primary projections to ten regions (scatter/anatomical maps)"
-  },
-  "FigureS6": {
-    "a": "Dendrite projections colored by dorsal-ventral soma location (anatomical reconstruction)",
-    "b": "Example neurons sorted by dendritic bipolarity across planes (microscopy/reconstruction montage)",
-    "c": "Somatic versus dendritic bipolarity continuum (scatter)",
-    "d": "Dendritic bipolarity in LC space (scatter/anatomical map)",
-    "e": "Soma-dendrite axis separation versus bipolarity (scatter)",
-    "f": "Combined bipolarity in CCF space (scatter/anatomical map)",
-    "g": "Dendritic length versus axon length (scatter)",
-    "h": "Total dendritic length in CCF space (scatter/anatomical map)"
-  },
-  "FigureS7": {
-    "a": "Retrograde tracing injection-site schematic (cartoon/anatomical map)",
-    "b": "CCF-registered images for three injection sites (microscopy montage)",
-    "c": "Retrogradely labeled LC-NE neuron counts by mouse and region (dot/bar plot)",
-    "d": "Density of retrogradely labeled cells by projection target (density maps)",
-    "e": "Overlay of retrogradely labeled neurons by target, coronal plane (scatter/anatomical map)",
-    "f": "Retrogradely labeled neurons in coronal plane, left/right hemispheres (scatter/anatomical map)",
-    "g": "Retrogradely labeled neurons in sagittal plane, first view (scatter/anatomical map)",
-    "h": "Retrogradely labeled neurons in sagittal plane, second view (scatter/anatomical map)"
-  },
-  "FigureS8": {
-    "a": "Example LC-region dissection for snRNAseq (microscopy/anatomical image)",
-    "b": "UMAP of all dissected cells (scatter)",
-    "c": "LC-NE marker expression defining Dbh/Th/Slc6a2/Slc18a2 cluster (UMAP/scatter)",
-    "d": "Gene-expression clusters from all-cell UMAP (scatter)",
-    "e": "MMIDAS model cluster-number comparison (model selection plot)",
-    "f": "LC-NE UMAP colored by pseudospace (scatter)"
-  },
-  "FigureS9": {
-    "": "Graded expression of functional gene categories along pseudospace (multi-gene expression/heatmap montage)"
-  },
-  "FigureS10": {
-    "a": "CCA analysis of MERFISH population gene expression (scatter/analysis plot)",
-    "b": "Confidence interval around CCA gene-expression axis (uncertainty plot)",
-    "c": "MERFISH genes with spatial gradients (spatial expression maps)"
-  },
-  "FigureS11": {
-    "a": "Retro-seq classifier prediction of projection targets (classification plot)",
-    "b": "Retro-seq cells embedded in snRNAseq PCA space by target (scatter)",
-    "c_left": "Imputed projection target on snRNAseq cells (scatter)",
-    "c_middle": "Projection-target imputation disagreement score (scatter)",
-    "c_right": "Third imputation display panel omitted in manuscript (not shown)"
   },
   "FigureS12": {
     "a": "Behavioral performance statistics (distribution)",
@@ -194,11 +83,7 @@
     "f": "Slope symmetry versus peak-to-trough time (scatter)",
     "g": "Tetrode waveform depth rank versus PC1 (scatter)",
     "h": "Mean tetrode spike waveform quantiles (filled psth)",
-    "i": "Ranked depth versus spike-waveform features (scatter)",
-    "j_top": "Whole-cell recordings by projection target at rheobase plus 30 pA (time series)",
-    "j_bottom": "Whole-cell recordings by projection target at rheobase (time series)",
-    "k_left": "Intracellular action potential waveforms by projection target (cdf)",
-    "k_right": "Membrane time constants by projection target (cdf)"
+    "i": "Ranked depth versus spike-waveform features (scatter)"
   },
   "FigureS15": {
     "a": "Respond-vs-ignore decoding by auROC (heatmap)",
@@ -208,14 +93,6 @@
     "e": "Baseline-response activity correlation distribution (histogram)",
     "f_top": "Lick-response spike increase versus tonic modulation strength (scatter)",
     "f_bottom": "Respond-vs-ignore baseline regression versus tonic modulation strength (scatter)",
-    "g": "Example tongue position aligned to go cue",
-    "h": "Reaction-time distribution for an example session",
-    "i": "Baseline spike count versus reaction time for example neuron",
-    "j": "Baseline-window t-statistics predicting reaction time",
-    "k": "Respond-vs-ignore versus reaction-time t-statistics in baseline window",
-    "l": "Example response-window neuron activity versus reaction time",
-    "m": "Response-window t-statistics predicting reaction time",
-    "n": "Respond-vs-ignore versus reaction-time t-statistics in response window",
     "o": "Example neuron activity aligned to lick-bout starts, task licks (raster, filled psth)",
     "p": "Example neuron activity aligned to lick-bout starts, spontaneous licks (raster, filled psth)",
     "q": "Peak spike rate around spontaneous versus in-trial licks (scatter, histogram)",
@@ -239,6 +116,7 @@
     "j": "Baseline pupil-spike correlation coefficients (histogram)",
     "k": "Pupil dilation aligned to trial start by baseline spike rate (filled psth)",
     "l": "Peak pupil dilation correlation with baseline spike rate (histogram)",
+    "m": "Example pupil dilation aligned to trial start by go-cue response of an NE neuron (filled psth)",
     "n": "Peak pupil dilation correlation with go-cue response (histogram) "
   },
   "FigureS17": {
@@ -249,7 +127,8 @@
     "e": "GCaMP and isosbestic power spectra (time series)",
     "f": "GCaMP and isosbestic signals around go cues for respond/ignore trials (filled psth)",
     "g": "Post-go-cue isosbestic versus GCaMP change across experiments (scatter)",
-    "h": "Example and population trial activity for lick-response effects (filled psth)",
+    "h_left": "Example trial activity for lick-response effects (filled psth)",
+    "h_right": "Population trial activity for lick-response effects (filled psth)",
     "i": "Baseline and post-go-cue activity comparison for lick-response trials plus ephys histogram (histogram, scatter)",
     "j": "Example axonal activity during switch versus stay trials (filled psth)"
   },
