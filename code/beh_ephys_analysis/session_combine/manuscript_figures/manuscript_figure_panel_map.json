@@ -1,7 +1,7 @@
 {
   "Figure4": {
     "a": "Dynamic foraging task structure",
-    "b": "Example session: mouse choices, rewards, and changing reward probabilities over trials (combined plot)",
+    "b": "Example session: mouse choices, rewards, and changing reward probabilities over trials (mZS061d20210408)",
     "c": "Choice-history logistic regression coefficients (errorbar plot)",
     "d": "LC-NE optotagging recording strategy",
     "e": "Example extracellular spiking around two trials (time series, raster)",
