@@ -33,7 +33,22 @@ __version__ = '0.1.0'
 #         return self.shape[0]
 
 class HDF5Recording(BaseRecording):
+    """
+    SpikeInterface recording extractor for HDF5 format neural data.
+
+    Loads neural recording data stored in HDF5 format and provides
+    a SpikeInterface-compatible interface.
+    """
+
     def __init__(self, file_path: Path | str):
+        """
+        Initialize HDF5 recording extractor.
+
+        Parameters
+        ----------
+        file_path : Path or str
+            Path to HDF5 file containing neural recording data
+        """
         self._h5file = h5py.File(file_path, mode="r")
 
         sampling_frequency = self._h5file.attrs["SamplingFrequency"]
@@ -72,15 +87,32 @@ class HDF5Recording(BaseRecording):
 
 
 class HDF5RecordingSegment(BaseRecordingSegment):
+    """
+    Recording segment class for HDF5-backed neural data.
+    """
+
     def __init__(self, h5_dataset, **time_kwargs):
+        """
+        Initialize recording segment.
+
+        Parameters
+        ----------
+        h5_dataset : h5py.Dataset
+            HDF5 dataset containing timeseries data
+        **time_kwargs : dict
+            Additional timing arguments passed to BaseRecordingSegment
+        """
         BaseRecordingSegment.__init__(self, **time_kwargs)
         self._timeseries = h5_dataset
 
     def get_num_samples(self) -> int:
-        """Returns the number of samples in this signal block
+        """
+        Get the number of samples in this signal block.
 
-        Returns:
-            SampleIndex : Number of samples in the signal block
+        Returns
+        -------
+        int
+            Number of samples in the signal block
         """
         return self._timeseries.shape[1]
 
@@ -90,6 +122,23 @@ class HDF5RecordingSegment(BaseRecordingSegment):
         end_frame: int | None = None,
         channel_indices: list[int | str] | None = None,
     ) -> np.ndarray:
+        """
+        Extract neural traces for specified time range and channels.
+
+        Parameters
+        ----------
+        start_frame : int, optional
+            Starting frame index (default: None, uses beginning)
+        end_frame : int, optional
+            Ending frame index (default: None, uses end)
+        channel_indices : list of int or str, optional
+            Channel indices to extract (default: None, uses all channels)
+
+        Returns
+        -------
+        np.ndarray
+            Extracted traces with shape (n_samples, n_channels)
+        """
         traces = self._timeseries[:, start_frame:end_frame].T
         if channel_indices is not None:
             traces = traces[:, channel_indices]

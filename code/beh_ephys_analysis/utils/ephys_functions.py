@@ -5,15 +5,16 @@ import re
 from PyPDF2 import PdfMerger
 import pandas as pd
 import os
-import sys
 from matplotlib.colors import LinearSegmentedColormap
-sys.path.append('/root/capsule/aind-beh-ephys-analysis/code/beh_ephys_analysis/utils')
 # from beh_functions import session_dirs
 from matplotlib import gridspec
 import matplotlib.pyplot as plt
 # from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 # from aind_ephys_utils import align
-from beh_functions import session_dirs 
+try:
+    from .beh_functions import session_dirs
+except ImportError:
+    from beh_functions import session_dirs
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 import ast
 import json
@@ -949,7 +950,7 @@ def make_summary_unit_tbl(session): # this is for hopkins data
     here = os.path.dirname(__file__)
     tbl_columns_file = os.path.join(here, 'summary_col_list.json')
     with open(tbl_columns_file, 'r') as f:
-        example_tbl_cols = json.load(open("summary_col_list.json"))
+        example_tbl_cols = json.load(f)
     unit_summary = pd.DataFrame(columns= example_tbl_cols)
     for row_ind, row in nwb_units.iterrows():
         for col in example_tbl_cols:

@@ -1,6 +1,5 @@
+from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
-import sys
-sys.path.append('/root/capsule/aind-beh-ephys-analysis/code/beh_ephys_analysis/utils')
 from scipy import stats
 import statsmodels.api as sm
 import re
@@ -13,12 +12,17 @@ import ast
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_data
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
+try:
+    from .capsule_migration import capsule_directories
+    from .mat_converter import load_df_from_mat
+except ImportError:
+    from capsule_migration import capsule_directories
+    from mat_converter import load_df_from_mat
 from uuid import uuid4
 import json
 from datetime import datetime
 import logging
 from dateutil.tz import tzlocal
-from mat_converter import load_df_from_mat
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
 from pynwb.file import Subject
 from hdmf_zarr import NWBZarrIO
@@ -37,7 +41,7 @@ from sklearn.metrics import r2_score
 
 import spikeinterface as si
 
-save_folder=R'/root/capsule/scratch/check_rwd_licks'
+# save_folder=CAPSULE_ROOT + R'/scratch/check_rwd_licks'
 
 logger = logging.getLogger(__name__)
 
@@ -643,12 +647,20 @@ def get_stream_info(directory):
 
     return pd.DataFrame(data=stream_info)
 
-def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch', hopkins = False):
+def session_dirs(session_id, model_name = None, data_dir = None, scratch_dir = None, hopkins = False):
+    # set up directories if not provided
+    if data_dir is None:
+        data_dir = capsule_directories()['data_dir']
+    if scratch_dir is None:
+        scratch_dir = capsule_directories()['derived_dir']
     # parse session_id 
+
     aniID, date_obj, raw_id = parseSessionID(session_id)
-    if aniID.startswith('ZS'):
+    hopkins_list = ['672850', '669492', '669489', '754898', '754896', '754895', '749624',  '749472', '701707', '699472', '699461', '699462']
+    # print(f"Parsing session_id: {session_id}, aniID: {aniID}")
+    if aniID.startswith('ZS') or aniID in hopkins_list:
         # print('Old data, using hopkins formats')
-        return session_dirs_hopkins(session_id, model_name, data_dir, scratch_dir)
+        return session_dirs_hopkins(session_id, model_name, data_dir = data_dir, scratch_dir = scratch_dir)
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
     session_dir = os.path.join(raw_dir, 'ecephys_clipped')
@@ -939,15 +951,19 @@ def session_dirs(session_id, model_name = None, data_dir = '/root/capsule/data',
 
     return dir_dict
 
-def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule/scratch'):
-    # parse session_id 
+def session_dirs_hopkins(session_id, model_name = None, data_dir = None, scratch_dir = None):
+    if data_dir is None:
+        data_dir = capsule_directories()['data_dir']
+    if scratch_dir is None:
+        scratch_dir = capsule_directories()['derived_dir']
+    # parse session_id
     aniID, date_obj, raw_id = parseSessionID(session_id)
     # raw dirs
     raw_dir = os.path.join(data_dir, session_id+'_raw_data')
     session_dir = os.path.join(raw_dir, 'ecephys', 'neuralynx', 'session')
     session_dir_raw = session_dir
     mat_dir = os.path.join(raw_dir, 'ecephys', 'sorted', 'session')
-    if not os.path.exists(session_dir):
+    if not os.path.exists(mat_dir):
         mat_dir = os.path.join(raw_dir, 'fib', 'sorted', 'session')
     if os.path.exists(mat_dir):
         beh_mat = [file for file in os.listdir(mat_dir) if file.endswith('sessionData_behav.mat')]
@@ -975,7 +991,7 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
     if session_dir is not None:
         raw_recording_dir = os.path.join(session_dir, 'raw_data.hdf5')
         if not os.path.exists(raw_recording_dir):
-            print(f'No raw session directory found for {session_id}.')
+            # print(f'No raw session directory found for {session_id}.')
             stream_name = None
             raw_recording_dir = None 
             experiment_id = None
@@ -998,11 +1014,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
         if len(nwb) == 1:
             nwb_dir_raw = os.path.join(nwb_dir_temp, nwb[0])
         elif len(nwb) > 1:
-            print('There are multiple recordings in the raw nwb directory. Picked one with units.')
+            # print('There are multiple recordings in the raw nwb directory. Picked one with units.')
             nwb_dir_raw = None
         else:
             nwb_dir_raw = None
-            print('There is no nwb file in the raw directory.')
+            # print('There is no nwb file in the raw directory.')
     nwb_dir_curated = None
     # curated version
     if os.path.exists(raw_dir):
@@ -1013,11 +1029,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
                 nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
             elif len(nwb_dir_temp) > 1:
                 nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
-                print('There are multiple nwb files in the curated directory. Picked first one.')
+                # print('There are multiple nwb files in the curated directory. Picked first one.')
             else:
                 nwb_dir_temp = None
                 nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
+                # print('There is no nwb file in the curated directory.')
 
         if nwb_dir_temp is not None:
             nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb.zarr')]
@@ -1025,11 +1041,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
             if len(nwb) == 1:
                 nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
             elif len(nwb) > 1:
-                print('There are multiple recordings in the curated nwb directory. Picked one with units.')
+                # print('There are multiple recordings in the curated nwb directory. Picked one with units.')
                 nwb_dir_curated = None
             else:
                 nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
+                # print('There is no nwb file in the curated directory.')
     # postprocessed dirs
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
     postprocessed_dir_raw = os.path.join(processed_dir, 'ephys', 'curated', 'analyzer.zarr')
@@ -1167,7 +1183,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = '/root/capsul
 
     return dir_dict
 
-def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scratch_dir = '/root/capsule'):
+def load_model_dv(session_id, model_name, data_dir = None, scratch_dir = None):
+    if data_dir is None:
+        data_dir = capsule_directories()['data_dir']
+    if scratch_dir is None:
+        scratch_dir = capsule_directories()['derived_dir']
     model_dirs = session_dirs(session_id, model_name, data_dir=data_dir, scratch_dir=scratch_dir)
     if model_dirs['model_file'] is not None and os.path.exists(model_dirs['model_file']):
         model_dv_temp = pd.read_csv(model_dirs['model_file'], index_col=0)
@@ -1185,7 +1205,7 @@ def load_model_dv(session_id, model_name, data_dir = '/root/capsule/data', scrat
 
 def makedirs(directories):
     for directory_name, directory in directories.items():
-        if 'dir' in directory_name and directory is not None and 'scratch' in directory:
+        if 'dir' in directory_name and directory is not None and 'scratch' in directory and 'data' not in directory:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
@@ -1223,6 +1243,7 @@ def delete_files_without_name(folder_path, name):
                 os.remove(file_path)
 
 def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptions = False, load_glm = False):
+    capsule_dirs = capsule_directories()
     session_dir = session_dirs(session)
     tblTrials = get_session_tbl(session)
 
@@ -1243,7 +1264,7 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
     responseInds = tblTrials['animal_response']!=2
     leftRewards = tblTrials.loc[responseInds, 'rewarded_historyL']
 
-    # oucome 
+    # oucome
     leftRewards = tblTrials.loc[tblTrials['animal_response']!=2, 'rewarded_historyL']
     rightRewards = tblTrials.loc[tblTrials['animal_response']!=2, 'rewarded_historyR']
     outcomes = leftRewards | rightRewards
@@ -1299,8 +1320,9 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
     trialData = pd.concat([trialData, choice_tbl], axis=1)
     if model_name is not None and load_glm:
         # load glm results if exist 
-        if os.path.exists(os.path.join(f"/root/capsule/scratch/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl')):
-            with open(os.path.join(f"/root/capsule/scratch/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl'), 'rb') as f:
+        glm_path = os.path.join(f"{capsule_dirs['derived_dir']}/{session_dir['aniID']}/ani_combinded", 'glm_choice_history_model_results.pkl')
+        if os.path.exists(glm_path):
+            with open(glm_path, 'rb') as f:
                 glm_results = pickle.load(f)
             p_choice = glm_results['choice_prob_by_session'][session]
             session_interruptions = trialData['auto_manual_trial'] | trialData['extra_reward']
@@ -1552,9 +1574,12 @@ def longest_zero_chunk(binary_list):
 
     return longest_start, longest_end, longest_len
 
-def get_session_tbl(session, cut_interruptions = False):
+def get_session_tbl(session, cut_interruptions = False, load_raw = False):
     session_dir = session_dirs(session)
-    nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
+    if load_raw:
+        nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '_all_trials.nwb')
+    else:
+        nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
     if os.path.exists(nwb_file):
         nwb = load_nwb_from_filename(nwb_file)
         tbl = nwb.trials.to_dataframe()
@@ -1611,8 +1636,8 @@ def get_session_tbl(session, cut_interruptions = False):
 def get_unit_tbl(session, data_type, summary = True):
     session_dir = session_dirs(session)
     unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary.pkl')
-    if 'ZS' in session:
-        unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary_raw_wf.pkl')
+    # if 'ZS' in session:
+    #     unit_tbl_summary = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_{data_type}_soma_opto_tagging_summary_raw_wf.pkl')
     unit_tbl_dir = os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_opto_tagging_metrics.pkl')
     ccf_dir = os.path.join(session_dir[f'ephys_processed_dir_{data_type}'],'ccf_unit_locations.csv')
     if summary: 
@@ -1640,7 +1665,7 @@ def get_unit_tbl(session, data_type, summary = True):
         print(f'No unit table found for {session} in {data_type} data.')
         return None
 
-def transfer_nwb(session_id, hopkins=False):
+def transfer_nwb(session_id, hopkins=False, CSplus_only=True):
     session_dir = session_dirs(session_id, hopkins=hopkins)
     src_path = session_dir['nwb_dir_raw']
     with NWBZarrIO(src_path, mode="r") as io:
@@ -1650,8 +1675,9 @@ def transfer_nwb(session_id, hopkins=False):
     trials_table = src_nwb.trials
 
     # --- Create a new NWBFile ---
+    session_description = "CS_plus only copy" if CSplus_only else "All trials copy"
     new_nwb = NWBFile(
-        session_description="CS_plus only copy",
+        session_description=session_description,
         identifier=src_nwb.identifier,
         session_start_time=src_nwb.session_start_time
     )
@@ -1691,32 +1717,61 @@ def transfer_nwb(session_id, hopkins=False):
         raise ValueError("Mismatch in number of trials between session and NWB file.")
         
     for ind, row in trials_df.iterrows():
-        if row['trial_type'] == 'CSplus':
+        if CSplus_only:
+            if row['trial_type'] != 'CSplus':
+                continue
             kwargs = row.to_dict()
             kwargs['ITI_duration'] = 0.5
-            if ind>0 and pre_row is not None:
+            if ind > 0 and pre_row is not None:
                 kwargs['start_time'] = pre_row['goCue_start_time'] + 3.1
             else:
                 kwargs['start_time'] = row['goCue_start_time'] - 1.5
             kwargs['stop_time'] = row['goCue_start_time'] + 3.1
             kwargs['delay_max'] = kwargs['delay_duration']
             kwargs['delay_min'] = kwargs['delay_duration']
-            kwargs['animal_response'] = choice_side[ind]  # 0 for left, 1 for right, 2 for no response
+            kwargs['animal_response'] = choice_side[ind]
             new_nwb.add_trial(**kwargs)
             pre_row = row
-    # add aquisition 
+        else:
+            kwargs = row.to_dict()
+            kwargs['ITI_duration'] = 0.5
+            if ind > 0 and pre_row is not None:
+                kwargs['start_time'] = pre_row['goCue_start_time'] + 3.1
+            else:
+                kwargs['start_time'] = row['goCue_start_time'] - 1.5
+            kwargs['stop_time'] = row['goCue_start_time'] + 3.1
+            kwargs['delay_max'] = kwargs['delay_duration']
+            kwargs['delay_min'] = kwargs['delay_duration']
+            kwargs['animal_response'] = choice_side[ind]
+            new_nwb.add_trial(**kwargs)
+            pre_row = row
+    # add acquisition 
     from pynwb import TimeSeries
+
+    def _materialize_array_like(value):
+        """Load lazy datasets into memory to avoid external zarr links in output."""
+        if value is None:
+            return None
+        try:
+            return np.asarray(value[:])
+        except Exception:
+            return np.asarray(value)
 
     for name, acq in src_nwb.acquisition.items():
         if isinstance(acq, TimeSeries):
-            new_acq = TimeSeries(
-                name=acq.name,
-                data=acq.data,
-                unit=acq.unit,
-                rate=acq.rate,
-                timestamps=acq.timestamps,
-                description=acq.description
-            )
+            new_acq_kwargs = {
+                'name': acq.name,
+                'data': _materialize_array_like(acq.data),
+                'unit': acq.unit,
+                'description': acq.description,
+            }
+            if acq.timestamps is not None:
+                new_acq_kwargs['timestamps'] = _materialize_array_like(acq.timestamps)
+            else:
+                new_acq_kwargs['starting_time'] = acq.starting_time
+                new_acq_kwargs['rate'] = acq.rate
+
+            new_acq = TimeSeries(**new_acq_kwargs)
             new_nwb.add_acquisition(new_acq)
         else:
             new_nwb.add_acquisition(acq)  # fallback
@@ -1727,6 +1782,9 @@ def transfer_nwb(session_id, hopkins=False):
 
     # --- Write the new NWB (Zarr) ---
     out_path = session_dir['nwb_beh']
+    if not CSplus_only:
+        base, ext = os.path.splitext(out_path)
+        out_path = base + '_all_trials' + ext
     shutil.rmtree(out_path, ignore_errors=True)
     with NWBZarrIO(out_path, mode="w") as out_io:
         out_io.write(new_nwb)
@@ -1994,9 +2052,10 @@ def fit_glm_session_list(session_list, max_lag=5, plot=False):
     return results, fig
 
 def fit_glm_animal(ani_focus, max_lag=5, plot=False):
-    dfs = [pd.read_csv('/root/capsule/code/data_management/session_assets.csv'),
-            pd.read_csv('/root/capsule/code/data_management/hopkins_session_assets.csv'),
-            pd.read_csv('/root/capsule/code/data_management/hopkins_FP_session_assets.csv')]
+    capsule_dirs = capsule_directories()
+    dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
+            pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv'),
+            pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_FP_session_assets.csv')]
     df = pd.concat(dfs)
     session_list = df['session_id'].values.tolist()
     ani_list = [str(session).split('_')[1] for session in session_list if str(session).startswith('behavior')]
@@ -2007,12 +2066,13 @@ def fit_glm_animal(ani_focus, max_lag=5, plot=False):
     results, fig = fit_glm_session_list(ani_session_list, max_lag=max_lag, plot=plot)
     if results is None:
         return None, None
-    save_dir = f'/root/capsule/scratch/{ani_focus}/ani_combinded'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    save_file = os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', 'glm_choice_history_model_results.pkl')
-    with open(save_file, 'wb') as f:
-        pickle.dump(results, f)
-    if plot:
-        fig.savefig(fname=os.path.join(f'/root/capsule/scratch/{ani_focus}/ani_combinded', f'{ani_focus}_glm_choice_history_model_results.pdf'))
+    save_dir = os.path.join(capsule_dirs['derived_dir'], f'{ani_focus}/ani_combinded')
+    if 'data' not in save_dir: # to avoid saving in the data directory
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_file = os.path.join(save_dir, 'glm_choice_history_model_results.pkl')
+        with open(save_file, 'wb') as f:
+            pickle.dump(results, f)
+        if plot:
+            fig.savefig(fname=os.path.join(save_dir, f'{ani_focus}_glm_choice_history_model_results.pdf'))
     return results, fig

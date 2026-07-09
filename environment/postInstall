@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 set -e
 
-pip uninstall -y traitlets
-# pip install --no-cache-dir --ignore-installed traitlets==5.9.0
+# Fix traitlets dependency issue
+pip uninstall -y traitlets || true
+pip install --no-cache-dir --ignore-installed traitlets==5.9.0
+
+# Install project dependencies
 # pip install -e git+https://github.com/AllenNeuralDynamics/aind_multisession_ephys.git#egg=aind-multisession-ephys
-pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc@sue_alignment_on_CO
-pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis@plot_session_in_time_sue
+pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-ephys-rig-qc.git@dd903935c67d5bbb47331d95a61a7441cf715e0a
+pip install --no-deps --no-cache-dir git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis@b3e2e4f29f062764f9a40bfdc630dd0b6f039989
 
-# move VS code data directory into capsule, so it persists
-ln -s /root/capsule/code/.vscode/ /.vscode
+# # move VS code data directory into capsule, so it persists
+# ln -s /root/capsule/code/.vscode/ /.vscode
 
-# install updated version of code-server
-VERSION=4.20.1
-mkdir /.code-server
-cd /.code-server
-curl -fL "https://github.com/coder/code-server/releases/download/v$VERSION/code-server-$VERSION-linux-amd64.tar.gz" \
-  | tar -xvz
-ln -s /.code-server/code-server-$VERSION-linux-amd64/bin/code-server  /usr/bin/code-server
-cd -
+# # install updated version of code-server
+# VERSION=4.20.1
+# mkdir /.code-server
+# cd /.code-server
+# curl -fL "https://github.com/coder/code-server/releases/download/v$VERSION/code-server-$VERSION-linux-amd64.tar.gz" \
+#   | tar -xvz
+# ln -s /.code-server/code-server-$VERSION-linux-amd64/bin/code-server  /usr/bin/code-server
+# cd -
 
 # eval "$(conda shell.bash hook)"
 

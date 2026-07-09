@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(python code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py)",
+      "Bash(python -m json.tool)",
+      "Bash(python3 -c \"import json; nb=json.load\\(open\\('/root/capsule/code/beh_ephys_analysis/session_combine/manuscript_figures/F_basic_ephys.ipynb'\\)\\); print\\('Total cells:', len\\(nb['cells']\\)\\); [print\\(f'Cell {i}: {c[\\\\\"cell_type\\\\\"]}', c.get\\('id', 'no-id'\\)[:8] if c.get\\('id'\\) else 'no-id'\\) for i, c in enumerate\\(nb['cells'][:15]\\)]\")",
+      "Bash(python3 -c \"import json; f=open\\('/root/capsule/code/beh_ephys_analysis/session_combine/manuscript_figures/F_hit_miss.ipynb'\\); nb=json.load\\(f\\); print\\(len\\(nb['cells']\\)\\)\")",
+      "Bash(python3 process_antidromic_notebook.py)",
+      "Bash(python process_notebook.py)"
+    ]
+  }
+}

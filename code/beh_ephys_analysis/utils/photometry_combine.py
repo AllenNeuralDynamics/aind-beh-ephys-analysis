@@ -1,11 +1,17 @@
+from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import pandas as pd
-import sys
 from pathlib import Path
 
 from requests import session
-sys.path.append('/root/capsule/code/beh_ephys_analysis')
-from utils.ephys_functions import fitSpikeModelG
+try:
+    from .ephys_functions import fitSpikeModelG
+    from .beh_functions import session_dirs, parseSessionID, get_session_tbl, makeSessionDF, load_model_dv
+    from .photometry_utils import get_FP_data, align_signal_to_events
+except ImportError:
+    from ephys_functions import fitSpikeModelG
+    from beh_functions import session_dirs, parseSessionID, get_session_tbl, makeSessionDF, load_model_dv
+    from photometry_utils import get_FP_data, align_signal_to_events
 import platform
 import os
 from pathlib import Path
@@ -15,8 +21,6 @@ import shutil
 # from utils.behavior.session_utils import load_session_df, parse_session_string
 # from utils.behavior.lick_analysis import clean_up_licks, parse_lick_trains
 # from utils.behavior.model_utils import get_param_names_dF, get_model_variables_dF, get_stan_model_params_samps_only, infer_model_var
-from utils.beh_functions import session_dirs, parseSessionID, get_session_tbl, makeSessionDF, load_model_dv
-from utils.photometry_utils import get_FP_data, align_signal_to_events
 from itertools import chain
 from matplotlib import pyplot as plt
 from IPython.display import display
@@ -55,7 +59,7 @@ def process_session(session, region, channel='G_tri-exp_mc', formula='spikes ~ 1
     session_dir = session_dirs(session)
     model = 'stan_qLearning_5params'
     # load animal metadata
-    ani_meta_file = os.path.join('/root/capsule/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
+    ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
     if not os.path.exists(ani_meta_file):
         print(f'Animal metadata file not found for session {session}.')
         return None, None, None, None, session
@@ -156,7 +160,7 @@ def process_session_ani(session_list, region, channel='G_tri-exp_mc', formula='s
     session_dir = session_dirs(session_list[0])
     model = 'stan_qLearning_5params'
     # load animal metadata
-    ani_meta_file = os.path.join('/root/capsule/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
+    ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
     if not os.path.exists(ani_meta_file):
         print(f'Animal metadata file not found for session {session_dir["aniID"]}.')
         return None, None, None, None, None, session_dir["aniID"]
@@ -468,8 +472,9 @@ def population_GLM_ani(
 def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-exp_mc', align='CSon', pre_time=-5, post_time=2.5, num_bins=5, thresh=0.5, quantiles=True):
     model = 'stan_qLearning_5params'
     def process_session_for_tuning(session):
+        print(f'Processing session {session} for tuning curve...')
         session_dir = session_dirs(session)
-        ani_meta_file = os.path.join('/root/capsule/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
+        ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
         with open(ani_meta_file, 'r') as f:
             ani_meta = json.load(f)
         if region not in ani_meta.keys():
@@ -488,13 +493,21 @@ def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-e
         if target_var not in trial_data.columns:
             print(f'{target_var} not found in trial data for session {session}.')
             return None, None, None
+        if session == 'behavior_754896_2025-01-08_16-03-27':
+            print('STOP')
         _, mean_psth, time, _ = align_signal_to_events(
                                                     curr_signal, 
                                                     signal['time_in_beh'], 
                                                     trial_data['goCue_start_time'].values, 
                                                     pre_event_time=1, post_event_time=1, window_size=0.2, step_size=0.1
                                                     );
-        go_resp_G = np.mean(mean_psth[time>100]) - np.mean(mean_psth[time<-100])
+        # Calculate go response with empty array checks
+        late_mask = time > 0.1
+        early_mask = time < -0.1
+        if np.sum(late_mask) > 0 and np.sum(early_mask) > 0:
+            go_resp_G = np.mean(mean_psth[late_mask]) - np.mean(mean_psth[early_mask])
+        else:
+            go_resp_G = np.nan
         if go_resp_G < thresh:
             return None, None, None
         aligned_matrix, _, time_bins, _ = align_signal_to_events(
@@ -530,6 +543,10 @@ def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-e
         return curr_bin_means, curr_signal_means, session
     
     results = Parallel(n_jobs=8)(delayed(process_session_for_tuning)(session) for session in session_list)
+    # results = []
+    # for session in session_list:
+    #     result = process_session_for_tuning(session)
+    #     results.append(result)
     all_bin_means, all_signal_means, processed_sessions = zip(*[res for res in results if res[0] is not None])
     all_bin_means = np.array(all_bin_means)
     all_signal_means = np.array(all_signal_means)
@@ -553,7 +570,7 @@ def plot_psth(
     model = 'stan_qLearning_5params'
     def process_session_for_psth(session):
         session_dir = session_dirs(session)
-        ani_meta_file = os.path.join('/root/capsule/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
+        ani_meta_file = os.path.join(CAPSULE_ROOT + '/code/data_management/FP_metadata', f'{session_dir["aniID"]}.json')
         if not os.path.exists(ani_meta_file):
             print(f'{session} Metadata file not found.')
             return None, None
@@ -572,6 +589,7 @@ def plot_psth(
         signal = get_FP_data(session)
         curr_signal = zscore(signal[channel][region])
         beh_session_data_raw = get_session_tbl(session, cut_interruptions=True)
+        beh_session_data_raw['hit'] = beh_session_data_raw['animal_response'].values != 2
         beh_session_data = makeSessionDF(session, model_name = model, cut_interruptions=True)
         _, mean_psth, time, _ = align_signal_to_events(
                                                     curr_signal, 
@@ -636,12 +654,13 @@ def plot_psth(
                          alpha=0.3, facecolor=custom_cmap(bin_ind / (mean_binned_psth.shape[0] - 1)), edgecolor='none')
     ax.set_xlabel('Time from ' + align + ' (ms)')
     ax.set_ylabel('Photometry signal')
+    ax.set_xlim([-pre_time, post_time])
     ax.legend()
     ax.set_title('Binned PSTH - raw')
 
     ax = fig.add_subplot(122)
     # remove baseline by subtracting mean of pre-event time
-    baseline_mask = time_bins[0] < 0
+    baseline_mask = (time_bins[0] < 0) & (time_bins[0] >= -pre_time)    
     baseline_values = mean_binned_psth[:, baseline_mask]
     baseline_mean = np.nanmean(baseline_values, axis=1, keepdims=True)
     mean_binned_psth_baseline_corrected = mean_binned_psth - baseline_mean
@@ -653,6 +672,7 @@ def plot_psth(
                          alpha=0.3, facecolor=custom_cmap(bin_ind / (mean_binned_psth_baseline_corrected.shape[0] - 1)), edgecolor='none')
     ax.set_xlabel('Time from ' + align + ' (ms)')
     ax.set_ylabel('Photometry signal')
+    ax.set_xlim([-pre_time, post_time])
     ax.legend()
     ax.set_title('Binned PSTH - baseline corrected')
 
