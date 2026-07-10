@@ -706,7 +706,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
     sessions = [
-        'behavior_751004_2024-12-20_13-26-11_raw_data',
+        'behavior_754897_2025-03-13_11-20-42',
     ]
 
     for session in sessions:
@@ -714,9 +714,6 @@ if __name__ == '__main__':
         print(f"Testing: {session}")
         print(f"{'='*80}\n")
 
-        licks = load_licks(session)
-        pose = load_keypoint_tracking(session)
-        pupil = load_pupil(session)
 
         # Test the full build_combined_nwb function
         save_path, nwb = build_combined_nwb(session, data_type='curated', save_file=None)
