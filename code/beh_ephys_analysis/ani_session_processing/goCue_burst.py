@@ -55,6 +55,24 @@ from joblib import Parallel, delayed
 from utils.plot_utils import shiftedColorMap, template_reorder, plot_raster_bar,merge_pdfs, combine_pdf_big
 
 def burst_analysis(session, data_type, units = None):
+    """
+    Analyze burst patterns and spike timing in relation to go-cue and choice events.
+
+    Creates comprehensive plots showing:
+    - Raster plots aligned to go-cue and choice, sorted by lick latency
+    - Raster plots sorted by first spike time
+    - ISI (inter-spike interval) distributions
+    - Spike timing colored by preceding ISI
+    - First spike time vs first lick time scatter plots
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        units (list or None): List of unit IDs to analyze. If None, analyze all units with p_max >= 0.5.
+
+    Returns:
+        None: Saves individual burst analysis plots as PDF files in the session directory.
+    """
     print(f'Processing session {session} for data type {data_type}')
     unit_tbl = get_unit_tbl(session, data_type)
     session_df = get_session_tbl(session)

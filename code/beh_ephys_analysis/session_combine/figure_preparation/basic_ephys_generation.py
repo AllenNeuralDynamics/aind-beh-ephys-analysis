@@ -1,3 +1,46 @@
+"""
+Step 5 of figure preparation pipeline: Generate basic electrophysiology features for all units.
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    Data requirements:
+    - combined_unit_tbl.pkl from Step 1
+    - Per-session quality metrics (*_qm.json) in processed_dir/
+    - Per-session spike times and unit tables from NWB files
+
+Pipeline Position:
+    Script #5 in sequence.txt (line 5)
+    Can run IN PARALLEL with:
+    - antidromic_generation.py
+    - waveform_generation_np.py
+    - waveform_generation_tt.py
+    - acg_generation.py
+    - response_tstats_generation.py
+    - outcome_window_generation_parallel.py
+    (All these scripts only need combined_unit_tbl.pkl from Step 1)
+
+Purpose:
+    Computes fundamental electrophysiological features for all units across sessions:
+    - Spike waveform characteristics (peak-to-trough width, amplitude, half-width)
+    - Firing statistics (firing rate, ISI distributions, burst properties)
+    - Quality control metrics (ISI violations, SNR, amplitude cutoff, presence ratio)
+    - Recording stability (spike amplitude drift over time)
+    - Anatomical locations (CCF coordinates, recording depth)
+
+Input:
+    - combined_unit_tbl.pkl from Step 1
+    - Per-session NWB files with spike times
+    - Quality metrics JSON files
+
+Output:
+    - combined_basic_ephys_tbl.pkl: DataFrame with basic electrophysiology features per unit
+    - Includes: waveform metrics, firing statistics, QC measures, anatomical coordinates
+
+Usage:
+    Run after Step 1 completes. Can run in parallel with other scripts that only need Step 1.
+"""
 # %%
 import sys
 import os
@@ -5,15 +48,9 @@ import os
 # file's location, so imports work no matter where the repo is checked out.
 import os
 import sys
-_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
-while _anchor != os.path.dirname(_anchor):
-    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
-    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
-        if _beh_ephys_root in sys.path:
-            sys.path.remove(_beh_ephys_root)
-        sys.path.insert(0, _beh_ephys_root)
-        break
-    _anchor = os.path.dirname(_anchor)
+_beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+if _beh_ephys_root not in sys.path:
+    sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import matplotlib.pyplot as plt
@@ -447,14 +484,22 @@ window_length = 2
 
 # %%
 all_results = []
+
+# Progress tracking variables
+_total_units = 0
+_processed_units = 0
+_last_reported_pct = -10
+
 def safe_process(row):
     """Wrapper to safely call process() and catch errors."""
+    global _processed_units, _last_reported_pct, _total_units
+
     try:
-        print(f"Processing session {row['session']}, unit {row['unit']}...")
-        return process(row['session'], row['unit'], row['in_df'])
+        result = process(row['session'], row['unit'], row['in_df'])
     except Exception as e:
-        print(f"[Error] session {row['session']}, unit {row['unit']}: {e}")
-        return {'session': row['session'],
+        # Only print errors, not every unit
+        print(f"[Error] session {row['session']}, unit {row['unit']}: {e}", flush=True)
+        result = {'session': row['session'],
                 'unit_id': row['unit'],
                 'bl_mean': np.nan,
                 'response_rate': np.nan,
@@ -479,6 +524,16 @@ def safe_process(row):
                 'response_isi': np.nan,
                 }
 
+    # Report progress at 10% intervals
+    _processed_units += 1
+    if _total_units > 0:
+        current_pct = int((_processed_units / _total_units) * 100)
+        if current_pct >= _last_reported_pct + 10:
+            _last_reported_pct = (current_pct // 10) * 10
+            print(f"  Progress: {_last_reported_pct}% ({_processed_units}/{_total_units} units)", flush=True)
+
+    return result
+
 # results = []
 # for ind, row in combined_tagged_units_filtered.iterrows():
 #     session = row['session']
@@ -488,8 +543,12 @@ def safe_process(row):
 #     result = process(session, unit_id, df)
 #     results.append(result)
 #
-print(f"Processing {len(combined_tagged_units_filtered)} units with parallelization...")
+_total_units = len(combined_tagged_units_filtered)
+_processed_units = 0
+_last_reported_pct = 0
+print(f"Processing {_total_units} units with parallelization...")
 results = Parallel(n_jobs=-1)(delayed(safe_process)(row) for ind, row in combined_tagged_units_filtered.iterrows())
+print(f"  Progress: 100% ({_total_units}/{_total_units} units) - Complete!", flush=True)
 
 # %%
 basic_ephys_df = pd.DataFrame(results)

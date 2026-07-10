@@ -122,7 +122,11 @@ def parse_lick_trains(licks, window_size = 1000, height = 2, min_dist = 2000, in
     if unit == 'seconds':
         licks = np.round(licks * 1000)
         licks_end = np.round(licks_end * 1000)
-    if np.mean(np.diff(licks)) < 100 and unit != 'seconds':
+    # Check for empty licks array
+    if len(licks) == 0:
+        # Return empty structure
+        return {'train_starts': np.array([]), 'train_ends': np.array([]), 'train_amps': np.array([]), 'train_durations': np.array([])}, None
+    if len(licks) > 1 and np.mean(np.diff(licks)) < 100 and unit != 'seconds':
         print('Warning: Lick times appear to be in ms. Consider converting to seconds by setting unit="seconds".')
     # Lick peak detection
     bins = np.arange(licks.min(), licks.max(), 1)
@@ -155,7 +159,12 @@ def parse_lick_trains(licks, window_size = 1000, height = 2, min_dist = 2000, in
             if train_end - train_start < 3500:
                 train_starts.append(train_start)
                 train_ends.append(train_end)
-                train_amps.append(np.mean(lick_peak_amplitudes[(lick_peak_times > train_start) & (lick_peak_times < train_end)]))
+                # Calculate mean amplitude, handle empty case
+                amp_mask = (lick_peak_times > train_start) & (lick_peak_times < train_end)
+                if np.any(amp_mask):
+                    train_amps.append(np.mean(lick_peak_amplitudes[amp_mask]))
+                else:
+                    train_amps.append(np.nan)
             else:
                 train_starts_not.append(train_start)
     

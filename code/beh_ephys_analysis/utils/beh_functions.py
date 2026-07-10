@@ -991,7 +991,7 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = None, scratch
     if session_dir is not None:
         raw_recording_dir = os.path.join(session_dir, 'raw_data.hdf5')
         if not os.path.exists(raw_recording_dir):
-            print(f'No raw session directory found for {session_id}.')
+            # print(f'No raw session directory found for {session_id}.')
             stream_name = None
             raw_recording_dir = None 
             experiment_id = None
@@ -1014,11 +1014,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = None, scratch
         if len(nwb) == 1:
             nwb_dir_raw = os.path.join(nwb_dir_temp, nwb[0])
         elif len(nwb) > 1:
-            print('There are multiple recordings in the raw nwb directory. Picked one with units.')
+            # print('There are multiple recordings in the raw nwb directory. Picked one with units.')
             nwb_dir_raw = None
         else:
             nwb_dir_raw = None
-            print('There is no nwb file in the raw directory.')
+            # print('There is no nwb file in the raw directory.')
     nwb_dir_curated = None
     # curated version
     if os.path.exists(raw_dir):
@@ -1029,11 +1029,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = None, scratch
                 nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
             elif len(nwb_dir_temp) > 1:
                 nwb_dir_temp = os.path.join(sorted_dir, nwb_dir_temp[0])
-                print('There are multiple nwb files in the curated directory. Picked first one.')
+                # print('There are multiple nwb files in the curated directory. Picked first one.')
             else:
                 nwb_dir_temp = None
                 nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
+                # print('There is no nwb file in the curated directory.')
 
         if nwb_dir_temp is not None:
             nwbs = [nwb for nwb in os.listdir(nwb_dir_temp) if nwb.endswith('.nwb.zarr')]
@@ -1041,11 +1041,11 @@ def session_dirs_hopkins(session_id, model_name = None, data_dir = None, scratch
             if len(nwb) == 1:
                 nwb_dir_curated = os.path.join(nwb_dir_temp, nwb[0])
             elif len(nwb) > 1:
-                print('There are multiple recordings in the curated nwb directory. Picked one with units.')
+                # print('There are multiple recordings in the curated nwb directory. Picked one with units.')
                 nwb_dir_curated = None
             else:
                 nwb_dir_curated = None
-                print('There is no nwb file in the curated directory.')
+                # print('There is no nwb file in the curated directory.')
     # postprocessed dirs
     processed_dir = os.path.join(scratch_dir, aniID, session_id)
     postprocessed_dir_raw = os.path.join(processed_dir, 'ephys', 'curated', 'analyzer.zarr')
@@ -1264,7 +1264,7 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
     responseInds = tblTrials['animal_response']!=2
     leftRewards = tblTrials.loc[responseInds, 'rewarded_historyL']
 
-    # oucome 
+    # oucome
     leftRewards = tblTrials.loc[tblTrials['animal_response']!=2, 'rewarded_historyL']
     rightRewards = tblTrials.loc[tblTrials['animal_response']!=2, 'rewarded_historyR']
     outcomes = leftRewards | rightRewards
@@ -1574,9 +1574,12 @@ def longest_zero_chunk(binary_list):
 
     return longest_start, longest_end, longest_len
 
-def get_session_tbl(session, cut_interruptions = False):
+def get_session_tbl(session, cut_interruptions = False, load_raw = False):
     session_dir = session_dirs(session)
-    nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
+    if load_raw:
+        nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '_all_trials.nwb')
+    else:
+        nwb_file = os.path.join(session_dir['beh_fig_dir'], session + '.nwb')
     if os.path.exists(nwb_file):
         nwb = load_nwb_from_filename(nwb_file)
         tbl = nwb.trials.to_dataframe()

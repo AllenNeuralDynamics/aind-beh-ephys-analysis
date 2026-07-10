@@ -1,3 +1,35 @@
+"""
+Step 1 of figure preparation pipeline: Create combined unit table across all sessions.
+
+Prerequisites:
+    NONE - This is the FIRST script in the pipeline.
+
+    Before running, ensure:
+    - All per-session preprocessing is complete (session_preprocessing.py)
+    - Optogenetic tagging analysis finished for all sessions (opto_tagging.py)
+    - Antidromic analysis complete if applicable (antidromic_analysis_session.py)
+    - Session metadata up-to-date in session_assets.csv and hopkins_session_assets.csv
+    - sessions_to_exclude.txt contains any sessions to skip
+
+Pipeline Position:
+    This is script #1 in sequence.txt - Run this FIRST before all other figure preparation scripts.
+
+Purpose:
+    Combines per-session unit tables with:
+    - Basic unit properties (spike times, waveforms, locations)
+    - Optogenetic tagging metrics (p_max, response latency, antidromic tier)
+    - Quality control metrics (ISI violations, firing rate, amplitude)
+    - Behavioral recording metadata (animal, date, recording side, sex)
+    - Cross-correlation and auto-correlation data
+
+Output:
+    Saves combined_unit_tbl.pkl to manuscript_fig_prep_dir/combined_unit_tbl/
+    This table serves as the foundation for all subsequent figure generation scripts.
+
+Usage:
+    Run as standalone script. Processes all sessions in session_assets.csv
+    (excluding those in sessions_to_exclude.txt) and combines their unit data.
+"""
 # %%
 import sys
 import os
@@ -5,15 +37,9 @@ import os
 # file's location, so imports work no matter where the repo is checked out.
 import os
 import sys
-_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
-while _anchor != os.path.dirname(_anchor):
-    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
-    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
-        if _beh_ephys_root in sys.path:
-            sys.path.remove(_beh_ephys_root)
-        sys.path.insert(0, _beh_ephys_root)
-        break
-    _anchor = os.path.dirname(_anchor)
+_beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+if _beh_ephys_root not in sys.path:
+    sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
 from open_ephys.analysis import Session
@@ -66,19 +92,22 @@ from joblib import Parallel, delayed
 # %%
 # Make combined session-unit table
 capsule_dirs = capsule_directories()
-dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv'),
-        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv')]
+# Read CSVs with probe as string to match working pickle at scratch/combined/
+# Working file has dtype:object with values '2', 'tt', 'opto' (all strings)
+dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv', dtype={'probe': str}),
+        pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv', dtype={'probe': str})]
 df = pd.concat(dfs).reset_index(drop=True)
-session_exclude_file = CAPSULE_ROOT + '/code/data_management/sessions_to_exclude.txt'
-with open(session_exclude_file, 'r') as f:
-    exclude = [line.strip() for line in f.readlines()]
+
+# session_exclude_file = CAPSULE_ROOT + '/code/data_management/sessions_to_exclude.txt'
+# with open(session_exclude_file, 'r') as f:
+#     exclude = [line.strip() for line in f.readlines()]
 # session_ids, behs = zip(*[
 #     (session, beh)
 #     for session, beh in zip(session_ids, behs)
 #     if isinstance(session, str) and session not in exclude
 # ])
 # exclude sessions
-df = df[~df['session_id'].isin(exclude)]
+# df = df[~df['session_id'].isin(exclude)]
 # remove those are not strings
 df = df[df['session_id'].apply(lambda x: isinstance(x, str))]
 df = df.reset_index(drop=True)
@@ -86,18 +115,37 @@ df = df.reset_index(drop=True)
 # behs = list(behs)
 # %%
 def process_session(session, beh, rec_side, probe, sex, target='soma'):
+    """
+    Extract and compile all unit-level data from a single session.
+
+    Aggregates unit properties, opto-tagging metrics, quality control measures,
+    cross-correlograms, and antidromic analysis results into a standardized format
+    for inclusion in the combined unit table.
+
+    Parameters:
+        session (str): Session identifier.
+        beh (str): Behavioral task type.
+        rec_side (str): Recording hemisphere ('left' or 'right').
+        probe (str): Probe identifier.
+        sex (str): Animal sex ('M' or 'F').
+        target (str): Optogenetic target region (default: 'soma').
+
+    Returns:
+        pd.DataFrame or None: DataFrame with one row per unit containing all compiled metrics.
+                             Returns None if session has no valid data or should be skipped.
+    """
     session_dir = session_dirs(session)
     bin_short = 100
     bin_long = 300
     # --- skip missing or invalid sessions ---
     if 'ZS' in session:
         if (not os.path.exists(session_dir['nwb_dir_raw'])) or (get_unit_tbl(session, 'curated') is None):
-            print(f'Skipping {session} due to no neuron data')
+            # Silently skip - summary will be reported
             return None
     if session_dir['curated_dir_curated'] is None:
         return None
 
-    print(f'Processing {session}')
+    # No per-session print - progress reported at intervals
     data_type = 'curated'
     qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
     with open(qm_file) as f:
@@ -269,7 +317,7 @@ def process_session(session, beh, rec_side, probe, sex, target='soma'):
                 if np.nanmean(spike_counts_slow) > 0:
                     sd = np.std(spike_counts_slow[np.where(~np.isnan(spike_counts_slow))[0]])/np.nanmean(spike_counts_slow)
                 else:
-                    print(f'{session}_{unit_id} spike_count_slow weird.\n')
+                    # print(f'{session}_{unit_id} spike_count_slow weird.\n')
                     sd = np.nan
 
 
@@ -347,13 +395,18 @@ def safe_process(session, beh, rec_side, probe, sex):
 #     result = safe_process(row['session_id'], row['behavior'], row['side'], row['probe'], row['sex'])
 #     if result is not None:
 #         results.append(result)
+
+print(f"Processing {len(df)} sessions with parallelization...", flush=True)
 results = Parallel(n_jobs=-1)(
     delayed(safe_process)(row['session_id'], row['behavior'], row['side'], row['probe'], row['sex'])
     for _, row in df.iterrows()
 )
 # %%
 # remove all None results
-results = [res for res in results if res is not None]
+valid_results = [res for res in results if res is not None]
+skipped = len(results) - len(valid_results)
+print(f"  Completed: {len(valid_results)} sessions processed, {skipped} skipped", flush=True)
+results = valid_results
 
 # %%
 # sort by the sequence of session_ids in df

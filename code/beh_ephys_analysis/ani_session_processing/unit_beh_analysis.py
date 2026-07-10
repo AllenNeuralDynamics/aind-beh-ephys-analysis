@@ -66,11 +66,33 @@ import shutil
 from aind_ephys_utils import align
 
 def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue', curate_time=True, opto_only=False,
-                        model_name = 'stan_qLearning_5params', 
+                        model_name = 'stan_qLearning_5params',
                         formula = 'spikes ~ 1 + outcome + choice + Qchosen',
                         pre_event=-1, post_event=3, binSize=0.2, stepSize=0.05,
                         units  = None):
-    # %%
+    """
+    Generate comprehensive behavioral analysis plots for all units in a session.
+
+    Creates plots showing firing rates aligned to behavioral events, split by trial conditions
+    (choice, outcome, value), and fits regression models relating neural activity to behavior.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        align_name (str): Event to align to ('go_cue', 'choice', 'reward', etc.).
+        curate_time (bool): If True, apply drift-based temporal curation to units.
+        opto_only (bool): If True, only analyze opto-tagged units.
+        model_name (str): Name of the behavioral model to use for value estimates.
+        formula (str): Regression formula for modeling neural activity.
+        pre_event (float): Time before alignment event in seconds.
+        post_event (float): Time after alignment event in seconds.
+        binSize (float): Bin size for firing rate calculation in seconds.
+        stepSize (float): Step size for sliding window in seconds.
+        units (list or None): Specific unit IDs to analyze. If None, analyze all qualifying units.
+
+    Returns:
+        None: Saves unit-behavior analysis plots as PDF files in session directory.
+    """
     # load behavior data
     session_dir = session_dirs(session, model_name = model_name) 
     session_df = makeSessionDF(session, model_name = model_name)
@@ -506,6 +528,27 @@ def plot_unit_beh_session(session, data_type = 'curated', align_name = 'go_cue',
     plt.close('all')
 
 def burst_analysis(session, data_type, units = None):
+    """
+    Analyze burst patterns and spike timing in relation to go-cue and choice events.
+
+    Similar to goCue_burst.burst_analysis but:
+    - Filters for units with tagged_loc==True instead of p_max >= 0.5
+    - Uses 2x6 grid layout (vs 2x8 in goCue_burst)
+    - Saves with "opto_" prefix in filename
+
+    Creates plots showing:
+    - Raster plots aligned to go-cue and choice, sorted by lick latency
+    - Raster plots sorted by first spike time
+    - ISI distributions
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        units (list or None): List of unit IDs to analyze. If None, analyze all units with tagged_loc=True.
+
+    Returns:
+        None: Saves burst analysis plots as opto_{session}{unit_id}_burst_selected.pdf in ephys_fig_dir/burst.
+    """
     print(f'Processing session {session} for data type {data_type}')
     unit_tbl = get_unit_tbl(session, data_type)
     session_df = get_session_tbl(session)
@@ -751,6 +794,21 @@ def burst_analysis(session, data_type, units = None):
 
 
 def plot_alignments(session, data_type='curated', unit_ids=None, win_len = 0.5):
+    """
+    Plot unit firing rates aligned to multiple behavioral events in a grid layout.
+
+    Creates comprehensive visualization showing unit responses aligned to go-cue, choice,
+    and reward events, with trials sorted by lick latency and separated by outcome.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        unit_ids (list or None): Specific unit IDs to plot. If None, plot all opto-tagged units passing QC.
+        win_len (float): Smoothing window length in seconds for firing rate calculation (default: 0.5).
+
+    Returns:
+        None: Saves multi-alignment plots as PDF files in session directory.
+    """
     bin_len = 0.01
     time_constant = 100
     time_window = [-1, 1.5]

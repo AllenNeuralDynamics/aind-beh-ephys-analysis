@@ -56,6 +56,30 @@ from sklearn.metrics import accuracy_score, log_loss
 
 # %%
 def assign_lick_label(start_time, end_time, peak_time, licks_L, licks_R):
+    """
+    Assign lick label and timing to a video segment based on detected lick events.
+
+    Determines whether the video segment contains a lick event and which side (left or right).
+    Also computes the time difference between the segment peak and the nearest lick.
+
+    Label assignment:
+    - has_lick = -1: Left lick detected within segment
+    - has_lick = 1: Right lick detected within segment
+    - has_lick = 0: No lick detected within segment
+
+    Parameters:
+        start_time (float): Start time of the video segment in seconds.
+        end_time (float): End time of the video segment in seconds.
+        peak_time (float): Peak time within the segment in seconds (relative to start_time).
+        licks_L (np.ndarray): Array of left lick timestamps in seconds.
+        licks_R (np.ndarray): Array of right lick timestamps in seconds.
+
+    Returns:
+        tuple: (has_lick, min_time_diff)
+            - has_lick (int): Lick label (-1 for left, 1 for right, 0 for none)
+            - min_time_diff (float): Time difference in seconds from (start_time + peak_time)
+                                    to the closest lick event (can be negative if lick precedes peak)
+    """
     has_lick = 0
     if np.any((licks_L >= start_time) & (licks_L <= end_time)):
         has_lick = -1
@@ -74,9 +98,23 @@ def pairplot_color_code(start, max_point, color_code, feature_name, fig, subplot
                         v_range=None, center_xys=None, bins_xy=50, bins_c=50,
                         equal_aspect=True):
     """
-    start, max_point: shape (2, N) arrays: [x_like, y_like] in your code it's [Y, X]
-    color_code: length N
-    center_xy: tuple (center_y, center_x) in your coordinate convention
+    Create a 2D histogram pairplot with color-coded trajectories from video analysis.
+
+    Parameters:
+        start (np.ndarray): Shape (2, N) array of starting positions [y, x].
+        max_point (np.ndarray): Shape (2, N) array of maximum positions [y, x].
+        color_code (np.ndarray): Length N array of values to color-code trajectories.
+        feature_name (str): Name of the feature being plotted.
+        fig (matplotlib.figure.Figure): Figure object to add subplots to.
+        subplot_gs: GridSpec subplot specification.
+        v_range (tuple): Optional (vmin, vmax) for color coding.
+        center_xys (tuple): Optional (center_y, center_x) to mark on plot.
+        bins_xy (int): Number of bins for x/y histograms.
+        bins_c (int): Number of bins for color histogram.
+        equal_aspect (bool): Whether to use equal aspect ratio for main plot.
+
+    Returns:
+        None: Modifies the figure in place.
     """
 
     # ---- layout ----
@@ -363,6 +401,40 @@ def classify_with_gmm(
 
 
 def plot_licks_from_video(session, plot=True, cutoff_percentile=0.95):
+    """
+    Analyze and plot lick kinematics from high-speed video recordings.
+
+    Processes tongue movement data from video, aligns it with behavioral lick timestamps,
+    filters outliers, and classifies licks as left or right using Gaussian Mixture Models (GMM).
+
+    Processing steps:
+    1. Load video-tracked tongue movements and match to session
+    2. Align video timestamps to behavioral NWB timestamps
+    3. Label each video segment with detected lick side using assign_lick_label
+    4. Compute kinematic features: speed, distance, duration, peak velocity
+    5. Calculate distances from center of mass for left and right spouts
+    6. Filter outliers using cutoff_percentile threshold on kinematic features
+    7. Classify left/right licks using GMM on tongue position at maximum extension
+    8. Generate diagnostic plots showing:
+       - Lick trajectories colored by features
+       - GMM classification results
+       - Feature distributions and filtering
+
+    Parameters:
+        session (str): Session identifier.
+        plot (bool): If True, generate and save diagnostic plots (default: True).
+        cutoff_percentile (float): Percentile threshold (0-1) for filtering outlier kinematics.
+                                   Values above this percentile are excluded (default: 0.95).
+
+    Returns:
+        dict or None: Dictionary containing:
+            - 'licks_L': Left lick timestamps (cleaned, crosstalk-removed)
+            - 'licks_R': Right lick timestamps (cleaned, crosstalk-removed)
+            - 'session_licks': DataFrame with all video segments and computed features
+            - 'gmm_result': GMM classification result dictionary
+            - 'filter': Boolean mask for quality-filtered segments
+        Returns None if session not found in video data or NWB file missing.
+    """
     video_data_file = str(capsule_directories()['data_dir']) + '/all_tongue_movements_04022026/all_tongue_movements_04022026.parquet'
     all_lick_df = pd.read_parquet(video_data_file)
     session_video_list = all_lick_df['session'].unique().tolist()

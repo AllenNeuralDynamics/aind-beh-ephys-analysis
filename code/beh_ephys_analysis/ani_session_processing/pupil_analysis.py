@@ -49,6 +49,25 @@ from scipy.stats import pearsonr
 def pupil_analysis_session(session, plot_licks=False, plot=True,
                             bin_size=0.5, formula='spikes ~ 1 + choice + svs + outcome + choice:outcome + time_between_trials + outcome_prev',
                             formula_all='spikes ~ 1 + hit + time_between_trials', time_conf_threshold=0.9, dia_conf_threshold=0.95):
+    """
+    Analyze pupil diameter dynamics and their relationship to behavior and neural activity.
+
+    Computes pupil diameter aligned to behavioral events, correlates with lick activity,
+    and fits regression models relating neural activity to pupil size and behavior.
+
+    Parameters:
+        session (str): Session identifier.
+        plot_licks (bool): If True, plot lick-related analyses.
+        plot (bool): If True, generate and save analysis plots.
+        bin_size (float): Bin size in seconds for spike rate calculations.
+        formula (str): Regression formula for choice trials.
+        formula_all (str): Regression formula for all trials.
+        time_conf_threshold (float): Confidence threshold for pupil tracking time quality (0-1).
+        dia_conf_threshold (float): Confidence threshold for pupil diameter quality (0-1).
+
+    Returns:
+        None: Saves pupil analysis results and plots to session directory.
+    """
     session_dir = session_dirs(session_id=session)
     beh_df = get_session_tbl(session)
     session_df = makeSessionDF(session)
@@ -254,6 +273,43 @@ def pupil_analysis_session(session, plot_licks=False, plot=True,
 # plot unit vs pupil correlation
 # def plot_unit_pupil_correlation(session, opto_only=True, bin_size=0.1):
 def plot_unit_pupil_correlation(session, bin_size = 5, step_size = 0.1, opto_only=True, bin_size_short=0.5, win_length=10, plot = True, time_conf_threshold=0.9, dia_conf_threshold=0.95):
+    """
+    Calculate and plot correlations between unit firing rates and pupil diameter.
+
+    Computes Pearson correlations between binned spike counts and z-scored pupil diameter
+    across different timescales (including and excluding trial periods). Generates scatter plots
+    showing spike rate vs pupil diameter relationships.
+
+    Analysis includes:
+    - Long-timescale correlation (bin_size, typically 5s) including all time
+    - Long-timescale correlation excluding trial periods (inter-trial intervals only)
+    - Short-timescale correlation (bin_size_short, typically 0.5s) using sliding windows
+    - Quality filtering based on pupil tracking confidence thresholds
+
+    Trial periods are defined as go-cue-relative windows and excluded from "no_trial" analysis
+    to isolate correlations during spontaneous/inter-trial activity.
+
+    Parameters:
+        session (str): Session identifier.
+        bin_size (float): Bin size in seconds for long-timescale analysis (default: 5s).
+        step_size (float): Step size in seconds for sliding window (default: 0.1s).
+        opto_only (bool): If True, only analyze opto-tagged units.
+        bin_size_short (float): Bin size in seconds for short-timescale analysis (default: 0.5s).
+        win_length (float): Window length in seconds for short-timescale correlation (default: 10s).
+        plot (bool): If True, generate and save scatter plots showing spike-pupil relationships.
+        time_conf_threshold (float): Minimum confidence for pupil time tracking (0-1, default: 0.9).
+        dia_conf_threshold (float): Minimum confidence for pupil diameter measurement (0-1, default: 0.95).
+
+    Returns:
+        pd.DataFrame: DataFrame with columns:
+            - unit_id: Unit identifier
+            - corr_all: Pearson correlation including all time periods
+            - corr_no_trial: Pearson correlation excluding trial periods
+            - corr_short: Short-timescale correlation coefficient
+            - p_all, p_no_trial, p_short: P-values for each correlation
+        Returns None if no pupil data or no qualifying units found.
+        Saves correlation plots as PDF files in session directory.
+    """
     trial_duration = [-0.01, 3.5]
     session_dir = session_dirs(session_id=session)
     unit_tbl = get_unit_tbl(session, data_type='curated')

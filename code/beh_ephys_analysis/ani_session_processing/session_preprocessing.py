@@ -45,6 +45,30 @@ import datetime
 from joblib import Parallel, delayed
 
 def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = None):
+    """
+    Compute cross-correlograms for neural units during laser and no-laser periods.
+
+    Separates spike data into laser-on and laser-off periods based on optogenetics
+    stimulation times, then computes cross-correlograms for all unit pairs in each condition.
+
+    Parameters
+    ----------
+    session : str
+        Session identifier
+    data_type : str
+        Type of data ('raw' or 'curated')
+    window_ms : float, optional
+        Cross-correlogram window size in milliseconds (default: 100)
+    bin_ms : float, optional
+        Bin size for cross-correlogram in milliseconds (default: 1)
+    post_fix : str, optional
+        Optional suffix for output filename (default: None)
+
+    Returns
+    -------
+    None
+        Saves cross-correlograms to pickle file in opto directory
+    """
     # loading info
     session_dir = session_dirs(session)
     if os.path.exists(os.path.join(session_dir['beh_fig_dir'], session + '.nwb')):
@@ -150,7 +174,45 @@ def session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = No
         pickle.dump(data_to_save, f)
 
 def ephys_opto_preprocessing(session, data_type, target):
+    """
+    Comprehensive preprocessing pipeline for electrophysiology sessions with optogenetic tagging.
 
+    **CRITICAL FUNCTION**: Performs temporal alignment between ephys and behavior timestamps.
+    Uses Harp clock synchronization to detect and correct misalignments between neural recordings
+    and behavioral data. If misalignment is detected (mean time difference > 20% of session duration),
+    automatically realigns timestamps and regenerates NWB file with corrected timestamps.
+
+    Orchestrates multiple analysis steps:
+    1. **Temporal alignment verification and correction**:
+       - Detects Harp clock line from Open Ephys recording
+       - Compares lick/spike timestamps between ephys and behavior
+       - Threshold: |mean(licks_ephys) - mean(licks_behavior)| > 0.2 * session_duration
+       - If misaligned, realigns spike times to behavior timestamps using Harp clock
+       - Regenerates NWB file with corrected alignment
+    2. Optogenetic event detection and categorization by power/site/frequency
+    3. Per-unit response analysis (PSTH, response probability, latency)
+    4. Waveform extraction with 2D spatial reordering
+    5. Quality metric computation (sync status, alignment validation)
+
+    Generated files saved to session directories:
+    - {session}_opto_session.csv: All opto stimulation events with timestamps
+    - {session}_opto_session_{target}.csv: Target-specific opto events
+    - {session}_opto_info.json, {session}_opto_info_{target}.json: Stimulation parameters
+    - {session}_opto_response.pkl: Per-unit response probabilities and latencies
+    - {session}_waveform_params.json: Waveform extraction parameters
+    - {session}_opto_waveforms.pkl: Extracted waveforms for all units
+    - {session}_qm.json: Quality metrics (soundcard_sync, ephys_sync status)
+    - {session}_timestamps.pdf, {session}_timestamps_corrected.pdf, {session}_laser_times.pdf: Alignment diagnostic plots
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        target (str): Target brain region for optogenetic stimulation (e.g., 'soma', 'LC').
+
+    Returns:
+        None: All results saved to session opto_dir_{data_type} and alignment_dir.
+              Corrected NWB file saved to beh_fig_dir if realignment was performed.
+    """
     # Create a white-to-bright red colormap
     colors = [(1, 1, 1), (1, 0, 0)]  # white to red
     my_red = LinearSegmentedColormap.from_list("white_to_red", colors)
@@ -553,6 +615,20 @@ def ephys_opto_preprocessing(session, data_type, target):
     log_file.close()
 
 def ephys_opto_crosscorr(session, data_type):
+    """
+    Compute cross-correlograms at both short and long timescales.
+
+    Wrapper function that calls session_crosscorr twice with different parameters
+    to generate both fine-timescale (100ms window, 1ms bins) and coarse-timescale
+    (1000ms window, 10ms bins) cross-correlograms.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+
+    Returns:
+        None: Saves cross-correlograms with 'short' and 'long' suffixes to pickle files.
+    """
     session_crosscorr(session, data_type, window_ms=100, bin_ms=1, post_fix = 'short')
     session_crosscorr(session, data_type, window_ms=1000, bin_ms=10, post_fix = 'long')
     # print(f"Cross-correlation saved to {session_dir[f'opto_dir_{data_type}']}")

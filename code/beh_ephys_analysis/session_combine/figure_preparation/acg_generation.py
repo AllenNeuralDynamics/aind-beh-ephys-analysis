@@ -1,3 +1,51 @@
+"""
+Step 7 of figure preparation pipeline: Generate auto-correlogram (ACG) features for all units.
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    Data requirements:
+    - combined_unit_tbl.pkl from Step 1 (contains spike times)
+    - Per-session spike trains for computing auto-correlograms
+    - Quality metrics for filtering units
+
+Pipeline Position:
+    Script #7 in sequence.txt (line 7)
+    Can run IN PARALLEL with:
+    - antidromic_generation.py
+    - waveform_generation_np.py
+    - waveform_generation_tt.py
+    - basic_ephys_generation.py
+    - response_tstats_generation.py
+    - outcome_window_generation_parallel.py
+    (All these scripts only need combined_unit_tbl.pkl from Step 1)
+
+Purpose:
+    Computes auto-correlogram (ACG) features and fits multi-component models to characterize
+    unit firing patterns:
+    - Short timescale inhibition (negative exponential decay, refractory period)
+    - Mid timescale excitation (gamma distribution, burst propensity)
+    - Long timescale inhibition (gamma distribution with fixed k, adaptation)
+
+    ACG features distinguish cell types and firing modes:
+    - Fast-spiking interneurons show narrow ACGs with short refractory periods
+    - Bursting neurons show mid-range peaks
+    - Regular-spiking neurons show broader ACGs
+
+Input:
+    - Combined unit table from Step 1 (with spike times)
+    - Per-session unit tables with spike trains
+
+Output:
+    - combined_acg_tbl.pkl: DataFrame with ACG features and fitted parameters per unit
+    - Includes: ACG curves, fitted component parameters (amplitudes, time constants),
+      burst indices, refractory period estimates
+
+Usage:
+    Run after behavior_metrics_generation.py. Fits multiple exponential/gamma components
+    to each unit's ACG to extract interpretable firing pattern features.
+"""
 # Fit multiple components to ACF: short inhibition (negative exponential), mid excitation (gamma with free k), long inhibition (gamma with fixed k)
 
 # %%
@@ -10,15 +58,9 @@ from matplotlib.colors import LinearSegmentedColormap
 # file's location, so imports work no matter where the repo is checked out.
 import os
 import sys
-_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
-while _anchor != os.path.dirname(_anchor):
-    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
-    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
-        if _beh_ephys_root in sys.path:
-            sys.path.remove(_beh_ephys_root)
-        sys.path.insert(0, _beh_ephys_root)
-        break
-    _anchor = os.path.dirname(_anchor)
+_beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+if _beh_ephys_root not in sys.path:
+    sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import matplotlib.pyplot as plt
@@ -351,7 +393,7 @@ def fit_acf(acf, dt, ftol=1e-12, xtol=1e-12, gtol=1e-12, verbose=0, p0=None):
             0.70                                   # peak3
         ], dtype=float)
 
-    print("Initial parameter guesses:", p0)
+    # Removed print - no need to print initial guesses for every unit
 
     # ---------- Bounds ----------
     # [A1, tau1, A2, peak2,  k2,  A3, peak3]
@@ -469,13 +511,13 @@ fit_sample = (0, int(np.round(1.5/dt)))
 def _fit_one_unit(unit_ind, unit_id, session_id,
                   auto_corr_mat_denoised, auto_corr_mat,
                   fit_sample, dt, x, fit_folder):
-    print(f"Fitting unit {unit_id} from session {session_id} (index {unit_ind})...")
+    # Removed per-unit print - progress reported by joblib verbose
 
     params, fig, axes = fit_acf(
         auto_corr_mat_denoised[unit_ind][fit_sample[0]:fit_sample[1]],
         dt,
-        ftol=10**-17,
-        xtol=10**-50,
+        ftol=1e-12,
+        xtol=1e-12,
         verbose=verbose,
     )
 

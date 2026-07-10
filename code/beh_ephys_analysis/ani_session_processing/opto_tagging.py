@@ -61,11 +61,15 @@ def max_index_ndarray(arr):
     """
     Find the index of the maximum value in an N-dimensional array.
 
-    Parameters:
-        arr (numpy.ndarray): Input N-dimensional array.
+    Parameters
+    ----------
+    arr : np.ndarray
+        Input N-dimensional array
 
-    Returns:
-        tuple: Indices of the maximum value in each dimension.
+    Returns
+    -------
+    tuple
+        Indices of the maximum value in each dimension
     """
     if not isinstance(arr, np.ndarray):
         raise ValueError("Input must be a NumPy array")
@@ -79,6 +83,59 @@ def max_index_ndarray(arr):
     return max_nd_index 
 # %%
 def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf, qc_dict, crosscorr, resp_p, resp_lat, opto_df, opto_info, qm, waveform_params, dim_1 = 'powers', resp_thresh=0.8, lat_thresh=0.015, plot = False):
+    """
+    Analyze and plot optogenetic tagging responses for a single neural unit.
+
+    Evaluates whether a unit responds to optogenetic stimulation by comparing
+    response probability and latency across different stimulation parameters
+    (power, duration, frequency, location) relative to baseline firing.
+
+    Parameters
+    ----------
+    unit_id : int or str
+        Unique identifier for the neural unit
+    spike_times : np.ndarray
+        Spike timestamps for the unit
+    spike_amplitude : np.ndarray
+        Amplitude of each spike
+    waveform : np.ndarray
+        Mean waveform of the unit
+    opto_wf : np.ndarray
+        Waveforms during optogenetic stimulation
+    qc_dict : dict
+        Quality metrics dictionary (must contain 'firing_rate')
+    crosscorr : np.ndarray
+        Cross-correlogram data
+    resp_p : np.ndarray
+        Response probability matrix across stimulation conditions
+    resp_lat : np.ndarray
+        Response latency matrix across stimulation conditions
+    opto_df : pd.DataFrame
+        DataFrame with optogenetic stimulation timing and metadata
+    opto_info : dict
+        Dictionary with opto parameters: resp_win, powers, sites, etc.
+    qm : dict
+        Quality metrics with 'ephys_cut' key for session boundaries
+    waveform_params : dict
+        Waveform parameter dictionary
+    dim_1 : str, optional
+        Primary dimension for analysis (default: 'powers'), used to separate raster plots.
+    resp_thresh : float, optional
+        Response probability threshold for tagging (default: 0.8)
+    lat_thresh : float, optional
+        Maximum latency in seconds for valid response (default: 0.015)
+    plot : bool, optional
+        Whether to generate diagnostic plots (default: False)
+
+    Returns
+    -------
+    opto_tagging_df : pd.DataFrame
+        DataFrame with tagging results for each condition
+    fig : matplotlib.figure.Figure or None
+        Diagnostic figure if plot=True, otherwise None
+    opto_pass : bool
+        Whether unit passes optogenetic tagging criteria
+    """
     # calculate baseline\
     # separate pre and post baseline
     session_start = qm['ephys_cut'][0]
@@ -405,6 +462,42 @@ def opto_plotting_unit(unit_id, spike_times, spike_amplitude, waveform, opto_wf,
     return fig, opto_tagging_dict, opto_tagging_df
 #%%
 def opto_plotting_session(session, data_type, target, resp_thresh=0.8, lat_thresh=0.015, plot = False, target_unit_ids=None, ephys_cut = False, save = False, drift_cut = True):
+    """
+    Generate comprehensive optogenetic tagging analysis and plots for all units in a session.
+
+    Creates raster plots, PSTHs, waveform comparisons, and statistical tests for each unit's
+    response to optogenetic stimulation. Computes tagging metrics and classifies units as
+    opto-tagged based on response probability and latency thresholds.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        target (str): Target brain region (e.g., 'soma', 'LC').
+        resp_thresh (float): Response probability threshold for tagging (default: 0.8).
+        lat_thresh (float): Response latency threshold in seconds (default: 0.015 = 15ms).
+        plot (bool): If True, generate and save plots for each unit.
+        target_unit_ids (list or None): Specific unit IDs to analyze. If None, analyze all units.
+        ephys_cut (bool): If True, apply recording-level temporal cuts.
+        save (bool): If True, save results to {session}_opto_tagging_metrics.pkl file.
+        drift_cut (bool): If True, apply unit-specific drift-based temporal cuts.
+
+    Returns:
+        dict: Dictionary with two DataFrames:
+            - 'opto_tagging_df': Wide-format table with one row per unit containing:
+                * unit_id: Unit identifier
+                * opto_pass: Boolean indicating if unit passes tagging criteria
+                * resp_p_max: Maximum response probability across all conditions
+                * resp_lat_min: Minimum response latency across all conditions
+                * default_qc: Boolean indicating if unit passes quality control
+                * Additional per-unit summary metrics
+            - 'opto_tagging_df_metrics': Long-format (tidy) table with one row per unit-condition:
+                * unit_id: Unit identifier
+                * condition parameters (power, duration, frequency, site)
+                * resp_p_bl: Baseline-corrected response probability
+                * resp_lat: Response latency
+                * Additional condition-specific metrics
+        Returns None if save=False (data only saved to file).
+    """
     session_dir = session_dirs(session)
     session_qm_file = os.path.join(session_dir['processed_dir'], f'{session}_qm.json')
     with open(session_qm_file) as f:

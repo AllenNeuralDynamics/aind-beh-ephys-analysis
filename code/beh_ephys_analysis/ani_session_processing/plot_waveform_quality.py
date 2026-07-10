@@ -32,6 +32,21 @@ from utils.ephys_functions import load_drift
 
 
 def waveform_check(session, data_type='curated', opto_only=True, units=None):
+    """
+    Generate detailed waveform quality check plots for individual units.
+
+    Creates plots showing raw waveforms, templates, ISI distributions, and autocorrelograms
+    to assess unit quality and isolation.
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+        opto_only (bool): If True, only check opto-tagged units.
+        units (list or None): List of specific unit IDs to check. If None, use all qualifying units.
+
+    Returns:
+        None: Saves waveform check plots as PDF files in session directory.
+    """
     if get_session_tbl(session) is None:
         print(f'{session}: No session table found, skipping.')
         return

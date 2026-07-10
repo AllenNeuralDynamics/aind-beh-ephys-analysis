@@ -1,18 +1,57 @@
+"""
+Step 3b of figure preparation pipeline: Generate waveform comparison data for tetrode recordings.
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    Data requirements:
+    - combined_unit_tbl.pkl with waveform data (wf, wf_raw, peak, peak_raw columns)
+    - Waveforms should be populated during session preprocessing
+    - Tetrode (tt) recordings only
+
+Pipeline Position:
+    Script #4 in sequence.txt (line 4)
+    Can run IN PARALLEL with:
+    - antidromic_generation.py
+    - waveform_generation_np.py
+    - basic_ephys_generation.py
+    - acg_generation.py
+    - response_tstats_generation.py
+    - outcome_window_generation_parallel.py
+    (All these scripts only need combined_unit_tbl.pkl from Step 1)
+
+Purpose:
+    Extracts waveform features from tetrode recordings to characterize cell types:
+    - Peak-to-trough width, half-width (distinguishes fast-spiking vs regular-spiking)
+    - Waveform symmetry metrics adapted for 4-channel tetrode data
+    - Amplitude features (peak, trough locations and magnitudes)
+    - PCA-based dimensionality reduction of waveform shapes
+
+    Parallel to waveform_generation_np.py but adapted for tetrode recording format.
+
+Input:
+    - Combined unit table from Step 1 (with wf, wf_raw, peak, peak_raw columns)
+
+Output:
+    - combined_waveform_tt_tbl.pkl: Waveform features for tetrode units
+    - Includes: peak-to-trough width, half-width, symmetry metrics, trough ratios,
+      waveform PCA components, all features for cell-type classification
+    - Quality control plots showing waveform distributions
+
+Usage:
+    Run after or in parallel with waveform_generation_np.py. Processes tetrode data only.
+    Extracts features from waveforms already in combined_unit_tbl.
+"""
 import sys
 import os
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
 import os
 import sys
-_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
-while _anchor != os.path.dirname(_anchor):
-    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
-    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
-        if _beh_ephys_root in sys.path:
-            sys.path.remove(_beh_ephys_root)
-        sys.path.insert(0, _beh_ephys_root)
-        break
-    _anchor = os.path.dirname(_anchor)
+_beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+if _beh_ephys_root not in sys.path:
+    sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
 from open_ephys.analysis import Session
@@ -73,6 +112,8 @@ capsule_dirs = capsule_directories()
 
 criteria_name = 'waveform_TT'
 waveform_version = '_raw' # 'wf_2D' for 'wf_2D_raw'
+sampling_frequency = 32000  # Hz - Tetrode sampling rate
+ms_per_sample = 1000 / sampling_frequency  # Convert samples to milliseconds (0.03125 ms/sample)
 target_folder = os.path.join(capsule_dirs['manuscript_fig_prep_dir'], 'waveforms_tt')
 if not os.path.exists(target_folder):
     os.makedirs(target_folder)
@@ -124,45 +165,65 @@ def zero_crossings_linear(x, y):
 
 # Extract waveform features for all units that passed QC
 # Extract waveform feature
-wf_norm = []
-wf_2D_norm = []
+wf_norm = []  # Normalized waveforms (divided by peak amplitude)
+wf_2D_norm = []  # Normalized 2D waveforms across tetrode channels
 
-half_w = []
-trough_w = []
-pre_half = []
-post_half = []
-post_w = []
+# Width features - distinguish fast-spiking (narrow) from regular-spiking (wide) neurons
+# All width features are in milliseconds (converted from samples using ms_per_sample)
+half_w = []  # Half-width: time between half-peak crossings before and after peak (ms)
+trough_w = []  # Trough-to-trough width: time from pre-peak trough to post-peak trough (ms)
+pre_half = []  # Pre-peak half-width: time from pre-peak half-crossing to peak (ms)
+post_half = []  # Post-peak half-width: time from peak to post-peak half-crossing (ms)
+post_w = []  # Post-peak trough width: time from peak to post-peak trough (ms)
 
-trough_post_ratio_1D = []
-trough_pre_ratio_1D = []
+# Trough ratio features - characterize waveform shape asymmetry
+trough_post_ratio_1D = []  # Post-peak trough amplitude / peak amplitude (positive if same sign)
+trough_pre_ratio_1D = []  # Pre-peak trough amplitude / peak amplitude (positive if same sign)
 
-post_slope = []
-post_trough_slope = []
-post_space = []
-post_space_raw = []
-pre_slope = []
-pre_space = []
-pre_space_raw = []
+# Slope and integral features - characterize rise/fall kinetics (slopes per ms, integrals in ms)
+post_slope = []  # Post-peak slope: ((peak - post_trough)/peak) / time_ms (normalized amplitude change per ms)
+post_trough_slope = []  # Post-trough slope: trough_post_ratio / time_ms (see trough_post_ratio_1D above, per ms)
+post_space = []  # Post-peak integral: trough_post_ratio × time_ms (normalized amplitude × ms)
+post_space_raw = []  # Post-peak raw area: sum of positive waveform values after peak (unnormalized, no time unit)
+pre_slope = []  # Pre-peak slope: ((peak - pre_trough)/peak) / time_ms (normalized amplitude change per ms)
+pre_space = []  # Pre-peak integral: trough_pre_ratio × time_ms (normalized amplitude × ms)
+pre_space_raw = []  # Pre-peak raw area: sum of positive waveform values before peak (unnormalized, no time unit)
 
-symmetry_inte = []
-symmetry_half = []
-symmetry_slope = []
-symmetry_inte_div = []
-symmetry_half_div = []
-symmetry_slope_div = []
-symmetry_space_raw_div = []
-symmetry_trough_dis = []
+# Symmetry features - quantify waveform asymmetry (difference between post- and pre-peak)
+symmetry_inte = []  # Integral asymmetry: post_space - pre_space (positive = more post-peak area)
+symmetry_half = []  # Half-width asymmetry: post_half - pre_half (ms, positive = slower repolarization)
+symmetry_slope = []  # Slope asymmetry: post_slope - pre_slope (positive = steeper post-peak)
+symmetry_inte_div = []  # Integral ratio: post_space / pre_space
+symmetry_half_div = []  # Half-width ratio: post_half / pre_half
+symmetry_slope_div = []  # Slope ratio: pre_slope / post_slope (inverted for convention)
+symmetry_space_raw_div = []  # Raw area ratio: post_space_raw / pre_space_raw
+symmetry_trough_dis = []  # Trough distance: post_trough_ind - pre_trough_ind (ms)
 
-trough_sum = []
-slope_sum = []
+# Summary features - combined metrics
+trough_sum = []  # Combined trough metric: (pre_space_raw + post_space_raw) / peak
+slope_sum = []  # Combined slope metric: post_slope + pre_slope
 
 # wf_norm = combined_tagged_units_filtered['wf']/np.abs(combined_tagged_units_filtered['peak'])
 # wf_2D_norm = combined_tagged_units_filtered['wf_2d']/np.abs(combined_tagged_units_filtered['peak'])
 
 wf_norm = combined_tagged_units_filtered[f'wf{waveform_version}']/np.abs(combined_tagged_units_filtered[f'peak{waveform_version}'])
 # wf_2D_norm = combined_tagged_units_filtered['wf_2d']/np.abs(combined_tagged_units_filtered['peak'])
+
+# Progress tracking
+total_units = len(combined_tagged_units_filtered)
+processed_count = 0
+last_reported_pct = -10
+print(f"Processing {total_units} units for waveform analysis...", flush=True)
+
 for rows in combined_tagged_units_filtered.iterrows():
-    print(f'Processing unit {rows[1]["unit"]} of session {rows[1]["session"]}')
+    # Removed per-unit print
+    # Report progress at 10% intervals
+    processed_count += 1
+    current_pct = int((processed_count / total_units) * 100)
+    if current_pct >= last_reported_pct + 10:
+        last_reported_pct = (current_pct // 10) * 10
+        print(f"  Progress: {last_reported_pct}% ({processed_count}/{total_units} units)", flush=True)
+
     # wf = rows[1]['wf']
     # peak = rows[1]['peak']
     # print(rows[1]['session'])
@@ -212,11 +273,14 @@ for rows in combined_tagged_units_filtered.iterrows():
         pre_trough_ind = peak_ind - np.argmin(wf[:peak_ind])  
     curr_trough_post = post_trough/peak # positive if same sign, negative if opposite sign
     curr_trough_pre = pre_trough/peak # positive if same sign, negative if opposite sign
-    curr_trough_loc_slope_post = ((peak - post_trough)/peak)/post_trough_ind
-    curr_trough_slope = (post_trough/peak)/post_trough_ind
-    curr_trough_loc_inte_post = ((post_trough)/peak)*post_trough_ind
-    curr_trough_loc_slope_pre = ((peak - pre_trough)/peak)/pre_trough_ind # positive if same sign, negative if opposite sign
-    curr_trough_loc_inte_pre = ((pre_trough)/peak)*pre_trough_ind # positive if same sign, negative if opposite sign
+    # Convert sample indices to ms for slope and integral calculations
+    post_trough_ind_ms = post_trough_ind * ms_per_sample
+    pre_trough_ind_ms = pre_trough_ind * ms_per_sample
+    curr_trough_loc_slope_post = ((peak - post_trough)/peak)/post_trough_ind_ms # normalized amplitude change per ms
+    curr_trough_slope = (post_trough/peak)/post_trough_ind_ms  # trough_post_ratio per ms
+    curr_trough_loc_inte_post = ((post_trough)/peak)*post_trough_ind_ms  # normalized amplitude × ms
+    curr_trough_loc_slope_pre = ((peak - pre_trough)/peak)/pre_trough_ind_ms # normalized amplitude change per ms
+    curr_trough_loc_inte_pre = ((pre_trough)/peak)*pre_trough_ind_ms # normalized amplitude × ms
     pre_peak_wf = wf[:peak_ind]
     post_peak_wf = wf[peak_ind:]
     curr_pre_space_raw = np.sum(pre_peak_wf[pre_peak_wf>0])
@@ -243,11 +307,11 @@ for rows in combined_tagged_units_filtered.iterrows():
             post_crossing = np.min(wf_half_crossings[wf_half_crossings > peak_ind]) - peak_ind
             pre_crossing = peak_ind - np.max(wf_half_crossings[wf_half_crossings < peak_ind])
 
-    half_w.append(post_crossing + pre_crossing)  # half width in samples
-    trough_w.append(post_trough_ind + pre_trough_ind)  # trough width in samples
-    post_w.append(post_trough_ind)  # post trough width in samples
-    pre_half.append(pre_crossing)
-    post_half.append(post_crossing)
+    half_w.append((post_crossing + pre_crossing) * ms_per_sample)  # half width in ms
+    trough_w.append((post_trough_ind + pre_trough_ind) * ms_per_sample)  # trough width in ms
+    post_w.append(post_trough_ind * ms_per_sample)  # post trough width in ms
+    pre_half.append(pre_crossing * ms_per_sample)  # pre-peak half-width in ms
+    post_half.append(post_crossing * ms_per_sample)  # post-peak half-width in ms
 
     trough_post_ratio_1D.append(curr_trough_post)
     trough_pre_ratio_1D.append(curr_trough_pre)
@@ -261,14 +325,14 @@ for rows in combined_tagged_units_filtered.iterrows():
     pre_space_raw.append(curr_pre_space_raw)
 
     symmetry_inte.append(curr_trough_loc_inte_post - curr_trough_loc_inte_pre)
-    symmetry_half.append(post_crossing - pre_crossing)
+    symmetry_half.append((post_crossing - pre_crossing) * ms_per_sample)  # in ms
     symmetry_slope.append(curr_trough_loc_slope_post - curr_trough_loc_slope_pre)
 
     symmetry_inte_div.append(curr_trough_loc_inte_post/curr_trough_loc_inte_pre)
-    symmetry_half_div.append(post_crossing/pre_crossing)
+    symmetry_half_div.append(post_crossing/pre_crossing)  # ratio, dimensionless
     symmetry_slope_div.append(curr_trough_loc_slope_post/curr_trough_loc_slope_pre)
     symmetry_space_raw_div.append(curr_post_space_raw/curr_pre_space_raw)
-    symmetry_trough_dis.append(post_trough_ind - pre_trough_ind)
+    symmetry_trough_dis.append((post_trough_ind - pre_trough_ind) * ms_per_sample)  # in ms
 
     trough_sum.append(curr_trough_sum)
     slope_sum.append(curr_slope_sum)
@@ -307,4 +371,5 @@ wf_features['symmetry_inte_div_log'] = np.log(wf_features['symmetry_inte_div'] +
 wf_features['symmetry_slope_div_log'] = np.log(wf_features['symmetry_slope_div'] + 1e-6)
 wf_features['symmetry_half_div_log'] = np.log(wf_features['symmetry_half_div'] + 1e-6)
 
+print(f"  Progress: 100% ({total_units}/{total_units} units) - Complete!", flush=True)
 wf_features.to_csv(os.path.join(target_folder, f'combined_features.csv'), index=False)

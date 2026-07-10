@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import os
 import subprocess
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -36,24 +39,34 @@ def load_sequence(sequence_file: Path) -> list[str]:
     return entries
 
 
-def run_script(script_name: str, check_only: bool = False) -> None:
-    """Run one figure-preparation Python script, or just validate that it exists."""
+def run_script(script_name: str, check_only: bool = False) -> float:
+    """Run one figure-preparation Python script, or just validate that it exists.
+
+    Returns:
+        float: Duration in seconds (0.0 if check_only mode).
+    """
     script_path = FIG_PREP_DIR / script_name
     if not script_path.is_file():
         raise FileNotFoundError(f"Script listed in sequence does not exist: {script_path}")
 
     if check_only:
         print(f"[CHECK] {script_path}", flush=True)
-        return
+        return 0.0
 
     print(f"\n=== Running {script_name} ===", flush=True)
+    start_time = time.time()
     completed = subprocess.run(
         [sys.executable, str(script_path)],
         cwd=str(WORKSPACE_DIR),
         check=False,
     )
+    duration = time.time() - start_time
+
     if completed.returncode != 0:
         raise subprocess.CalledProcessError(completed.returncode, completed.args)
+
+    print(f"✓ Completed in {duration:.2f}s", flush=True)
+    return duration
 
 
 def build_subprocess_env() -> dict[str, str]:
@@ -66,17 +79,22 @@ def build_subprocess_env() -> dict[str, str]:
     return env
 
 
-def run_notebook(notebook_name: str, check_only: bool = False) -> None:
-    """Execute one manuscript-figure notebook in place, or just validate it exists."""
+def run_notebook(notebook_name: str, check_only: bool = False) -> float:
+    """Execute one manuscript-figure notebook in place, or just validate it exists.
+
+    Returns:
+        float: Duration in seconds (0.0 if check_only mode).
+    """
     notebook_path = MANUSCRIPT_FIG_DIR / notebook_name
     if not notebook_path.is_file():
         raise FileNotFoundError(f"Notebook listed in figure order does not exist: {notebook_path}")
 
     if check_only:
         print(f"[CHECK] {notebook_path}", flush=True)
-        return
+        return 0.0
 
     print(f"\n=== Executing {notebook_name} ===", flush=True)
+    start_time = time.time()
     completed = subprocess.run(
         [
             sys.executable,
@@ -93,8 +111,13 @@ def run_notebook(notebook_name: str, check_only: bool = False) -> None:
         env=build_subprocess_env(),
         check=False,
     )
+    duration = time.time() - start_time
+
     if completed.returncode != 0:
         raise subprocess.CalledProcessError(completed.returncode, completed.args)
+
+    print(f"✓ Completed in {duration:.2f}s", flush=True)
+    return duration
 
 
 def run_data_attachment(check_only: bool = False) -> None:
@@ -117,6 +140,60 @@ def run_data_attachment(check_only: bool = False) -> None:
         raise subprocess.CalledProcessError(completed.returncode, completed.args)
 
 
+def save_timing_csv(timings: list[tuple[str, float]], output_path: Path, category: str) -> None:
+    """Save timing data to a CSV file, updating existing rows or appending new ones.
+
+    Args:
+        timings: List of (filename, duration_seconds) tuples
+        output_path: Path to the output CSV file
+        category: Category label (e.g., "prep_script" or "manuscript_figure")
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Read existing data if file exists
+    existing_data = {}
+    if output_path.exists():
+        with open(output_path, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row['filename'] != 'TOTAL':  # Skip TOTAL row
+                    existing_data[row['filename']] = row
+
+    # Update with new timings
+    for filename, duration in timings:
+        existing_data[filename] = {
+            'filename': filename,
+            'duration_seconds': f"{duration:.2f}",
+            'duration_minutes': f"{duration/60:.2f}",
+            'category': category,
+            'timestamp': timestamp
+        }
+
+    # Write all data back
+    with open(output_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['filename', 'duration_seconds', 'duration_minutes', 'category', 'timestamp'])
+
+        for row in existing_data.values():
+            writer.writerow([
+                row['filename'],
+                row['duration_seconds'],
+                row['duration_minutes'],
+                row['category'],
+                row['timestamp']
+            ])
+
+        # Add total row
+        total_duration = sum(float(row['duration_seconds']) for row in existing_data.values())
+        writer.writerow([
+            'TOTAL',
+            f"{total_duration:.2f}",
+            f"{total_duration/60:.2f}",
+            category,
+            timestamp
+        ])
+
+
 def run(check_only: bool = False) -> int:
     """Run figure-preparation scripts, then manuscript notebooks, in their listed order."""
     scripts = load_sequence(FIG_PREP_SEQUENCE_FILE)
@@ -124,20 +201,91 @@ def run(check_only: bool = False) -> int:
     print(f"Loaded {len(scripts)} scripts from {FIG_PREP_SEQUENCE_FILE}", flush=True)
     print(f"Loaded {len(notebooks)} notebooks from {FIG_NOTEBOOK_LIST}", flush=True)
 
+<<<<<<< HEAD
+    # Track timing for all scripts and notebooks
+    script_timings = []
+    notebook_timings = []
+
+    # run_data_attachment(check_only=check_only)
+=======
     run_data_attachment(check_only=check_only)
+>>>>>>> fbbacfc (Added datasets.json, secrets.json; and changes in 3 other files)
 
-    # for idx, script_name in enumerate(scripts, start=1):
-    #     print(f"[prep {idx}/{len(scripts)}] {script_name}", flush=True)
-    #     run_script(script_name, check_only=check_only)
+    print("\n" + "="*80, flush=True)
+    print("FIGURE PREPARATION SCRIPTS", flush=True)
+    print("="*80, flush=True)
 
+    prep_csv_path = FIG_PREP_DIR / "timing_report.csv"
+
+    for idx, script_name in enumerate(scripts, start=1):
+        print(f"\n[prep {idx}/{len(scripts)}] {script_name}", flush=True)
+        duration = run_script(script_name, check_only=check_only)
+        script_timings.append((script_name, duration))
+
+    #     # Save timing after each script completes
+    #     if not check_only:
+    #         save_timing_csv(script_timings, prep_csv_path, "prep_script")
+    #         print(f"  → Updated timing report: {prep_csv_path}", flush=True)
+
+    notebook_csv_path = MANUSCRIPT_FIG_DIR / "timing_report.csv"
+
+<<<<<<< HEAD
+    for idx, notebook_name in enumerate(notebooks, start=1):
+        print(f"[figure {idx}/{len(notebooks)}] {notebook_name}", flush=True)
+        duration = run_notebook(notebook_name, check_only=check_only)
+        notebook_timings.append((notebook_name, duration))
+    
+        # Save timing after each notebook completes
+        # if not check_only:
+        #     save_timing_csv(notebook_timings, notebook_csv_path, "manuscript_figure")
+        #     print(f"  → Updated timing report: {notebook_csv_path}", flush=True)
+
+    # Print timing summary and save CSV files
+    if not check_only:
+        print("\n" + "="*80, flush=True)
+        print("TIMING SUMMARY", flush=True)
+        print("="*80, flush=True)
+
+        if script_timings:
+            print("\nFigure Preparation Scripts:", flush=True)
+            print("-" * 80, flush=True)
+            total_script_time = 0.0
+            for name, duration in script_timings:
+                print(f"  {name:60s} {duration:8.2f}s", flush=True)
+                total_script_time += duration
+            print("-" * 80, flush=True)
+            print(f"  {'TOTAL PREP TIME':60s} {total_script_time:8.2f}s", flush=True)
+
+            # Final save already done after each script
+            print(f"\n  → Final timing report: {prep_csv_path}", flush=True)
+
+        if notebook_timings:
+            print("\nManuscript Figure Notebooks:", flush=True)
+            print("-" * 80, flush=True)
+            total_notebook_time = 0.0
+            for name, duration in notebook_timings:
+                print(f"  {name:60s} {duration:8.2f}s", flush=True)
+                total_notebook_time += duration
+            print("-" * 80, flush=True)
+            print(f"  {'TOTAL NOTEBOOK TIME':60s} {total_notebook_time:8.2f}s", flush=True)
+
+            # Final save already done after each notebook
+            print(f"\n  → Final timing report: {notebook_csv_path}", flush=True)
+
+        total_time = sum(d for _, d in script_timings) + sum(d for _, d in notebook_timings)
+        print("\n" + "="*80, flush=True)
+        print(f"  {'GRAND TOTAL':60s} {total_time:8.2f}s ({total_time/60:.2f} min)", flush=True)
+        print("="*80, flush=True)
+=======
     # for idx, notebook_name in enumerate(notebooks, start=1):
     #     print(f"[figure {idx}/{len(notebooks)}] {notebook_name}", flush=True)
     #     run_notebook(notebook_name, check_only=check_only)
+>>>>>>> fbbacfc (Added datasets.json, secrets.json; and changes in 3 other files)
 
     if check_only:
-        print("Sequence validation completed successfully for scripts and notebooks.", flush=True)
+        print("\nSequence validation completed successfully for scripts and notebooks.", flush=True)
     else:
-        print("All scripts and notebooks completed successfully.", flush=True)
+        print("\nAll scripts and notebooks completed successfully.", flush=True)
     return 0
 
 

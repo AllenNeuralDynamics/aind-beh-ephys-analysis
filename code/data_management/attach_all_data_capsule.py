@@ -62,6 +62,7 @@ def _load_mount_data_multi_assets(base_dir: Path) -> list[tuple[str, str]]:
             ("1a8bede7-bdc1-4b41-8290-bc0bdafdf019", "merfish_data"),
             ("c712751d-f744-4fe8-9657-93a7084eab22", "LC_percentile_meshes"),
             ("adf4f98c-5015-4d23-81e3-359a9a5b6ec1", "all_tongue_movements_16092025"),
+            ("42507b86-4484-4505-87cd-ce70fb031da5", "scratch_data"),
         ]
     )
 

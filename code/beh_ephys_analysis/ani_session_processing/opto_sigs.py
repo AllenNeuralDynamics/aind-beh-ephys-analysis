@@ -29,6 +29,28 @@ from scipy.stats import wilcoxon
 
 # %%
 def cal_opto_sigs(session, data_type):
+    """
+    Calculate optogenetic response significance for all units across different stimulation conditions.
+
+    Tests each unit's response to optogenetic stimulation at different power levels, sites,
+    frequencies, and pre/post conditions using Wilcoxon signed-rank test. For each condition,
+    tests response separately for each pulse in a pulse train (typically 5 pulses).
+
+    Parameters:
+        session (str): Session identifier.
+        data_type (str): Type of data to use ('curated' or 'raw').
+
+    Returns:
+        pd.DataFrame: DataFrame with columns:
+            - unit_id: Unit identifier
+            - power: Laser power level
+            - site: Stimulation site (e.g., 'surface_LC', 'surface_PrL')
+            - freq: Stimulation frequency in Hz
+            - pre_post: 'pre' or 'post' relative to task
+            - p_unit_condition: List of p-values, one per pulse in the train
+            - p_sig_count: Number of pulses (out of total, e.g. 5) with significant response (p < 0.05)
+        Saves results to pickle file in session opto directory.
+    """
     unit_tbl = get_unit_tbl(session, data_type)
     opto_tbl = get_opto_tbl(session, data_type, loc = 'soma')
     # loop through all conditions

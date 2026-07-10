@@ -1,3 +1,59 @@
+"""
+Step 9 of figure preparation pipeline: Generate outcome-window neural activity features (PARALLEL).
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    OPTIONAL (for some features):
+    - combined_beh_sessions.pkl (if exists, used for additional behavioral context)
+
+    Data requirements:
+    - combined_unit_tbl.pkl from Step 1 (contains spike times and quality metrics)
+    - Per-session trial tables with outcome times and trial types
+    - Session behavior tables with reward delivery, choice outcomes
+    - Drift/stability information for filtering stable recording periods
+
+Pipeline Position:
+    Script #9 in sequence.txt (line 9)
+    Can run IN PARALLEL with:
+    - antidromic_generation.py
+    - waveform_generation_np.py
+    - waveform_generation_tt.py
+    - basic_ephys_generation.py
+    - acg_generation.py
+    - response_tstats_generation.py
+    (All these scripts only need combined_unit_tbl.pkl from Step 1)
+
+    This is a PARALLELIZED version for faster computation over (session, unit) pairs.
+
+Purpose:
+    Extracts neural firing rates in time windows around trial outcomes:
+    - Outcome-locked firing rates (reward vs no-reward)
+    - Choice-outcome conjunctions (chosen side × reward)
+    - ROC analysis for outcome discriminability
+    - Temporal profiles around reward delivery
+    - Baseline-normalized activity changes
+    - Choice selectivity during outcome period
+
+    Critical for identifying value-coding, reward-prediction, and outcome-evaluation neurons.
+
+Input:
+    - Combined unit table from Step 1
+    - Per-session trial tables with outcome events
+    - Session behavior tables with reward timing
+
+Output:
+    - Per-unit outcome window results saved as individual pickle files
+    - combined_outcome_window_tbl.pkl: DataFrame with outcome-period features per unit
+    - Includes: firing rates by outcome type, ROC scores, outcome selectivity indices,
+      time-resolved outcome responses, baseline comparisons
+
+Usage:
+    Run after response_tstats_generation.py. Uses joblib Parallel for efficient
+    computation over many (session, unit) pairs. Based on outcome_window_generation.py
+    but with parallel execution.
+"""
 # Parallel outcome-window generation over (session, unit) pairs
 # Based on `outcome_window_generation.py`
 
@@ -22,15 +78,9 @@ from sklearn.metrics import roc_auc_score
 # file's location, so imports work no matter where the repo is checked out.
 import os
 import sys
-_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
-while _anchor != os.path.dirname(_anchor):
-    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
-    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
-        if _beh_ephys_root in sys.path:
-            sys.path.remove(_beh_ephys_root)
-        sys.path.insert(0, _beh_ephys_root)
-        break
-    _anchor = os.path.dirname(_anchor)
+_beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+if _beh_ephys_root not in sys.path:
+    sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 
 from utils.beh_functions import makeSessionDF, get_session_tbl, get_unit_tbl, session_dirs
@@ -201,7 +251,7 @@ def process_session_unit_pair(
         }
 
     except Exception as exc:
-        print(f'[Error] session {session}, unit {unit_id}: {exc}')
+        print(f'[Error] session {session}, unit {unit_id}: {exc}', flush=True)
         return _nan_result(session, unit_id, slide_times_auc, labels, error=str(exc))
 
 
@@ -266,7 +316,7 @@ def compute_outcome_window_parallel(criteria_name, pre_event, post_event, n_jobs
     bin_size = 1.5
     step_size = 0.1
     labels = ['outcome', 'hit', 'svs']
-    align = 'go_cue_time'
+    align = 'outcome_time'
     data_type = 'curated'
     model_name = 'stan_qLearning_5params'
     slide_times_auc = _expected_slide_times(pre_event, post_event, step_size)
@@ -428,8 +478,8 @@ def main():
             compute_outcome_window_parallel(criteria_name, args.pre_event, args.post_event, n_jobs=args.n_jobs)
     else:
         default_runs = [
-            ('beh_all_TT', 0, 2),
-            ('beh_all_NP', 0, 2.5),
+            ('beh_all_TT', -1, 1.75),
+            ('beh_all_NP', -1, 2.0),
         ]
         for criteria_name, pre_event, post_event in default_runs:
             compute_outcome_window_parallel(criteria_name, pre_event, post_event, n_jobs=args.n_jobs)

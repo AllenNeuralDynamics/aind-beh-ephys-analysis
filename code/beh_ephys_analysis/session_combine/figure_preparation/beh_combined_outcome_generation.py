@@ -1,3 +1,54 @@
+"""
+Step 10 of figure preparation pipeline: Combine outcome-window results with behavioral data.
+
+Prerequisites:
+    MUST run FIRST:
+    1. make_combined_unit_tbl.py (Step 1) - Creates combined_unit_tbl.pkl
+
+    ALSO NEEDS:
+    - combined_beh_sessions.pkl (behavioral session metrics)
+    - Outcome window CSV files from Step 9 (if using individual files)
+
+    Data requirements:
+    - combined_unit_tbl.pkl from Step 1
+    - combined_beh_sessions.pkl (session-level behavioral metrics)
+    - Outcome window analysis results (auc_max_lag_indi.csv or individual unit files)
+
+Pipeline Position:
+    Script #10 in sequence.txt (line 10)
+    Must run AFTER:
+    - make_combined_unit_tbl.py (Step 1)
+    - outcome_window_generation_parallel.py (Step 9)
+
+    Cannot run in parallel - needs outputs from other scripts.
+    This is one of the FINAL integration steps before photometry data.
+
+Purpose:
+    Merges outcome-related neural features with session-level behavioral metrics:
+    - Links unit-level outcome responses to session-level performance
+    - Correlates outcome selectivity with behavioral measures (accuracy, bias, lick latency)
+    - Combines reward-coding features with switch/stay probabilities
+    - Integrates model parameters with neural outcome representations
+    - Creates unified table for behavior-neural relationship analyses
+
+    Enables analysis of how neural outcome coding relates to behavioral performance
+    and decision-making strategies across sessions.
+
+Input:
+    - combined_unit_tbl.pkl from Step 1 (for session-unit mapping)
+    - combined_beh_sessions.pkl (session behavioral metrics)
+    - Outcome window results from Step 9
+
+Output:
+    - combined_beh_outcome_tbl.pkl: Merged DataFrame with both behavioral metrics
+      and neural outcome features per unit
+    - Includes: outcome firing rates, ROC scores, selectivity indices joined with
+      session accuracy, bias, switch probabilities, model parameters, lick statistics
+
+Usage:
+    Run after outcome_window_generation_parallel.py completes. Merges tables on session ID
+    to create comprehensive behavior-neural dataset for cross-correlation and regression analyses.
+"""
 # %%
 import sys
 import os
@@ -7,15 +58,9 @@ from pandas.core.apply import com
 # file's location, so imports work no matter where the repo is checked out.
 import os
 import sys
-_anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
-while _anchor != os.path.dirname(_anchor):
-    _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
-    if os.path.isdir(os.path.join(_beh_ephys_root, "utils")):
-        if _beh_ephys_root in sys.path:
-            sys.path.remove(_beh_ephys_root)
-        sys.path.insert(0, _beh_ephys_root)
-        break
-    _anchor = os.path.dirname(_anchor)
+_beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+if _beh_ephys_root not in sys.path:
+    sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import matplotlib.pyplot as plt
@@ -636,11 +681,10 @@ all_p_regressors = merge_df_with_suffix([all_p_regressors_ori.copy(), all_p_regr
 # compare regressors in early and late
 fig, axes = plt.subplots(1, len(regressors_focus), figsize=(15, 5))
 probes = combined_tagged_units_filtered['probe']
-if probes.dtype == 'O' or not np.issubdtype(probes.dtype, np.number):
-    # Convert string labels to integers for coloring
-    _, cvals = np.unique(probes, return_inverse=True)
-else:
-    cvals = probes.values
+
+# Convert to string to handle mixed types (float 2.0 and string 'tt')
+probes_str = probes.astype(str)
+_, cvals = np.unique(probes_str, return_inverse=True)
 
 for ind_reg, regressor in enumerate(regressors_focus):
     axes[ind_reg].scatter(t_regressors_e[regressor][probes.values == '2'], t_regressors_l[regressor][probes.values == '2'], alpha=0.5, edgecolors='none', s=20, label = '2')

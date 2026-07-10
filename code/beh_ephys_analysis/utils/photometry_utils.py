@@ -301,10 +301,27 @@ def align_signal_to_events(signal, signal_time, event_times, kernel = False, avo
             aligned_signal = signal[mask]
             aligned_time = signal_time[mask] - event_time
 
+            if len(aligned_time) == 0:
+                print(f"WARNING [photometry_utils.py:303]: aligned_time is EMPTY for event {i}/{len(event_times)}")
+                print(f"  Event time: {event_time:.3f}, start_time: {start_time:.3f}, end_time: {end_time:.3f}")
+                print(f"  signal_time range: [{signal_time.min():.3f}, {signal_time.max():.3f}]")
+                print(f"  Mask range: [{start_time-0.5*window_size:.3f}, {end_time+0.5*window_size:.3f}]")
+                print(f"  Mask captured 0 points - event likely outside signal time range")
+
             for j in range(num_steps):
                 window_start = j * step_size - pre_event_time
                 window_end = window_start + window_size
                 window_mask = (aligned_time >= window_start) & (aligned_time < window_end)
+                if np.sum(window_mask) == 0:
+                    aligned_time_info = f"[{aligned_time.min():.3f}, {aligned_time.max():.3f}]" if len(aligned_time) > 0 else "EMPTY"
+                    print(f"WARNING [photometry_utils.py:313]: Empty window mask - event {i}/{len(event_times)}, step {j}/{num_steps}")
+                    print(f"  Window: [{window_start:.3f}, {window_end:.3f}], aligned_time: {aligned_time_info} (len={len(aligned_time)})")
+                    print(f"  aligned_signal len: {len(aligned_signal)}, Event time: {event_time:.3f}")
+                    print(f"  Original mask captured {np.sum(mask)} points from signal")
+                elif np.all(np.isnan(aligned_signal[window_mask])):
+                    print(f"WARNING [photometry_utils.py:321]: All-NaN values in window - event {i}/{len(event_times)}, step {j}/{num_steps}")
+                    print(f"  Window: [{window_start:.3f}, {window_end:.3f}], captured {np.sum(window_mask)} points but all are NaN")
+                    print(f"  aligned_signal has {np.sum(np.isnan(aligned_signal))}/{len(aligned_signal)} NaN values total")
                 aligned_matrix[i, j] = np.nanmean(aligned_signal[window_mask])
     else:
         # linear interpolation to get signal at exact time bins and get rid of timepoints too close to other events
@@ -320,6 +337,15 @@ def align_signal_to_events(signal, signal_time, event_times, kernel = False, avo
             
 
 
+    if aligned_matrix.shape[0] == 0:
+        print(f"WARNING [photometry_utils.py:331]: aligned_matrix has 0 events!")
+        print(f"  event_times length: {len(event_times)}, signal length: {len(signal)}")
+        print(f"  pre_event_time: {pre_event_time}, post_event_time: {post_event_time}")
+    # Check if there are any non-NaN values across all events
+    all_nan_columns = np.all(np.isnan(aligned_matrix), axis=0)
+    if np.any(all_nan_columns):
+        print(f"WARNING [photometry_utils.py:331]: {np.sum(all_nan_columns)}/{len(all_nan_columns)} time bins have all-NaN values across events")
+        print(f"  This means some time windows had no valid signal data across all events")
     mean_psth = np.nanmean(aligned_matrix, axis=0)
     std_psth = np.nanstd(aligned_matrix, axis=0)
     se_psth = std_psth / np.sqrt(aligned_matrix.shape[0])
