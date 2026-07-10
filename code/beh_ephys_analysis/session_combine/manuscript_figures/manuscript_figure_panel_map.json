@@ -36,7 +36,7 @@
     "g": "Average activity of reward- and no-reward-excited neurons versus RPE (errorbar plot)",
     "h": "Behavioral choice-change versus neuron activity (errorbar plots)",
     "i": "Frontal-cortex LC-NE axonal fluorescence by RPE (filled psth)",
-    "j": "Chosen-value versus outcome effects on axonal activity (scatter)",
+    "j": "Chosen-value versus outcome effects on NE axonal activity (scatter)",
     "k": "Regression coefficient angle distribution for cortical axonal activity (polar histogram)",
     "l": "Frontal-cortex LC-NE axonal activity versus RPE (errorbar plot)"
   },
