@@ -201,15 +201,11 @@ def run(check_only: bool = False) -> int:
     print(f"Loaded {len(scripts)} scripts from {FIG_PREP_SEQUENCE_FILE}", flush=True)
     print(f"Loaded {len(notebooks)} notebooks from {FIG_NOTEBOOK_LIST}", flush=True)
 
-<<<<<<< HEAD
     # Track timing for all scripts and notebooks
     script_timings = []
     notebook_timings = []
 
-    # run_data_attachment(check_only=check_only)
-=======
     run_data_attachment(check_only=check_only)
->>>>>>> fbbacfc (Added datasets.json, secrets.json; and changes in 3 other files)
 
     print("\n" + "="*80, flush=True)
     print("FIGURE PREPARATION SCRIPTS", flush=True)
@@ -217,10 +213,10 @@ def run(check_only: bool = False) -> int:
 
     prep_csv_path = FIG_PREP_DIR / "timing_report.csv"
 
-    for idx, script_name in enumerate(scripts, start=1):
-        print(f"\n[prep {idx}/{len(scripts)}] {script_name}", flush=True)
-        duration = run_script(script_name, check_only=check_only)
-        script_timings.append((script_name, duration))
+    # for idx, script_name in enumerate(scripts, start=1):
+    #     print(f"\n[prep {idx}/{len(scripts)}] {script_name}", flush=True)
+    #     duration = run_script(script_name, check_only=check_only)
+    #     script_timings.append((script_name, duration))
 
     #     # Save timing after each script completes
     #     if not check_only:
@@ -229,11 +225,10 @@ def run(check_only: bool = False) -> int:
 
     notebook_csv_path = MANUSCRIPT_FIG_DIR / "timing_report.csv"
 
-<<<<<<< HEAD
-    for idx, notebook_name in enumerate(notebooks, start=1):
-        print(f"[figure {idx}/{len(notebooks)}] {notebook_name}", flush=True)
-        duration = run_notebook(notebook_name, check_only=check_only)
-        notebook_timings.append((notebook_name, duration))
+    # for idx, notebook_name in enumerate(notebooks, start=1):
+    #     print(f"[figure {idx}/{len(notebooks)}] {notebook_name}", flush=True)
+    #     duration = run_notebook(notebook_name, check_only=check_only)
+    #     notebook_timings.append((notebook_name, duration))
     
         # Save timing after each notebook completes
         # if not check_only:
@@ -276,11 +271,6 @@ def run(check_only: bool = False) -> int:
         print("\n" + "="*80, flush=True)
         print(f"  {'GRAND TOTAL':60s} {total_time:8.2f}s ({total_time/60:.2f} min)", flush=True)
         print("="*80, flush=True)
-=======
-    # for idx, notebook_name in enumerate(notebooks, start=1):
-    #     print(f"[figure {idx}/{len(notebooks)}] {notebook_name}", flush=True)
-    #     run_notebook(notebook_name, check_only=check_only)
->>>>>>> fbbacfc (Added datasets.json, secrets.json; and changes in 3 other files)
 
     if check_only:
         print("\nSequence validation completed successfully for scripts and notebooks.", flush=True)
