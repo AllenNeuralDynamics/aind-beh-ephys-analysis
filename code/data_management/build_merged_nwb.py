@@ -174,7 +174,7 @@ def load_licks(session_id):
 
 def _df_to_dynamic_table(df, name, description):
     """Convert a DataFrame to an hdmf DynamicTable, coercing nullable dtypes to plain numpy."""
-    table = DynamicTable(name=name, description=description)
+    table = DynamicTable(id=np.array(range(len(df))), name=name, description=description)
     for col in df.columns:
         arr = df[col].to_numpy(dtype=object, na_value=np.nan)
         try:
@@ -472,7 +472,7 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
     # Track creation time
     data_modalities['nwb_created'] = creation_time.isoformat()
     logger.info("Created NWB file")
-
+    
     # 5. Add trials with descriptions (if session table exists)
     if session_tbl is not None:
         trial_df = session_tbl.reset_index(drop=True).copy()
@@ -706,13 +706,17 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
     sessions = [
-        'behavior_754897_2025-03-13_11-20-42',
+        'behavior_751004_2024-12-20_13-26-11_raw_data',
     ]
 
     for session in sessions:
         print(f"\n{'='*80}")
         print(f"Testing: {session}")
         print(f"{'='*80}\n")
+
+        licks = load_licks(session)
+        pose = load_keypoint_tracking(session)
+        pupil = load_pupil(session)
 
         # Test the full build_combined_nwb function
         save_path, nwb = build_combined_nwb(session, data_type='curated', save_file=None)
