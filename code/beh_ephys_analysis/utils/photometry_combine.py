@@ -1,3 +1,62 @@
+"""
+Step 11 of figure preparation pipeline: Generate fiber photometry features for analysis.
+
+Prerequisites:
+    NONE - This script is COMPLETELY INDEPENDENT.
+
+    Data requirements:
+    - hopkins_FP_session_assets.csv (photometry session metadata)
+    - Per-session fiber photometry data files (if available)
+    - Raw photometry signals (GCaMP/isosbestic channels)
+    - Harp clock alignment for temporal synchronization
+    - Trial event times for trial-aligned photometry
+    - Session behavior tables for linking photometry to task events
+
+Pipeline Position:
+    Script #11 in sequence.txt (line 11) - FINAL step of the figure preparation pipeline.
+    COMPLETELY INDEPENDENT - can run IN PARALLEL with ALL other scripts!
+    Does NOT depend on any other figure_preparation script.
+
+Purpose:
+    Processes and extracts fiber photometry features for sessions with photometry recordings:
+    - Baseline correction and normalization (ΔF/F calculation)
+    - Motion artifact removal using isosbestic control channel
+    - Temporal alignment with behavioral events using Harp clock
+    - Trial-aligned photometry responses (stimulus, choice, outcome)
+    - Peak detection and response latencies
+    - Correlation with behavioral performance metrics
+    - Exponential fitting to photometry decay kinetics
+
+    Provides population-level DA/ACh/NE dynamics to complement single-unit recordings.
+
+Input:
+    - Per-session raw photometry data files
+    - Behavioral trial tables with event timestamps
+    - Session tables for trial-by-trial conditions
+    - Harp clock data for temporal alignment
+
+Output:
+    - combined_photometry_tbl.pkl: DataFrame with photometry features per session
+    - Includes: trial-aligned ΔF/F traces, peak amplitudes, response latencies,
+      baseline-corrected signals, correlations with behavior
+    - Per-session photometry plots and quality metrics
+
+Usage:
+    Run after all electrophysiology and behavioral pipelines complete. Only processes
+    sessions with available photometry data. Can run in parallel with joblib for
+    efficiency across multiple sessions.
+"""
+# %%
+import numpy as np
+import pandas as pd
+import sys
+from pathlib import Path
+# Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
+# file's location, so imports work no matter where the repo is checked out.
+import os
+_beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+if _beh_ephys_root not in sys.path:
+    sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 import pandas as pd
@@ -14,8 +73,6 @@ except ImportError:
     from photometry_utils import get_FP_data, align_signal_to_events
 import platform
 import os
-from pathlib import Path
-import shutil
 from pathlib import Path
 import shutil
 # from utils.behavior.session_utils import load_session_df, parse_session_string
@@ -83,12 +140,14 @@ def process_session(session, region, channel='G_tri-exp_mc', formula='spikes ~ 1
     beh_session_data['ipsi'] = implant_side * beh_session_data['choice'].values
     beh_session_data['hit'] = beh_session_data['animal_response'].values!=2
 
-    beh_session_data_model = makeSessionDF(session, model_name = model, cut_interruptions=True)
+    if 'Qchosen' not in formula:
+        model = None
+    beh_session_data_model = makeSessionDF(session, model_name = model, cut_interruptions=False)
     beh_session_data_model['choice'] = 2*(beh_session_data_model['choice'].values - 0.5) 
     beh_session_data_model['ipsi'] = implant_side * beh_session_data_model['choice'].values
     if 'hit' not in formula:
         beh_session_data = beh_session_data_model.copy()
-    if 'outcome' in formula or 'Qchosen' in formula:
+    if 'pe' in formula or 'Qchosen' in formula:
         model_dv, cut = load_model_dv(session, model)
         if model_dv is None:
             print(f'Model variables not found for session {session}.')
@@ -189,7 +248,7 @@ def process_session_ani(session_list, region, channel='G_tri-exp_mc', formula='s
         beh_session_data['ipsi'] = implant_side * beh_session_data['choice'].values
         beh_session_data['hit'] = beh_session_data['animal_response'].values!=2
 
-        beh_session_data_model = makeSessionDF(session, model_name = model, cut_interruptions=True)
+        beh_session_data_model = makeSessionDF(session, model_name = model, cut_interruptions=False)
         beh_session_data_model['choice'] = 2*(beh_session_data_model['choice'].values - 0.5) 
         beh_session_data_model['ipsi'] = implant_side * beh_session_data_model['choice'].values
         if 'hit' not in formula:
@@ -489,7 +548,7 @@ def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-e
             return None, None, None
         signal = get_FP_data(session)
         curr_signal = zscore(signal[channel][region])
-        trial_data = makeSessionDF(session, model_name = model, cut_interruptions=True)
+        trial_data = makeSessionDF(session, model_name = model, cut_interruptions=False)
         if target_var not in trial_data.columns:
             print(f'{target_var} not found in trial data for session {session}.')
             return None, None, None
@@ -588,7 +647,7 @@ def plot_psth(
             return None, None
         signal = get_FP_data(session)
         curr_signal = zscore(signal[channel][region])
-        beh_session_data_raw = get_session_tbl(session, cut_interruptions=True)
+        beh_session_data_raw = get_session_tbl(session, cut_interruptions=False)
         beh_session_data_raw['hit'] = beh_session_data_raw['animal_response'].values != 2
         beh_session_data = makeSessionDF(session, model_name = model, cut_interruptions=True)
         _, mean_psth, time, _ = align_signal_to_events(

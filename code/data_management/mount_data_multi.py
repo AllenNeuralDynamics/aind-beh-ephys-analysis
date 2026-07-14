@@ -45,8 +45,17 @@ for curr_col in col_to_attach:
 #%%
 # all_ids = all_ids + ['f908dd4d-d7ed-4d52-97cf-ccd0e167c659']
 # all_mounts = all_mounts + ['all_behavior']
-all_ids = all_ids + ['c1a35fd0-c3aa-47a8-ba40-288b1e39a86a', 'ac7c7961-9178-4bf9-9d66-0a426cf3cc24', '1a8bede7-bdc1-4b41-8290-bc0bdafdf019', 'c712751d-f744-4fe8-9657-93a7084eab22', 'adf4f98c-5015-4d23-81e3-359a9a5b6ec1', '42507b86-4484-4505-87cd-ce70fb031da5']
-all_mounts = all_mounts + ['alignment_fix', 'dorsal_edges', 'merfish_data', 'LC_percentile_meshes', 'all_tongue_movements_16092025', 'scratch_data']
+data_to_add = [
+            ("c1a35fd0-c3aa-47a8-ba40-288b1e39a86a", "alignment_fix"),
+            ("ac7c7961-9178-4bf9-9d66-0a426cf3cc24", "dorsal_edges"),
+            ("7bf4aa31-226c-4c9c-835b-ae0da5ff1ce0", "merfish_data"), # updated
+            ("299fd5aa-1454-4b7a-968c-1e7d2c570d27", "LC_percentile_meshes"), # updated
+            ("adf4f98c-5015-4d23-81e3-359a9a5b6ec1", "all_tongue_movements_16092025"),
+            ("60d862b2-173a-4024-8a45-9714d40ae7e3", "scratc_data"), # updated
+            ("fcda6874-91fa-488f-bd97-f30e17dd61c3", "LC_retro") # updated
+            ]
+all_ids.extend([item[0] for item in data_to_add])
+all_mounts.extend([item[1] for item in data_to_add])
 
 # Generate the list of DataAssetAttachParams objects
 all_mounts_new = []

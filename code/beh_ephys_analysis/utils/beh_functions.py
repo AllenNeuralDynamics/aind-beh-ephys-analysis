@@ -1294,6 +1294,7 @@ def makeSessionDF(session, cut = [0, np.nan], model_name = None, cut_interruptio
     # stay vs switch
     svs = np.zeros(len(choices), dtype=bool)
     svs[choices!=choicesPrev] = True
+    svs[0] = False
 
     # time since last trial
     time_between_trials = np.diff(tblTrials['goCue_start_time'], prepend = np.nan)

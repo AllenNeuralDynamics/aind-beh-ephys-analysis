@@ -49,7 +49,7 @@ def capsule_directories():
         'output_dir': output_dir,
         'manuscript_fig_dir': output_dir / 'manuscript' / 'figures',
         'manuscript_fig_prep_dir': output_dir / 'manuscript' / 'prep',
-        'derived_dir': root / 'data' / 'scratch_data',
+        'derived_dir': root / 'data' / 'LC-subject-level-processing',
         'data_dir': root / 'data',
     }
     for dir in dirs.values():
