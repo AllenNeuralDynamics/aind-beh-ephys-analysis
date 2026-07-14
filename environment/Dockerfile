@@ -57,7 +57,11 @@ RUN pip install -U --no-cache-dir \
     aind_data_schema==2.6.0 \
     openpyxl==3.1.5 \
     pycircstat2==0.1.15 \
-    scanpy==1.12.1
+    scanpy==1.12.1 \
+    myterial==1.2.1 \
+    rich==14.3.1 \
+    brainrender==2.1.17 \
+    brainglobe-atlasapi==2.3.0
 
 
 

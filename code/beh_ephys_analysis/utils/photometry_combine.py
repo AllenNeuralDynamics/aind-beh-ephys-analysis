@@ -670,7 +670,7 @@ def plot_psth(
                                                         signal['time_in_beh'], 
                                                         trial_data[align].values, 
                                                         pre_event_time=pre_time, post_event_time=post_time,
-                                                        step_size=step_size, window_size=step_size, kernel=True);
+                                                        step_size=step_size, window_size=step_size, kernel=False);
         target_var_values = trial_data[target_var].values
  
         if quantiles:
@@ -686,7 +686,7 @@ def plot_psth(
         for bin_ind in range(num_bins):
             bin_mask = (target_var_values >= bins[bin_ind]) & (target_var_values < bins[bin_ind+1])
             if np.sum(bin_mask) > 0:
-                binned_psth[bin_ind, :] = np.mean(aligned_matrix[bin_mask, :], 0)
+                binned_psth[bin_ind, :] = np.nanmean(aligned_matrix[bin_mask, :], 0)
         return binned_psth, time_bins       
     results = Parallel(n_jobs=-4)(delayed(process_session_for_psth)(session) for session in session_list)
     # results = []
