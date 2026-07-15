@@ -15,15 +15,24 @@ import numpy as np
 from datetime import datetime
 from uuid import uuid4
 from dateutil.tz import tzlocal
-from pynwb import NWBHDF5IO, NWBFile
+from pynwb import NWBHDF5IO, NWBFile, TimeSeries
 from pynwb.file import Subject
 
 import sys
 sys.path.insert(0, '/root/capsule/code/beh_ephys_analysis')
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
-from utils.beh_functions import get_session_tbl, get_unit_tbl, session_dirs
+from utils.beh_functions import get_session_tbl, get_unit_tbl, session_dirs, parseSessionID
+from utils.pupil_utils import load_pupil
+from pathlib import Path
+from hdmf.common import DynamicTable, VectorData
+from aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys import load_intermediate_data
 
 logger = logging.getLogger(__name__)
+
+# Lick/tongue movement data
+LICK_DATA_DIR = Path('/root/capsule/data/all_tongue_movements_04022026')
+LICK_PARQUET = LICK_DATA_DIR / 'all_tongue_movements_04022026.parquet'
+KEYPOINT_TRACKING_DIR = Path('/root/capsule/data/keypoint_tracking_bottomview_LCrecordings_20260403')
 
 # Load column mappings and descriptions
 COLUMN_MAP_PATH = '/root/capsule/code/data_management/column_names_map.json'
@@ -45,6 +54,195 @@ KNOWN_ARRAY_COLUMNS = {
     'waveform_on_peak_channel_of_raw_waveform', 'waveform_on_peak_channel_of_aligned_raw_waveform',
     'peak_waveform_fake_raw', 'peak_waveform_aligned_fake_raw',
 }
+
+def pupil_data_to_timeseries(pupil_data):
+    """
+    Convert a pupil data dict to a pynwb TimeSeries.
+
+    Args:
+        pupil_data: dict with keys 'pupil_times' (1D array, seconds) and
+                    'pupil_diameter' (1D array, pixels)
+
+    Returns:
+        pynwb.TimeSeries with name 'pupil_diameter'
+    """
+    return TimeSeries(
+        name='pupil_diameter',
+        data=np.array(pupil_data['pupil_diameter'], dtype=np.float64),
+        timestamps=np.array(pupil_data['pupil_times'], dtype=np.float64),
+        unit='pixels',
+        description='Pupil diameter measured from DLC tracking, aligned to session time.',
+    )
+
+
+def load_licks(session_id):
+    """
+    Load tongue/lick movements for a session from the parquet data asset.
+
+    Matches session_id to the video session by animal ID and closest datetime,
+    then returns only rows where has_lick=True as a pynwb DynamicTable.
+
+    Args:
+        session_id: session identifier string, e.g. 'behavior_791691_2025-06-27_13-54-30'
+
+    Returns:
+        hdmf DynamicTable with one row per lick, or None if no match found.
+    """
+    if not LICK_PARQUET.exists():
+        logger.warning(f"Lick parquet not found at {LICK_PARQUET}")
+        return None
+
+    all_lick_df = pd.read_parquet(LICK_PARQUET)
+    session_video_list = all_lick_df['session'].unique().tolist()
+
+    animal_id, session_time, _ = parseSessionID(session_id)
+    if animal_id is None:
+        logger.warning(f"Could not parse session_id: {session_id}")
+        return None
+
+    candidate_sessions = [s for s in session_video_list if str(s).startswith(f'behavior_{animal_id}')]
+    if not candidate_sessions:
+        logger.info(f"No lick data found for animal {animal_id}")
+        return None
+
+    time_diffs = [abs((parseSessionID(s)[1] - session_time).total_seconds()) for s in candidate_sessions]
+    best_idx = int(np.argmin(time_diffs))
+    if time_diffs[best_idx] > 60:
+        logger.info(f"Closest lick session is {time_diffs[best_idx]:.0f}s away — skipping")
+        return None
+
+    matched_session = candidate_sessions[best_idx]
+    logger.info(f"Matched lick session: {matched_session}")
+
+    licks = all_lick_df[(all_lick_df['session'] == matched_session) & (all_lick_df['has_lick'])].copy().reset_index(drop=True)
+    if len(licks) == 0:
+        logger.info("No lick rows found after filtering has_lick=True")
+        return None
+
+    # Columns to include in the DynamicTable (drop session identifier and redundant flags)
+    exclude_cols = {'session', 'has_lick'}
+    col_descriptions = {
+        'movement_id': 'Unique tongue movement identifier',
+        'start_time': 'Movement onset time relative to session start (s)',
+        'end_time': 'Movement offset time relative to session start (s)',
+        'duration': 'Movement duration (s)',
+        'lick_time': 'Time of lick contact relative to session start (s)',
+        'lick_count': 'Number of lick contacts within this movement',
+        'lick_latency': 'Latency from go cue to lick contact (s)',
+        'trial': 'Trial number',
+        'cue_response': 'Whether the animal responded to the cue',
+        'rewarded': 'Whether the trial was rewarded',
+        'event': 'Lick event type (left_lick_time / right_lick_time)',
+        'peak_velocity': 'Peak tongue velocity (px/s)',
+        'mean_velocity': 'Mean tongue velocity (px/s)',
+        'total_distance': 'Total tongue path distance (px)',
+        'excursion_angle_deg': 'Tongue excursion angle (degrees)',
+        'goCue_start_time_in_session': 'Go cue time for this trial relative to session start (s)',
+        'movement_latency_from_go': 'Latency from go cue to movement onset (s)',
+        'movement_number_in_trial': 'Index of this movement within the trial',
+    }
+
+    keep_cols = [c for c in licks.columns if c not in exclude_cols]
+
+    table = DynamicTable(
+        name='licks',
+        description='Tongue lick movements detected from video DLC tracking, one row per lick.',
+    )
+
+    for col in keep_cols:
+        series = licks[col]
+        # Normalise nullable integer / boolean dtypes to plain numpy
+        if hasattr(series, 'to_numpy'):
+            arr = series.to_numpy(dtype=object, na_value=np.nan)
+            # Cast to float if numeric, keeping NaN for missing values
+            try:
+                arr = arr.astype(np.float64)
+            except (ValueError, TypeError):
+                arr = arr.astype(object)
+        else:
+            arr = np.array(series, dtype=object)
+
+        table.add_column(
+            name=col,
+            description=col_descriptions.get(col, col),
+            data=arr.tolist(),
+        )
+
+    logger.info(f"Built lick DynamicTable with {len(licks)} rows and {len(keep_cols)} columns")
+    return table
+
+
+def _df_to_dynamic_table(df, name, description):
+    """Convert a DataFrame to an hdmf DynamicTable, coercing nullable dtypes to plain numpy."""
+    table = DynamicTable(id=np.array(range(len(df))), name=name, description=description)
+    for col in df.columns:
+        arr = df[col].to_numpy(dtype=object, na_value=np.nan)
+        try:
+            arr = arr.astype(np.float64)
+        except (ValueError, TypeError):
+            arr = arr.astype(object)
+        table.add_column(name=col, description=col, data=arr.tolist())
+    return table
+
+
+def load_keypoint_tracking(session_id):
+    """
+    Load tongue keypoint tracking data for a session from the bottomview DLC asset.
+
+    Matches session_id to the nearest session directory under KEYPOINT_TRACKING_DIR
+    by animal ID and datetime, then calls load_intermediate_data and returns
+    DynamicTables for the movement summary (movs) and per-frame kinematics (kins).
+
+    Args:
+        session_id: session identifier string
+
+    Returns:
+        Tuple (movs_table, kins_table), or (None, None) if no match found.
+    """
+    if not KEYPOINT_TRACKING_DIR.exists():
+        logger.warning(f"Keypoint tracking directory not found: {KEYPOINT_TRACKING_DIR}")
+        return None, None
+
+    animal_id, session_time, _ = parseSessionID(session_id)
+    if animal_id is None:
+        logger.warning(f"Could not parse session_id: {session_id}")
+        return None, None
+
+    candidate_dirs = [d for d in KEYPOINT_TRACKING_DIR.iterdir()
+                      if d.is_dir() and d.name.startswith(f'behavior_{animal_id}')]
+    if not candidate_dirs:
+        logger.info(f"No keypoint tracking data found for animal {animal_id}")
+        return None, None
+
+    time_diffs = [abs((parseSessionID(d.name)[1] - session_time).total_seconds()) for d in candidate_dirs]
+    best_idx = int(np.argmin(time_diffs))
+    if time_diffs[best_idx] > 60:
+        logger.info(f"Closest keypoint session is {time_diffs[best_idx]:.0f}s away — skipping")
+        return None, None
+
+    matched_dir = candidate_dirs[best_idx]
+    logger.info(f"Matched keypoint tracking session: {matched_dir.name}")
+
+    try:
+        data = load_intermediate_data(matched_dir)
+    except Exception as e:
+        logger.warning(f"Failed to load intermediate data from {matched_dir}: {e}")
+        return None, None
+
+    movs_table = _df_to_dynamic_table(
+        data['movs'],
+        name='tongue_movements',
+        description='Tongue movement summary table from DLC keypoint tracking (one row per movement).',
+    )
+    kins_table = _df_to_dynamic_table(
+        data['kins'],
+        name='tongue_kinematics',
+        description='Per-frame tongue kinematics from DLC keypoint tracking (x, y, velocity, confidence).',
+    )
+
+    logger.info(f"Built tongue_movements ({len(data['movs'])} rows) and tongue_kinematics ({len(data['kins'])} rows) tables")
+    return movs_table, kins_table
+
 
 def merge_unit_tables(session_id, data_type='curated', return_nwb=False):
     """
@@ -193,6 +391,9 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
         'lick_times': False,
         'reward_times': False,
         'FP': False,  # Fiber photometry
+        'pupil': False,
+        'lick_video': False,
+        'keypoint_tracking': False,
         'beh_version': 'none',  # 'raw', 'processed', or 'none'
         'nwb_created': None,  # Timestamp when NWB object was created
         'nwb_saved': None,  # Timestamp when NWB file was saved (if save_file provided)
@@ -271,7 +472,7 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
     # Track creation time
     data_modalities['nwb_created'] = creation_time.isoformat()
     logger.info("Created NWB file")
-
+    
     # 5. Add trials with descriptions (if session table exists)
     if session_tbl is not None:
         trial_df = session_tbl.reset_index(drop=True).copy()
@@ -439,11 +640,54 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
     else:
         logger.info("No units to add - behavior/acquisition only NWB")
 
-    # 7. Log data modalities included
+    # 7. Add pupil data to behavior processing module (if available)
+    pupil_data = load_pupil(session_id)
+    if pupil_data is not None:
+        if 'behavior' not in new_nwb.processing:
+            new_nwb.create_processing_module(
+                name='behavior',
+                description='Processed behavioral data',
+            )
+        new_nwb.processing['behavior'].add(pupil_data_to_timeseries(pupil_data))
+        data_modalities['pupil'] = True
+        logger.info("Added pupil diameter TimeSeries to behavior processing module")
+    else:
+        logger.info("No pupil data available for this session")
+
+    # 7b. Add lick DynamicTable to behavior processing module (if available)
+    lick_table = load_licks(session_id)
+    if lick_table is not None:
+        if 'behavior' not in new_nwb.processing:
+            new_nwb.create_processing_module(
+                name='behavior',
+                description='Processed behavioral data',
+            )
+        new_nwb.processing['behavior'].add(lick_table)
+        data_modalities['lick_video'] = True
+        logger.info(f"Added lick DynamicTable to behavior processing module")
+    else:
+        logger.info("No lick video data available for this session")
+
+    # 7c. Add keypoint tracking tables to behavior processing module (if available)
+    movs_table, kins_table = load_keypoint_tracking(session_id)
+    if movs_table is not None and kins_table is not None:
+        if 'behavior' not in new_nwb.processing:
+            new_nwb.create_processing_module(
+                name='behavior',
+                description='Processed behavioral data',
+            )
+        new_nwb.processing['behavior'].add(movs_table)
+        new_nwb.processing['behavior'].add(kins_table)
+        data_modalities['keypoint_tracking'] = True
+        logger.info("Added tongue_movements and tongue_kinematics tables to behavior processing module")
+    else:
+        logger.info("No keypoint tracking data available for this session")
+
+    # 8. Log data modalities included
     included_modalities = [k for k, v in data_modalities.items() if v]
     logger.info(f"Data modalities included: {', '.join(included_modalities) if included_modalities else 'none'}")
 
-    # 8. Save if requested
+    # 9. Save if requested
     if save_file is not None:
         os.makedirs(os.path.dirname(save_file), exist_ok=True)
         save_time = datetime.now(tzlocal())
@@ -469,6 +713,7 @@ if __name__ == '__main__':
         print(f"\n{'='*80}")
         print(f"Testing: {session}")
         print(f"{'='*80}\n")
+
 
         # Test the full build_combined_nwb function
         save_path, nwb = build_combined_nwb(session, data_type='curated', save_file=None)
