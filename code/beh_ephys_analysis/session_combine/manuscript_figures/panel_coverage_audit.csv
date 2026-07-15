@@ -2,7 +2,7 @@ panel,category,session_if_example,unit_if_example,figure_generated,csv_generated
 Figure4a,3_cartoon_no_csv,,,,,
 Figure4b,2_example_regeneration,mZS061d20210408,,Yes,Yes,F_ephys_behavior_examples
 Figure4d,3_cartoon_no_csv,,,,,
-Figure4f,2_example_regeneration,751766_2025-02-14_11-37-11,36,Yes,No,F_ephys_behavior_examples
+Figure4f,2_example_regeneration,751766_2025-02-14_11-37-11,36,Yes,Yes,F_ephys_behavior_examples
 Figure5i_left,3_cartoon_no_csv,,,,,
 Figure5i_right,2_example_regeneration,m754896d20250108,,Yes,Yes,
 Figure6b_left,3_cartoon_no_csv,,,,,
@@ -26,8 +26,8 @@ FigureS13j_top,1_matched_to_code,behavior_752014_2025-03-26_11-18-5,46,Yes,Yes,F
 FigureS13j_bottom,1_matched_to_code,behavior_752014_2025-03-26_11-18-5,46,Yes,Yes,F_ephys_behavior_examples
 FigureS14a,3_cartoon_no_csv,,,,,
 FigureS15d,2_example_regeneration,"behavior_751766_2025-02-14_11-37-11, behavior_751766_2025-02-11_11-53-38","36, 11",Yes,Yes,
-FigureS15o,2_example_regeneration,behavior_751004_2024-12-23_14-20-03,21,No,No,
-FigureS15p,2_example_regeneration,behavior_754897_2025-03-13_11-20-42,26,No,No,
+FigureS15o,2_example_regeneration,behavior_751004_2024-12-23_14-20-03,21,Yes,Yes,
+FigureS15p,2_example_regeneration,behavior_754897_2025-03-13_11-20-42,26,Yes,Yes,
 FigureS16a,3_cartoon_no_csv,,,,,
 FigureS16b,2_example_regeneration,,,No,No,
 FigureS16c,2_example_regeneration,,,No,No,
