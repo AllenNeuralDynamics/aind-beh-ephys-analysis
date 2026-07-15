@@ -14,6 +14,7 @@ from pathlib import Path
 CODE_DIR = Path(__file__).resolve().parent
 WORKSPACE_DIR = CODE_DIR.parent
 DATA_ATTACH_SCRIPT = CODE_DIR / "data_management" / "attach_all_data_capsule.py"
+FIGURE_CSV_PATH = CODE_DIR / "data_management" / "figure_csv_organization.py"
 FIG_PREP_DIR = CODE_DIR / "beh_ephys_analysis" / "session_combine" / "figure_preparation"
 FIG_PREP_SEQUENCE_FILE = FIG_PREP_DIR / "sequence.txt"
 MANUSCRIPT_FIG_DIR = CODE_DIR / "beh_ephys_analysis" / "session_combine" / "manuscript_figures"
@@ -244,7 +245,7 @@ def run(check_only: bool = False) -> int:
         if script_timings:
             print("\nFigure Preparation Scripts:", flush=True)
             print("-" * 80, flush=True)
-            total_script_time = 0.0
+            total_script_time = 0.0  
             for name, duration in script_timings:
                 print(f"  {name:60s} {duration:8.2f}s", flush=True)
                 total_script_time += duration
@@ -271,6 +272,17 @@ def run(check_only: bool = False) -> int:
         print("\n" + "="*80, flush=True)
         print(f"  {'GRAND TOTAL':60s} {total_time:8.2f}s ({total_time/60:.2f} min)", flush=True)
         print("="*80, flush=True)
+
+        # Reorganze figure and csvs in output directory
+        if not check_only:
+            print("\nReorganizing figure and CSV outputs...", flush=True)
+            subprocess.run(
+                [sys.executable, str(FIGURE_CSV_PATH)],
+                cwd=str(WORKSPACE_DIR),
+                env=build_subprocess_env(),
+                check=True,
+            )
+            print("✓ Reorganization complete.", flush=True)
 
     if check_only:
         print("\nSequence validation completed successfully for scripts and notebooks.", flush=True)

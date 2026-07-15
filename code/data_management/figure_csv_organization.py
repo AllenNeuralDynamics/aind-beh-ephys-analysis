@@ -52,10 +52,19 @@ def main():
 
     for subdir_name in sorted(source_subdirs):
         subdir_path = os.path.join(fig_dir, subdir_name)
-        for fname in os.listdir(subdir_path):
-            src = os.path.join(subdir_path, fname)
-            if not os.path.isfile(src):
-                continue
+        # collect files from this level and one level deeper
+        search_paths = []
+        for entry in os.listdir(subdir_path):
+            entry_path = os.path.join(subdir_path, entry)
+            if os.path.isfile(entry_path):
+                search_paths.append(entry_path)
+            elif os.path.isdir(entry_path):
+                for fname2 in os.listdir(entry_path):
+                    fp = os.path.join(entry_path, fname2)
+                    if os.path.isfile(fp):
+                        search_paths.append(fp)
+        for src in search_paths:
+            fname = os.path.basename(src)
             for fig_name in figure_names:
                 if fname.startswith(fig_name):
                     dst = os.path.join(dest_dirs[fig_name], fname)
