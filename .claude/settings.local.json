@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(python3)",
+      "Bash(python3 -)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(x['notebook'], '-', x['removed'], 'cells'\\) for x in d['details']]\")",
+      "Bash(pip install *)",
+      "Bash(nbdiff --version)",
+      "Bash(nbdiff HEAD \"code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_action&outcome.ipynb\")",
+      "Bash(nbdiff-web HEAD \"code/beh_ephys_analysis/session_combine/manuscript_figures/F_ephys_behavior_action&outcome.ipynb\")",
+      "Bash(python3 -c \"import json; nb=json.load\\(open\\('/root/capsule/code/beh_ephys_analysis/session_combine/manuscript_figures/F_basic_ephys.ipynb'\\)\\); print\\('nbformat:', nb.get\\('nbformat'\\), nb.get\\('nbformat_minor'\\)\\)\")",
+      "Bash(jupyter nbconvert *)",
+      "Bash(echo \"EXIT_CHECK: $?\")",
+      "Bash(echo \"EXIT_CODE_CHECK: $?\")",
+      "Bash(wait)",
+      "Bash(cat \"/tmp/claude-0/-root-capsule/899f3085-ea41-4f52-bafa-09c2ec24ba7f/tasks/b9u8m61tw.output\" 2>&1; echo \"EXIT_CODE_CHECK\"; ls /tmp/out_F_pupil_beh_ephys.ipynb 2>&1)",
+      "Read(//tmp/**)",
+      "Bash(# Check if a saved pkl exists that could be loaded *)",
+      "Read(//scratch/results/manuscript/figures/F_waveform_space/**)",
+      "Read(//scratch/**)"
+    ]
+  }
+}
