@@ -36,12 +36,12 @@ Figure6j,1_matched_to_code,Chosen-value versus outcome effects on NE axonal acti
 Figure6k,1_matched_to_code,Regression coefficient angle distribution for cortical axonal activity (polar histogram),Yes,Yes,,,F_photometry_tuning_psth
 Figure6l,1_matched_to_code,Frontal-cortex LC-NE axonal activity versus RPE (errorbar plot),Yes,Yes,,,F_photometry_tuning_psth
 FigureS12a,1_matched_to_code,Behavioral performance statistics (distribution),Yes,Yes,,,F_behavior_w_FP
-FigureS12b,2_example_regeneration,Example lick raster aligned to choice start (raster),,,lick raster,,
-FigureS12c,2_example_regeneration,Mean licking rate for reward-latency sessions (filled psth),,,lick psth,,
+FigureS12b,2_example_regeneration,Example lick raster aligned to choice start (raster),Yes,Yes,lick raster,,F_example_licks
+FigureS12c,2_example_regeneration,Mean licking rate for reward-latency sessions (filled psth),Yes,Yes,lick psth,,F_example_licks
 FigureS12d,1_matched_to_code,"Stay/switch lick-latency distributions and switch-vs-stay lick latency by session (histogram, scatter)",Yes,Yes,,,F_lick_train_analysis
 FigureS12e,2_example_regeneration,In-trial and spontaneous licks example (time series),Yes,Yes,m754896d20250108,,F_photometry_examples
 FigureS12f,3_cartoon_no_csv,Example video frame for lick detection,,,,,
-FigureS12g_bottom,2_example_regeneration,"Video-detected licks aligned to go cue (raster, histogram)",,,784806,,
+FigureS12g_bottom,2_example_regeneration,"Video-detected licks aligned to go cue (raster, histogram)",Yes,Yes,784806,,F_example_licks
 FigureS12h,1_matched_to_code,Spontaneous lick preference versus task reward ratio (scatter),Yes,Yes,,,F_lick_train_analysis
 FigureS12i,1_matched_to_code,Task lick percentage versus reward-ratio deviation (scatter),Yes,Yes,,,F_lick_train_analysis
 FigureS12j,1_matched_to_code,Logistic-regression z-statistics predicting spontaneous licks (histogram),Yes,Yes,,,F_lick_train_analysis

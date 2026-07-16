@@ -51,7 +51,7 @@ data_to_add = [
             ("7bf4aa31-226c-4c9c-835b-ae0da5ff1ce0", "merfish_data"), # updated
             ("299fd5aa-1454-4b7a-968c-1e7d2c570d27", "LC_percentile_meshes"), # updated
             ("adf4f98c-5015-4d23-81e3-359a9a5b6ec1", "all_tongue_movements_16092025"),
-            ("60d862b2-173a-4024-8a45-9714d40ae7e3", "scratc_data"), # updated
+            ("60d862b2-173a-4024-8a45-9714d40ae7e3", "scratch_data"), # updated
             ("fcda6874-91fa-488f-bd97-f30e17dd61c3", "LC_retro") # updated
             ]
 all_ids.extend([item[0] for item in data_to_add])
