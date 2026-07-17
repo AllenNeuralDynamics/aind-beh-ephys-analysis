@@ -1,0 +1,12 @@
+Figure,1_matched_to_code,2_example_needs_regeneration,3_cartoon_diagram_no_csv,4_in_json_missing_from_1-3
+Figure4,"c, e, g, h","b, f","a, d",
+Figure5,"a, b, c, d, e, f, g, h, j, k_left, k_right", i_right,i_left,
+Figure6,"a, c, e, f, g, h, i, j, k, l","d_left, d_right, b_right",b_left,
+FigureS12,"a, d, h, i, j, l, m","b, c, e, g_bottom","f, k",
+FigureS13,"e, f_topleft, f_topright,  f_bottomleft,   f_bottomright, k, l, m","c, d, j_top, j_bottom, i","a, b, g, h",
+FigureS14,"b, c, d, e, f, g, h, i",,a,
+FigureS15,"a, b, c, e, f_top, f_bottom, q, r_left, r_mid, r_right, s, t","d, o, p",,
+FigureS16,"d, f, g_right, h, j,  l, n","b, c, e, g_left, i, k, m",a,
+FigureS17,"g, h_right, i_left, i_right, b","c, d, e, f, h_left, j",a,
+FigureS18,"a, b, c, d",,,
+TOTAL,78,31,13,0

@@ -1,0 +1,129 @@
+panel,category,title,figure_generated,csv_generated,session_if_example,unit_if_example,notebook
+Figure4a,3_cartoon_no_csv,Dynamic foraging task structure,,,,,
+Figure4b,2_example_regeneration,"Example session: mouse choices, rewards, and changing reward probabilities over trials (mZS061d20210408)",Yes,Yes,mZS061d20210408,,F_ephys_behavior_examples
+Figure4c,1_matched_to_code,Choice-history logistic regression coefficients (errorbar plot),Yes,Yes,,,F_behavior_w_FP
+Figure4d,3_cartoon_no_csv,LC-NE optotagging recording strategy,,,,,
+Figure4e,1_matched_to_code,"Example extracellular spiking around two trials (time series, raster)",Yes,Yes,,,F_cross_correlation
+Figure4f,2_example_regeneration,Example go-cue-aligned spike raster sorted by first spike after go cue (raster),Yes,Yes,751766_2025-02-14_11-37-11,36,F_ephys_behavior_examples
+Figure4g,1_matched_to_code,Go-cue spike rate versus baseline spike rate (scatter),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure4h,1_matched_to_code,Go-cue excitation versus go-baseline correlation (scatter),Yes,Yes,,,F_basic_ephys
+Figure5a,1_matched_to_code,Respond-vs-ignore dependence on reward history (errorbar plot),Yes,Yes,,,F_ephys_behavior_examples
+Figure5b,1_matched_to_code,Pre-respond versus pre-ignore spike rates (scatter),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure5c,1_matched_to_code,Respond-vs-ignore encoding mapped in LC (scatter),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure5d,1_matched_to_code,"Respond-vs-ignore encoding along axonal-projection and gene-expression axes (scatter, regression)",Yes,Yes,,,F_spatial-axis-comparison
+Figure5e,1_matched_to_code,Switch-vs-stay dependence on reward and choice history (errorbar plot),Yes,Yes,,,F_behavior_w_FP
+Figure5f,1_matched_to_code,Switch versus stay spike rates after go cue (scatter),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure5g,1_matched_to_code,Switch-vs-stay encoding mapped in LC (scatter),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure5h,1_matched_to_code,"Switch-vs-stay encoding along axonal-projection and gene-expression axes (scatter, regression)",Yes,Yes,,,F_spatial-axis-comparison
+Figure5i_left,3_cartoon_no_csv,Frontal-cortex LC-NE axon photometry strategy,,,,,
+Figure5i_right,2_example_regeneration,Example LC-NE axonal GCaMP signal in frontal cortex during behavior (time series),Yes,Yes,m754896d20250108,,F_photometry_examples
+Figure5i_right,1_matched_to_code,,Yes,Yes,,,F_photometry_examples
+Figure5j,1_matched_to_code,Mean frontal-cortex axon encoding during switch versus stay trials (filled psth),Yes,Yes,,,F_photometry_tuning_psth
+Figure5k_left,1_matched_to_code,Switch-vs-stay statistics for frontal-cortex LC-NE axonal activity (histogram),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure5k_right,1_matched_to_code,"Switch-vs-stay statistics for isocortex-projecting LC-NE neurons and LC-NE population (histogram, scatter)",Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure6a,1_matched_to_code,"Reward-vs-no-reward encoding t-statistics distribution and distribution in space (histogram, scatter)",Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure6b_left,3_cartoon_no_csv,Reinforcement-learning model schema for RPE,,,,,F_behavior_w_FP
+Figure6b_right,2_example_regeneration,Model fit to example behavior over trials (time series),Yes,Yes,mZS061d20210408,,F_ephys_behavior_examples
+Figure6c,1_matched_to_code,Choice-change relationship to RPE (errorbar plot),Yes,Yes,,,
+Figure6d_left,2_example_regeneration,"Example RPE-scaling neuron (raster, filled psth)",Yes,Yes,behavior_ZS061_2021-03-29_17-48-18,TT1_SS_03,F_ephys_behavior_examples
+Figure6d_right,2_example_regeneration,"Example no-reward-excited neuron (raster, filled psth)",Yes,Yes,behavior_ZS061_2021-03-25_17-12-27,TT3_SS_01,F_ephys_behavior_examples
+Figure6e,1_matched_to_code,Chosen-value versus outcome effects on spike rates (scatter),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure6f,1_matched_to_code,Regression coefficient angle distribution for LC-NE neurons (polar histogram),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure6g,1_matched_to_code,Average activity of reward- and no-reward-excited neurons versus RPE (errorbar plot),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure6h,1_matched_to_code,Behavioral choice-change versus neuron activity (errorbar plots),Yes,Yes,,,F_ephys_behavior_action&outcome
+Figure6i,1_matched_to_code,Frontal-cortex LC-NE axonal fluorescence by RPE (filled psth),Yes,Yes,,,F_photometry_tuning_psth
+Figure6j,1_matched_to_code,Chosen-value versus outcome effects on NE axonal activity (scatter),Yes,Yes,,,F_photometry_tuning_psth
+Figure6k,1_matched_to_code,Regression coefficient angle distribution for cortical axonal activity (polar histogram),Yes,Yes,,,F_photometry_tuning_psth
+Figure6l,1_matched_to_code,Frontal-cortex LC-NE axonal activity versus RPE (errorbar plot),Yes,Yes,,,F_photometry_tuning_psth
+FigureS12a,1_matched_to_code,Behavioral performance statistics (distribution),Yes,Yes,,,F_behavior_w_FP
+FigureS12b,2_example_regeneration,Example lick raster aligned to choice start (raster),Yes,Yes,lick raster,,F_example_licks
+FigureS12c_top,2_example_regeneration,Mean licking rate for reward-latency sessions (filled psth),Yes,Yes,lick psth,,F_example_licks
+FigureS12c_bottom,2_example_regeneration,Mean licking rate for reward-latency sessions (filled psth),Yes,Yes,lick psth,,F_example_licks
+FigureS12d,1_matched_to_code,"Stay/switch lick-latency distributions and switch-vs-stay lick latency by session (histogram, scatter)",Yes,Yes,,,F_lick_train_analysis
+FigureS12e,2_example_regeneration,In-trial and spontaneous licks example (time series),Yes,Yes,m754896d20250108,,F_photometry_examples
+FigureS12f,3_cartoon_no_csv,Example video frame for lick detection,,,,,
+FigureS12g_bottom,2_example_regeneration,"Video-detected licks aligned to go cue (raster, histogram)",Yes,Yes,784806,,F_example_licks
+FigureS12h,1_matched_to_code,Spontaneous lick preference versus task reward ratio (scatter),Yes,Yes,,,F_lick_train_analysis
+FigureS12i,1_matched_to_code,Task lick percentage versus reward-ratio deviation (scatter),Yes,Yes,,,F_lick_train_analysis
+FigureS12j,1_matched_to_code,Logistic-regression z-statistics predicting spontaneous licks (histogram),Yes,Yes,,,F_lick_train_analysis
+FigureS12k,3_cartoon_no_csv,Reinforcement model schema,,,,,
+FigureS12l,1_matched_to_code,Fitted reinforcement-model parameters (histogram),Yes,Yes,,,F_behavior_w_FP
+FigureS12m,1_matched_to_code,Lick-rate changes with negative RPE (errorbar plot),Yes,Yes,,,F_behavior_w_FP
+FigureS13a,3_cartoon_no_csv,Optogenetic LC-NE identification strategy with probes/tetrodes,,,,,
+FigureS13b,3_cartoon_no_csv,ChR2 expression in LC-NE neurons,,,,,
+FigureS13c,2_example_regeneration,Raw tetrode trace with laser-evoked spikes (time series),Yes,Yes,opto trace,,F_ephys_opto_examples
+FigureS13d_left,1_matched_to_code,"Example identified LC-NE neurons responding to light trains (raster, time series)",Yes,Yes,,,F_ephys_opto_examples
+FigureS13d_right,1_matched_to_code,"Example identified LC-NE neurons responding to light trains (raster, time series)",Yes,Yes,,,F_ephys_opto_examples
+FigureS13e,1_matched_to_code,"Single-unit quality metrics for identified and unidentified neurons (scatter, distribution)",Yes,Yes,,,F_basic_ephys
+FigureS13f_bottomleft,1_matched_to_code,Euclidean distance between waveforms of spontaneous and evoked spikes for identified and unidentified neurons (histogram),Yes,Yes,,,F_basic_ephys
+FigureS13f_bottomright,1_matched_to_code,Correlation between waveform of spontaneous and evoked spikes for identified and unidentified neurons (histogram),Yes,Yes,,,F_basic_ephys
+FigureS13f_topleft,1_matched_to_code,ISI violation ratio for identified and unidentified neurons (histogram),Yes,Yes,,,F_basic_ephys
+FigureS13f_topright,1_matched_to_code,Waveform peak for identified and unidentified neurons (histogram),Yes,Yes,,,F_basic_ephys
+FigureS13g,3_cartoon_no_csv,Antidromic stimulation strategy for cortex-projecting neurons,,,,,
+FigureS13h,3_cartoon_no_csv,ChRmine expression in LC-NE neurons,,,,,
+FigureS13i,2_example_regeneration,"Example antidromic spikes and collision test (raster, time series)",Yes,Yes,raw trace antidromic,,F_ephys_opto_examples
+FigureS13j_top,1_matched_to_code,Antidromic stimulation trials sorted by first spike (raster),Yes,Yes,,,F_ephys_behavior_examples
+FigureS13j_bottom,1_matched_to_code,Mean spike rate aligned to antidromic stimulation with latency/jitter/window definitions (time series),Yes,Yes,,,F_ephys_behavior_examples
+FigureS13k,1_matched_to_code,"Antidromic response-property distributions for cortex-projecting versus other neurons (histograms, distributions)",Yes,Yes,,,F_antidromic_combined
+FigureS13l,1_matched_to_code,Light-evoked response jitter for cortex-projecting versus other LC-NE cells (distribution),Yes,Yes,,,F_antidromic_combined
+FigureS13m,1_matched_to_code,Identified NE neurons in LC space highlighting cortex-projecting cells (scatter),Yes,Yes,,,F_antidromic_combined
+FigureS14a,3_cartoon_no_csv,Extracellular waveform feature definitions,,,,,
+FigureS14b,1_matched_to_code,"Post-trough slope distribution in LC space (scatter, filled psth, histogram)",Yes,Yes,,,F_waveform_space
+FigureS14c,1_matched_to_code,"Slope symmetry distribution in LC space (scatter, filled psth, histogram)",Yes,Yes,,,F_waveform_space
+FigureS14d,1_matched_to_code,"Waveform-feature PC1 distribution in LC space (scatter, filled psth)",Yes,Yes,,,F_waveform_space
+FigureS14e,1_matched_to_code,Mean normalized waveforms by PC1 quintile (filled psth),Yes,Yes,,,F_waveform_space
+FigureS14f,1_matched_to_code,Slope symmetry versus peak-to-trough time (scatter),Yes,Yes,,,F_waveform_space
+FigureS14g,1_matched_to_code,Tetrode waveform depth rank versus PC1 (scatter),Yes,Yes,,,F_waveform_space_tetrode
+FigureS14h,1_matched_to_code,Mean tetrode spike waveform quantiles (filled psth),Yes,Yes,,,F_waveform_space_tetrode
+FigureS14i,1_matched_to_code,Ranked depth versus spike-waveform features (scatter),Yes,Yes,,,F_waveform_space_tetrode
+FigureS15a,1_matched_to_code,Respond-vs-ignore decoding by auROC (heatmap),Yes,Yes,,,F_ephys_behavior_action&outcome
+FigureS15b,1_matched_to_code,Switch-vs-stay decoding by auROC (heatmap),Yes,Yes,,,F_ephys_behavior_action&outcome
+FigureS15c,1_matched_to_code,Reward-vs-no-reward decoding by auROC (heatmap),Yes,Yes,,,F_ephys_behavior_action&outcome
+FigureS15d_left,2_example_regeneration,Example go-cue-aligned neurons sorted by first spike (rasters),Yes,Yes,behavior_751766_2025-02-14_11-37-11,36,F_ephys_behavior_examples
+FigureS15d_right,2_example_regeneration,Example go-cue-aligned neurons sorted by first spike (rasters),Yes,Yes,behavior_751766_2025-02-11_11-53-38,11,F_ephys_behavior_examples
+FigureS15e,1_matched_to_code,Baseline-response activity correlation distribution (histogram),Yes,Yes,,,F_ephys_behavior_action&outcome
+FigureS15f_bottom,1_matched_to_code,Respond-vs-ignore baseline regression versus tonic modulation strength (scatter),Yes,Yes,,,F_ephys_behavior_action&outcome
+FigureS15f_top,1_matched_to_code,Lick-response spike increase versus tonic modulation strength (scatter),Yes,Yes,,,F_ephys_behavior_action&outcome
+FigureS15o,2_example_regeneration,"Example neuron activity aligned to lick-bout starts, task licks (raster, filled psth)",Yes,Yes,behavior_751004_2024-12-23_14-20-03,21,F_ephys_behavior_examples
+FigureS15p,2_example_regeneration,"Example neuron activity aligned to lick-bout starts, spontaneous licks (raster, filled psth)",Yes,Yes,behavior_754897_2025-03-13_11-20-42,26,F_ephys_behavior_examples
+FigureS15q,1_matched_to_code,"Peak spike rate around spontaneous versus in-trial licks (scatter, histogram)",Yes,Yes,,,F_spont_choice_lick_neuron
+FigureS15r_left,1_matched_to_code,Three simultaneously recorded neurons with correlated spike rates (time series),Yes,Yes,,,F_cross_correlation
+FigureS15r_mid,1_matched_to_code,Three simultaneously recorded neurons with correlated spike rates (time series),Yes,Yes,,,F_cross_correlation
+FigureS15r_right,1_matched_to_code,Cross-correlations for simultaneous neurons during whole experiment and spontaneous spiking (time series),Yes,Yes,,,F_cross_correlation
+FigureS15s,1_matched_to_code,Example cross-correlograms across neuron pairs (time series),Yes,Yes,,,F_cross_correlation
+FigureS15t,1_matched_to_code,Spatial analysis of cross-correlogram PC1 versus task-response axes (scatter),Yes,Yes,,,F_cross_correlation
+FigureS16a,3_cartoon_no_csv,Example pupil video frame,,,,,
+FigureS16b,2_example_regeneration,Simultaneous LC-NE activity and pupil diameter with go cues (time series),Yes,Yes,,,F_pupil_examples
+FigureS16c,2_example_regeneration,Example pupil-diameter autocorrelation with exponential fit (time series),Yes,Yes,,,F_pupil_examples
+FigureS16d,1_matched_to_code,Distribution of pupil autocorrelation time constants (histogram),Yes,Yes,,,F_pupil_beh_ephys
+FigureS16e_top_left,2_example_regeneration,Trial-aligned spike rates split by switch status (filled psth),Yes,Yes,,,F_pupil_examples
+FigureS16e_top_right,2_example_regeneration,Trial-aligned spike rates split by reward  status (filled psth),Yes,Yes,,,F_pupil_examples
+FigureS16e_bottom_left,2_example_regeneration,Trial-aligned spike rates split by switch status (filled psth),Yes,Yes,,,F_pupil_examples
+FigureS16e_bottom_right,2_example_regeneration,Trial-aligned spike rates split by reward status (filled psth),Yes,Yes,,,F_pupil_examples
+FigureS16f,1_matched_to_code,"Pupil regression t-statistics for response, outcome, switch and choice side (histogram)",Yes,Yes,,,F_pupil_beh_ephys
+FigureS16g_left,2_example_regeneration,Example spike-pupil cross-correlations (time series),Yes,Yes,,,F_pupil_examples
+FigureS16g_right,1_matched_to_code,Population spike-pupil cross-correlations (time series),Yes,Yes,,,F_pupil_beh_ephys
+FigureS16h,1_matched_to_code,Peak cross-correlation values and lags (histogram),Yes,Yes,,,F_pupil_beh_ephys
+FigureS16i,2_example_regeneration,Example baseline pupil diameter versus baseline spike rate (scatter),Yes,Yes,,,F_pupil_examples
+FigureS16j,1_matched_to_code,Baseline pupil-spike correlation coefficients (histogram),Yes,Yes,,,F_pupil_beh_ephys
+FigureS16k,2_example_regeneration,Pupil dilation aligned to trial start by baseline spike rate (filled psth),Yes,Yes,,,F_pupil_examples
+FigureS16l,1_matched_to_code,Peak pupil dilation correlation with baseline spike rate (histogram),Yes,Yes,,,F_pupil_beh_ephys
+FigureS16m,2_example_regeneration,Example pupil dilation aligned to trial start by go-cue response of an NE neuron (filled psth),Yes,Yes,,,F_pupil_examples
+FigureS16n,1_matched_to_code,"Peak pupil dilation correlation with go-cue response (histogram) ",Yes,Yes,,,F_pupil_beh_ephys
+FigureS17a,3_cartoon_no_csv,Example optic-fiber reconstruction in PL,,,,,
+FigureS17b,1_matched_to_code,"Optic-fiber termini across mice (anatomical map, scatter)",Yes,Yes,,,F_fiber_location
+FigureS17c,2_example_regeneration,Raw photometry data processing steps (time series),Yes,Yes,m754896d20250107,,F_photometry_examples
+FigureS17d,2_example_regeneration,Motion-corrected ΔF/F traces (time series),Yes,Yes,m754896d20250107,,F_photometry_examples
+FigureS17e,2_example_regeneration,GCaMP and isosbestic power spectra (time series),Yes,Yes,m754896d20250108,,F_photometry_examples
+FigureS17f,2_example_regeneration,GCaMP and isosbestic signals around go cues for respond/ignore trials (filled psth),Yes,Yes,m754896d20250108,,F_photometry_examples
+FigureS17g,1_matched_to_code,Post-go-cue isosbestic versus GCaMP change across experiments (scatter),Yes,Yes,,,F_photometry_tuning_psth
+FigureS17h_left,2_example_regeneration,Example trial activity for lick-response effects (filled psth),Yes,Yes,m749472d20250108,,F_photometry_examples
+FigureS17h_right,1_matched_to_code,Population trial activity for lick-response effects (filled psth),Yes,Yes,,,F_photometry_tuning_psth
+FigureS17i_left,1_matched_to_code,Baseline axonal activity in PL for lick-response (histogram),Yes,Yes,,,F_ephys_behavior_action&outcome
+FigureS17i_right,1_matched_to_code,"Baseline single neuron activity for lick-response (histogram, scatter)",Yes,Yes,,,F_ephys_behavior_action&outcome
+FigureS17j,2_example_regeneration,Example axonal activity during switch versus stay trials (filled psth),Yes,Yes,m754898d20250106,,F_photometry_examples
+FigureS18a,1_matched_to_code,"Primary axes of gene expression, projection target, and spike waveform features (vectors)",Yes,Yes,,,F_spatial-axis-comparison
+FigureS18b,1_matched_to_code,Bootstrapped primary-axis azimuth and elevation distributions (scatter),Yes,Yes,,,F_spatial-axis-comparison
+FigureS18c,1_matched_to_code,Pairwise comparisons between primary axes across cellular properties (scatter),Yes,Yes,,,F_spatial-axis-comparison
+FigureS18d,1_matched_to_code,Reward-vs-no-reward t-statistics along first primary axis (scatter/regression),Yes,Yes,,,F_spatial-axis-comparison
+,,,,,,,
