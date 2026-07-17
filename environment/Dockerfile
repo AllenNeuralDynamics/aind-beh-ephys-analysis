@@ -20,6 +20,7 @@ RUN conda install -y \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        awscli \
         build-essential \
         libgl1-mesa-glx \
         libssl-dev \
