@@ -191,7 +191,7 @@ channel_curr = 'G_tri-exp_mc'
 align_curr = 'goCue_start_time'
 window_size_curr = 2
 thresh_curr = 0.5
-formula = 'spikes ~ 1+hit+iso'
+formula = 'spikes ~ 1+hit'
 post = 2
 pre = 3
 
@@ -205,7 +205,7 @@ params_dict_hit = {
     'post_time': post,
     'thresh': thresh_curr,
     'step_size': 0.1,
-    'polar_regressors': ['hit', 'iso']
+    'polar_regressors': ['hit', 'outcome']
 }
 
 print(
@@ -281,8 +281,8 @@ channel_curr = 'G_tri-exp_mc'
 align_curr = 'goCue_start_time'
 window_size_curr = 0.75
 thresh_curr = 0.5
-formula = 'spikes ~ 1+svs+iso'
-post = 2
+formula = 'spikes ~ 1+svs+outcome'
+post = 2.5
 pre = 3
 
 params_dict_svs = {
@@ -295,7 +295,7 @@ params_dict_svs = {
     'post_time': post,
     'thresh': thresh_curr,
     'step_size': 0.1,
-    'polar_regressors': ['hit', 'iso']
+    'polar_regressors': ['svs', 'outcome']
 }
 
 print(
@@ -307,7 +307,6 @@ print(
     f"threshold: {params_dict_svs['thresh']}, "
     f"formula: {params_dict_svs['formula']}"
 )
-
 results = population_GLM(session_list, **params_dict_svs)
 
 if not os.path.exists(save_dir):
