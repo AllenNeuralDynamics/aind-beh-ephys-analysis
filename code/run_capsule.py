@@ -206,7 +206,7 @@ def run(check_only: bool = False) -> int:
     script_timings = []
     notebook_timings = []
 
-    # run_data_attachment(check_only=check_only)
+    run_data_attachment(check_only=check_only)
 
     print("\n" + "="*80, flush=True)
     print("FIGURE PREPARATION SCRIPTS", flush=True)
