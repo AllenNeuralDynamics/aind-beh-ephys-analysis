@@ -3,10 +3,7 @@ set -e
 
 # Fix traitlets dependency issue
 pip uninstall -y traitlets || true
-pip install --no-cache-dir --ignore-installed traitlets==5.9.0
-
-# Fix IPython/ipykernel compatibility with Python 3.12
-pip install --force-reinstall --no-cache-dir ipython ipykernel
+pip install --no-cache-dir --ignore-installed traitlets==5.13.0
 
 # Install project dependencies
 # pip install -e git+https://github.com/AllenNeuralDynamics/aind_multisession_ephys.git#egg=aind-multisession-ephys

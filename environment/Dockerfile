@@ -20,12 +20,13 @@ RUN conda install -y \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
-        libgl1-mesa-glx \
-        libssl-dev \
-        pandoc \
-        pkg-config \
-        poppler-utils \
+        awscli=1.22.34-1 \
+        build-essential=12.9ubuntu3 \
+        libgl1-mesa-glx=23.0.4-0ubuntu1~22.04.1 \
+        libssl-dev=3.0.2-0ubuntu1.25 \
+        pandoc=2.9.2.1-3ubuntu2 \
+        pkg-config=0.29.2-1ubuntu3 \
+        poppler-utils=22.02.0-2ubuntu0.13 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir uv==0.7.15
@@ -57,7 +58,11 @@ RUN pip install -U --no-cache-dir \
     aind_data_schema==2.6.0 \
     openpyxl==3.1.5 \
     pycircstat2==0.1.15 \
-    scanpy==1.12.1
+    scanpy==1.12.1 \
+    myterial==1.2.1 \
+    rich==14.3.1 \
+    brainrender==2.1.17 \
+    brainglobe-atlasapi==2.3.0
 
 
 
