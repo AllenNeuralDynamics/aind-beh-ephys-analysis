@@ -177,8 +177,9 @@ def pupil_analysis_session(session, plot_licks=False, plot=True,
         lm_results_all = None
 
     # save results
-    with open(os.path.join(session_dir['beh_fig_dir'], f'{session}_pupil_lm_results.pkl'), 'wb') as f:
-        pickle.dump({'lm_results': lm_results, 'lm_results_all': lm_results_all}, f)
+    if 'data' not in session_dir['beh_fig_dir']:
+        with open(os.path.join(session_dir['beh_fig_dir'], f'{session}_pupil_lm_results.pkl'), 'wb') as f:
+            pickle.dump({'lm_results': lm_results, 'lm_results_all': lm_results_all}, f)
 
     if plot: 
         fig = plt.figure(figsize=(12,11))
@@ -263,16 +264,16 @@ def pupil_analysis_session(session, plot_licks=False, plot=True,
         )
 
         plt.tight_layout()
-
-        fig.savefig(os.path.join(session_dir['beh_fig_dir'], f'{session}_pupil_analysis.pdf'))
-    # plt.close('all')
-
-    return lm_results, lm_results_all
+        if 'data' not in session_dir['beh_fig_dir']:
+            fig.savefig(os.path.join(session_dir['beh_fig_dir'], f'{session}_pupil_analysis.pdf'))
+            return lm_results, lm_results_all
+        else: 
+            return lm_results, lm_results_all, fig 
 
 
 # plot unit vs pupil correlation
 # def plot_unit_pupil_correlation(session, opto_only=True, bin_size=0.1):
-def plot_unit_pupil_correlation(session, bin_size = 5, step_size = 0.1, opto_only=True, bin_size_short=0.5, win_length=10, plot = True, time_conf_threshold=0.9, dia_conf_threshold=0.95):
+def plot_unit_pupil_correlation(session, units = None, bin_size = 5, step_size = 0.1, opto_only=True, bin_size_short=0.5, win_length=20, plot = True, time_conf_threshold=0.9, dia_conf_threshold=0.95):
     """
     Calculate and plot correlations between unit firing rates and pupil diameter.
 
@@ -313,6 +314,16 @@ def plot_unit_pupil_correlation(session, bin_size = 5, step_size = 0.1, opto_onl
     trial_duration = [-0.01, 3.5]
     session_dir = session_dirs(session_id=session)
     unit_tbl = get_unit_tbl(session, data_type='curated')
+    if unit_tbl is None or len(unit_tbl) == 0:
+        print(f'No units for session {session}')
+        return None
+    if units is not None:
+        unit_tbl = unit_tbl[unit_tbl['unit_id'].isin(units)]
+        # preserve input order
+        unit_tbl = unit_tbl.set_index('unit_id').loc[[u for u in units if u in unit_tbl['unit_id'].values]].reset_index()
+        if len(unit_tbl) == 0:
+            print(f'None of the requested units {units} found in session {session}')
+            return None
     sesssion_df = get_session_tbl(session)
     pupil_data = load_pupil(session)
     if pupil_data is None:
@@ -647,7 +658,7 @@ def plot_unit_pupil_correlation(session, bin_size = 5, step_size = 0.1, opto_onl
                 }
 
         results.append(result)
-
+        figs = []
         if plot:
 
             fig = plt.figure(figsize=(20, 13))
@@ -759,14 +770,19 @@ def plot_unit_pupil_correlation(session, bin_size = 5, step_size = 0.1, opto_onl
             plt.suptitle(f'Session {session} Unit {row["unit_id"]} pupil correlation analysis')
             plt.tight_layout()
             os.makedirs(name=session_dir['ephys_fig_dir_curated'] + '/unit_pupil', exist_ok=True)
-            fig.savefig(os.path.join(session_dir['ephys_fig_dir_curated'], 'unit_pupil', f'{session}_unit_{row["unit_id"]}_pupil_correlation_analysis.pdf'))
+            figs.append(fig)
+            if 'data' not in session_dir['ephys_fig_dir_curated']:
+                fig.savefig(os.path.join(session_dir['ephys_fig_dir_curated'], 'unit_pupil', f'{session}_unit_{row["unit_id"]}_pupil_correlation_analysis.pdf'))
     # save results
     results_df = pd.DataFrame(results)
     # save to .pickle
-    with open(os.path.join(session_dir['ephys_processed_dir_curated'], f'{session}_unit_pupil_correlation_results.pickle'), 'wb') as f:
-        pickle.dump(results_df, f)
-
-    return results_df
+    if 'data' not in session_dir['ephys_processed_dir_curated']:
+        with open(os.path.join(session_dir['ephys_processed_dir_curated'], f'{session}_unit_pupil_correlation_results.pickle'), 'wb') as f:
+            pickle.dump(results_df, f)
+    if 'data' in session_dir['ephys_processed_dir_curated']:
+        return results_df, figs
+    else:
+        return results_df
 # plt.close('all')
 
 

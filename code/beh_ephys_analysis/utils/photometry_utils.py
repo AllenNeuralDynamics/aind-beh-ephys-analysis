@@ -426,80 +426,178 @@ def plot_FP_with_licks(session, label, region):
     fig.savefig(os.path.join(session_dir['saveFigFolder'], f'{session}_{region}_FP_licks.pdf'))
 
 
-def plot_FP_beh_analysis(session, channel = 'G_tri-exp_mc'):
-    signal, params = get_FP_data(session)
-    regions = signal['G'].keys()
-    session_df, licks_L, licks_R = load_session_df(session)
-    session_dir = parse_session_string(session)
-    reward_mask = (session_df['rewardR']>0) | (session_df['rewardL']>0)
-    for region in regions:
+def plot_FP_beh_analysis(session, target=None, channel='G_tri-exp_mc',
+                          save_dir=None, align_kwargs=None):
+    """Per-region behavioral event-triggered FP averages.
+
+    Uses the current NWB-based loading path (mirrors ``plot_G_vs_Iso``): FP via
+    ``get_FP_data`` and behavior via ``get_session_tbl``. Session-df schema:
+    ``goCue_start_time``, ``reward_outcome_time``, ``rewarded_historyL/R``,
+    ``animal_response`` (0=left, 1=right, 2=no response).
+
+    Panels per region:
+        row 0: [go vs no-go], [go vs no-go in rewarded], [go vs no-go in unrewarded]
+        row 1: [reward vs no-reward], [L vs R], [reward vs no-reward | L],
+               [reward vs no-reward | R], [switch vs stay]
+
+    Parameters
+    ----------
+    session : str
+    target : str or iterable of str, optional
+        Brain region(s) to analyze (e.g. ``'PL'`` or ``['PL', 'TH']``). If None,
+        every region present for the given ``channel`` is analyzed.
+    channel : str or iterable of str
+        FP channel(s) to analyze (e.g. ``'G_tri-exp_mc'`` or
+        ``['G_tri-exp_mc', 'Iso_tri-exp_mc']``). One figure is generated per
+        (channel, region) pair.
+    save_dir : str or None
+        If given and not under ``/data``, the figure is written there as
+        ``{save_dir}/{region}_FP_beh_analysis_{channel}.pdf``. Otherwise the
+        figure is returned only.
+    align_kwargs : dict, optional
+        Extra kwargs forwarded to ``align_signal_to_events`` — e.g.
+        ``kernel``, ``tau``, ``pre_event_time``, ``post_event_time``,
+        ``window_size``, ``step_size``, ``avoid_other_events``, ``plot_error``.
+        Keys already used by this function (``ax``, ``legend``, ``color``) are
+        ignored.
+
+    Returns
+    -------
+    list of matplotlib.figure.Figure
+    """
+    channels = [channel] if isinstance(channel, str) else list(channel)
+    align_kwargs = dict(align_kwargs or {})
+    for _reserved in ('ax', 'legend', 'color', 'plot_error'):
+        align_kwargs.pop(_reserved, None)
+    if target is None:
+        targets = None
+    elif isinstance(target, str):
+        targets = [target]
+    else:
+        targets = list(target)
+
+    if targets is None:
+        tar_channels = None
+    else:
+        tar_channels = [(t, ch) for t in targets for ch in channels]
+
+    signal = get_FP_data(session, tar_channels=tar_channels)
+    if signal is None:
+        print(f'No FP data for {session}')
+        return []
+    missing = [ch for ch in channels if ch not in signal]
+    if missing:
+        print(f'{session}: channels not found in FP data: {missing}')
+    channels = [ch for ch in channels if ch in signal]
+    if not channels:
+        return []
+
+    session_df = get_session_tbl(session)
+    session_dir = session_dirs(session)
+
+    # (channel, region) pairs to loop over
+    pairs = []
+    for ch in channels:
+        avail_regions = list(signal[ch].keys())
+        use_regions = avail_regions if targets is None else [r for r in targets if r in avail_regions]
+        missing_regions = [] if targets is None else [r for r in targets if r not in avail_regions]
+        if missing_regions:
+            print(f'{session}/{ch}: regions not found: {missing_regions}')
+        pairs.extend((ch, r) for r in use_regions)
+    time_in_beh = np.asarray(signal['time_in_beh'])
+
+    rewarded = (session_df['rewarded_historyL'].astype(bool)
+                | session_df['rewarded_historyR'].astype(bool)).values
+    response_mask = session_df['animal_response'].values != 2
+    left_mask = session_df['animal_response'].values == 0
+    right_mask = session_df['animal_response'].values == 1
+    goCue = session_df['goCue_start_time'].values
+    respond = session_df['reward_outcome_time'].values
+
+    # switch vs stay on choice trials
+    choices = session_df.loc[response_mask, 'animal_response'].values
+    choice_go_cues = session_df.loc[response_mask, 'goCue_start_time'].values
+    switch_idx = np.where(choices[:-1] != choices[1:])[0] + 1
+    stay_idx = np.where(choices[:-1] == choices[1:])[0] + 1
+
+    figs = []
+    should_save = save_dir is not None and '/data' not in save_dir
+    if should_save:
+        os.makedirs(save_dir, exist_ok=True)
+
+    for ch, region in pairs:
         fig = plt.figure(figsize=(20, 10))
-        gs = GridSpec(2, 5, height_ratios=[1, 1]) 
-        curr_signal = zscore(signal[channel][region])
-        # Aligned to cue
-        # go cue vs nogo cue
+        gs = GridSpec(2, 5, height_ratios=[1, 1])
+        curr_signal = zscore(signal[ch][region])
+
+        # row 0: aligned to go cue
         ax = fig.add_subplot(gs[0, 0])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSplus')&(~reward_mask), 'CSon'].values, legend = 'CSplus', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSminus')&(~reward_mask), 'CSon'].values, legend = 'CSminus', color = 'r', plot_error = False, ax=ax)
-        ax.set_xlabel('Time from go cue (ms)')
-        ax.legend()
-        # go vs no go
+        align_signal_to_events(curr_signal, time_in_beh, goCue[response_mask],
+                                legend='Go', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, goCue[~response_mask],
+                                legend='No Go', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from go cue (s)')
+
         ax = fig.add_subplot(gs[0, 1])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[~session_df['respondTime'].isna(), 'CSon'].values, legend = 'Go', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['respondTime'].isna(), 'CSon'].values, legend = 'No Go', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from go cue (ms)')
-        # go vs no go in go cue
+        align_signal_to_events(curr_signal, time_in_beh, goCue[response_mask & rewarded],
+                                legend='Go|rewarded', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, goCue[~response_mask & rewarded],
+                                legend='No Go|rewarded', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from go cue (s)')
+
         ax = fig.add_subplot(gs[0, 2])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSplus')&(~session_df['respondTime'].isna())&(~reward_mask), 'CSon'].values, legend = 'Go in CSplus', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSplus')&(session_df['respondTime'].isna())&(~reward_mask), 'CSon'].values, legend = 'No Go in CSplus', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from go cue (ms)')
-        # go vs no go in nogo cue
-        ax = fig.add_subplot(gs[0, 3])
-        
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSminus')&(~session_df['respondTime'].isna())&(~reward_mask), 'CSon'].values, legend = 'Go in CSminus', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSminus')&(session_df['respondTime'].isna())&(~reward_mask), 'CSon'].values, legend = 'No Go in CSminus', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from go cue (ms)')
-        # Aligned to response
-        # reward vs no reward
+        align_signal_to_events(curr_signal, time_in_beh, goCue[response_mask & ~rewarded],
+                                legend='Go|unrewarded', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, goCue[~response_mask & ~rewarded],
+                                legend='No Go|unrewarded', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from go cue (s)')
+
+        # row 0 col 3-4 left empty for symmetry with prior layout — reserve for future
+
+        # row 1: aligned to response (reward_outcome_time)
         ax = fig.add_subplot(gs[1, 0])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['rewardR']>0) | (session_df['rewardL']>0), 'respondTime'].values, legend = 'Reward', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['rewardR']==0) | (session_df['rewardL']==0), 'respondTime'].values, legend = 'No Reward', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from response (ms)')
-        # left vs right
-        ax  = fig.add_subplot(gs[1, 1])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[~session_df['rewardR'].isna(), 'respondTime'].values, legend = 'Right', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[~session_df['rewardL'].isna(), 'respondTime'].values, legend = 'Left', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from response (ms)')
-        # reward vs no reward in left
+        align_signal_to_events(curr_signal, time_in_beh, respond[response_mask & rewarded],
+                                legend='Reward', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, respond[response_mask & ~rewarded],
+                                legend='No Reward', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from response (s)')
+
+        ax = fig.add_subplot(gs[1, 1])
+        align_signal_to_events(curr_signal, time_in_beh, respond[right_mask],
+                                legend='Right', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, respond[left_mask],
+                                legend='Left', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from response (s)')
+
         ax = fig.add_subplot(gs[1, 2])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['rewardL']>0, 'respondTime'].values, legend = 'Reward in Left', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['rewardL']==0, 'respondTime'].values, legend = 'No Reward in Left', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from response (ms)')
-        # reward vs no reward in right
+        align_signal_to_events(curr_signal, time_in_beh, respond[left_mask & rewarded],
+                                legend='Reward in Left', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, respond[left_mask & ~rewarded],
+                                legend='No Reward in Left', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from response (s)')
+
         ax = fig.add_subplot(gs[1, 3])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['rewardR']>0, 'respondTime'].values, legend = 'Reward in Right', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['rewardR']==0, 'respondTime'].values, legend = 'No Reward in Right', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from response (ms)')
+        align_signal_to_events(curr_signal, time_in_beh, respond[right_mask & rewarded],
+                                legend='Reward in Right', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, respond[right_mask & ~rewarded],
+                                legend='No Reward in Right', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from response (s)')
+
         ax = fig.add_subplot(gs[1, 4])
-        choices_mask = ~session_df['rewardL'].isna().values | ~session_df['rewardR'].isna().values
-        choices = session_df.loc[choices_mask, 'rewardR'].isna().values.astype(int)
-        change_trials = np.where(choices[:-1] != choices[1:])[0] + 1
-        stay_trials = np.where(choices[:-1] == choices[1:])[0] + 1
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[choices_mask, 'CSon'].values[change_trials], legend = 'Change', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[choices_mask, 'CSon'].values[stay_trials], legend = 'Stay', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from go cue (ms)')
-        plt.suptitle(f'{region} - {session}')
+        align_signal_to_events(curr_signal, time_in_beh, choice_go_cues[switch_idx],
+                                legend='Switch', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, choice_go_cues[stay_idx],
+                                legend='Stay', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from go cue (s)')
+
+        plt.suptitle(f'{region} - {ch} - {session}')
         plt.tight_layout()
 
-        fig.savefig(os.path.join(session_dir['saveFigFolder'], f'{region}_FP_beh_analysis_{channel}.pdf'))
+        if should_save:
+            fig.savefig(os.path.join(save_dir, f'{region}_FP_beh_analysis_{ch}.pdf'))
+        figs.append(fig)
+
+    return figs
 
 def plot_FP_beh_analysis_model(session, model, category, channels = ['G_tri-exp_mc', 'Iso_tri-exp_mc'], regions = None, focus = 'pe', num_bins = 4, pre = 2000, post = 2500):
     """
