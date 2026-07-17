@@ -19,7 +19,7 @@ import shutil
 # from utils.basics.data_org import curr_computer, move_subfolders
 from pathlib import Path
 # from utils.behavior.session_utils import load_session_df, parse_session_string
-# from utils.behavior.lick_analysis import clean_up_licks, parse_lick_trains
+from .lick_utils import clean_up_licks, parse_lick_trains, load_licks
 from scipy.io import loadmat
 from itertools import chain
 from IPython.display import display
@@ -258,7 +258,7 @@ def smooth_exp(y, fs, tau_s=0.2):
     return out
 
 
-def align_signal_to_events(signal, signal_time, event_times, kernel = False, avoid_other_events = True, tau = 0.2, pre_event_time=1, post_event_time=2, window_size=0.1, step_size=10, ax = None, legend = 'signal', color = 'b', plot_error = True):
+def align_signal_to_events(signal, signal_time, event_times, kernel = False, avoid_other_events = True, tau = 0.2, pre_event_time=1, post_event_time=2, window_size=0.1, step_size=0.01, ax = None, legend = 'signal', color = 'b', plot_error = True):
     """
     Aligns the signal to event times and generates a matrix and PSTH using a moving average.
 
@@ -356,7 +356,7 @@ def align_signal_to_events(signal, signal_time, event_times, kernel = False, avo
         ax.fill_between(time_bins, mean_psth - se_psth, mean_psth + se_psth, alpha=0.3, facecolor=color)
         if plot_error:
             ax.fill_between(time_bins, mean_psth - std_psth, mean_psth + std_psth, alpha=0.1, facecolor=color)
-        ax.set_xlabel('Time (ms)')
+        ax.set_xlabel('Time (s)')
     return aligned_matrix, mean_psth, time_bins, ax
 
 def plot_FP_with_licks(session, label, region):
@@ -425,204 +425,179 @@ def plot_FP_with_licks(session, label, region):
 
     fig.savefig(os.path.join(session_dir['saveFigFolder'], f'{session}_{region}_FP_licks.pdf'))
 
-def plot_G_vs_Iso(session, zscore_flag = True):
-    signal, _ = get_FP_data(session)
-    session_df, licks_L, licks_R = load_session_df(session)
-    parsed_licks_L, _ = parse_lick_trains(licks_L)
-    parsed_licks_R, _ = parse_lick_trains(licks_R)
-    session_dir = parse_session_string(session)
-    regions = signal['G'].keys()
-    start = signal['time_in_beh'][0]+100*1000
-    fig = plt.figure(figsize=(20, 6))
-    gs = GridSpec(len(regions), 4, height_ratios=[1]*len(regions), width_ratios=[5, 1, 1, 1])
-    reward_times = session_df[(session_df['rewardL']==1) | (session_df['rewardR']==1)]['rewardTime']
-    for region_ind, region in enumerate(regions):
-        ax = plt.subplot(gs[region_ind, 0])
-        if zscore_flag:
-            ax.plot(signal['time_in_beh'], zscore(signal['G_tri-exp_mc'][region]), label='G_tri-exp_mc', linewidth=0.5, alpha=0.7)
-            ax.plot(signal['time_in_beh'], zscore(signal['Iso_tri-exp_mc'][region]), label='Iso_tri-exp_mc', linewidth=0.5, alpha=0.7)
-            peak = np.max(zscore(signal['G_tri-exp_mc'][region]))
-        else:
-            ax.plot(signal['time_in_beh'], signal['G_tri-exp_mc'][region], label='G_tri-exp_mc', linewidth=0.5, alpha=0.7)
-            ax.plot(signal['time_in_beh'], signal['Iso_tri-exp_mc'][region], label='Iso_tri-exp_mc', linewidth=0.5, alpha=0.7)
-            peak = np.max(signal['G_tri-exp_mc'][region])
-        offset = 112136
-        ax.set_xlim(start + offset, 120*1000+start + offset)
-        if region_ind == 0:
-            ax.legend()
-        ax.scatter(session_df['CSon'], 1.3 * peak * np.ones_like(session_df['CSon']), c='k', s=5, label='go cue')
-        # ax.scatter(parsed_licks_L['train_starts'], 1.2 * peak *np.ones_like(parsed_licks_L['train_starts']), c='r', s=5, label='left licks')
-        # ax.scatter(parsed_licks_R['train_starts'], 1.2 * peak *np.ones_like(parsed_licks_R['train_starts']), c='b', s=5, label='right licks')
-        # change to real licks
-        ax.scatter(licks_L, 1.2 * peak * np.ones_like(licks_L), c='m', s=5, label='clean left licks', marker='|')
-        ax.scatter(licks_R, 1.2 * peak * np.ones_like(licks_R), c='c', s=5, label='clean right licks', marker='|')
-        ax.scatter(reward_times, 1.05 * peak * np.ones_like(reward_times), c='g', s=5, label='rewards', marker='D')
-        ax.set_title(region)    
-        ax.legend()
 
-        from scipy.signal import welch
+def plot_FP_beh_analysis(session, target=None, channel='G_tri-exp_mc',
+                          save_dir=None, align_kwargs=None):
+    """Per-region behavioral event-triggered FP averages.
 
-        fs = 20  # Sampling frequency (Hz)
-        sig = signal['G'][region]
-        sig = sig[~np.isnan(sig)]  # Remove NaN values for PSD calculation
-        # Welch PSD (power per Hz)
-        # nperseg: choose based on your data length; 256–2048 are common
-        f, Pxx = welch(
-            sig,
-            fs=fs,
-            window="hann",
-            nperseg=min(256, len(sig)),
-            noverlap=None,          # default = nperseg//2
-            detrend="constant",
-            scaling="density"       # PSD units: power/Hz
-        )
+    Uses the current NWB-based loading path (mirrors ``plot_G_vs_Iso``): FP via
+    ``get_FP_data`` and behavior via ``get_session_tbl``. Session-df schema:
+    ``goCue_start_time``, ``reward_outcome_time``, ``rewarded_historyL/R``,
+    ``animal_response`` (0=left, 1=right, 2=no response).
 
-        # (Optional) drop 0 Hz for log-log plotting
-        mask = (f > 0) & (f < fs/2)  # Keep frequencies between 0 and Nyquist
-        f = f[mask]
-        Pxx = Pxx[mask]
-  
-        ax = plt.subplot(gs[region_ind, 1])
-        ax.loglog(f, Pxx, label="Signal", linewidth=1, alpha=0.7, color='blue')
-        ax.set_xlabel("Frequency (Hz)")
-        ax.set_ylabel("Power")
-        # ax.grid(True, which="both", linestyle="--", alpha=0.6)
-        # ax.set_xlim(0)
+    Panels per region:
+        row 0: [go vs no-go], [go vs no-go in rewarded], [go vs no-go in unrewarded]
+        row 1: [reward vs no-reward], [L vs R], [reward vs no-reward | L],
+               [reward vs no-reward | R], [switch vs stay]
 
-        # Plot Power Spectrum of Iso Signal
-        sig = signal['Iso'][region]
-        sig = sig[~np.isnan(sig)]  # Remove NaN values for PSD calculation
-        f, Pxx = welch(
-            sig,
-            fs=fs,
-            window="hann",
-            nperseg=min(256, len(sig)),
-            noverlap=None,          # default = nperseg//2
-            detrend="constant",
-            scaling="density"       # PSD units: power/Hz
-        )
-        mask = (f > 0) & (f < fs/2)  # Keep frequencies between 0 and Nyquist
+    Parameters
+    ----------
+    session : str
+    target : str or iterable of str, optional
+        Brain region(s) to analyze (e.g. ``'PL'`` or ``['PL', 'TH']``). If None,
+        every region present for the given ``channel`` is analyzed.
+    channel : str or iterable of str
+        FP channel(s) to analyze (e.g. ``'G_tri-exp_mc'`` or
+        ``['G_tri-exp_mc', 'Iso_tri-exp_mc']``). One figure is generated per
+        (channel, region) pair.
+    save_dir : str or None
+        If given and not under ``/data``, the figure is written there as
+        ``{save_dir}/{region}_FP_beh_analysis_{channel}.pdf``. Otherwise the
+        figure is returned only.
+    align_kwargs : dict, optional
+        Extra kwargs forwarded to ``align_signal_to_events`` — e.g.
+        ``kernel``, ``tau``, ``pre_event_time``, ``post_event_time``,
+        ``window_size``, ``step_size``, ``avoid_other_events``, ``plot_error``.
+        Keys already used by this function (``ax``, ``legend``, ``color``) are
+        ignored.
 
+    Returns
+    -------
+    list of matplotlib.figure.Figure
+    """
+    channels = [channel] if isinstance(channel, str) else list(channel)
+    align_kwargs = dict(align_kwargs or {})
+    for _reserved in ('ax', 'legend', 'color', 'plot_error'):
+        align_kwargs.pop(_reserved, None)
+    if target is None:
+        targets = None
+    elif isinstance(target, str):
+        targets = [target]
+    else:
+        targets = list(target)
 
-        ax.loglog(f[mask], Pxx[mask], label="Iso Signal", linewidth=1, alpha=0.7, color='orange')
-        ax.set_xlabel("Frequency (Hz)")
-        ax.set_ylabel("Power")
-        ax.set_title("Power Spectrum G vs Iso")
-        if region_ind == 0:
-            ax.legend()
-        # ax.set_xlim(0, 2)
+    if targets is None:
+        tar_channels = None
+    else:
+        tar_channels = [(t, ch) for t in targets for ch in channels]
 
-        ax = plt.subplot(gs[region_ind, 2])
-        align_signal_to_events(zscore(signal['G_tri-exp_mc'][region]), signal['time_in_beh'], session_df.loc[session_df['respondTime'].isna(), 'CSon'].values, ax=ax, color='r', legend='nogo')
-        align_signal_to_events(zscore(signal['G_tri-exp_mc'][region]), signal['time_in_beh'], session_df.loc[~session_df['respondTime'].isna(), 'CSon'].values, ax=ax, color='b', legend='go')
-        ax.set_title("G")
-        ax.legend()
+    signal = get_FP_data(session, tar_channels=tar_channels)
+    if signal is None:
+        print(f'No FP data for {session}')
+        return []
+    missing = [ch for ch in channels if ch not in signal]
+    if missing:
+        print(f'{session}: channels not found in FP data: {missing}')
+    channels = [ch for ch in channels if ch in signal]
+    if not channels:
+        return []
 
-        ax = plt.subplot(gs[region_ind, 3])
-        align_signal_to_events(zscore(signal['Iso_tri-exp_mc'][region]), signal['time_in_beh'], session_df.loc[session_df['respondTime'].isna(), 'CSon'].values, ax=ax, color='r', legend='nogo')
-        align_signal_to_events(zscore(signal['Iso_tri-exp_mc'][region]), signal['time_in_beh'], session_df.loc[~session_df['respondTime'].isna(), 'CSon'].values, ax=ax, color='b', legend='go')
-        ax.set_title("Iso")
-        ax.legend()
+    session_df = get_session_tbl(session)
+    session_dir = session_dirs(session)
 
-        plt.tight_layout()
+    # (channel, region) pairs to loop over
+    pairs = []
+    for ch in channels:
+        avail_regions = list(signal[ch].keys())
+        use_regions = avail_regions if targets is None else [r for r in targets if r in avail_regions]
+        missing_regions = [] if targets is None else [r for r in targets if r not in avail_regions]
+        if missing_regions:
+            print(f'{session}/{ch}: regions not found: {missing_regions}')
+        pairs.extend((ch, r) for r in use_regions)
+    time_in_beh = np.asarray(signal['time_in_beh'])
 
-            
+    rewarded = (session_df['rewarded_historyL'].astype(bool)
+                | session_df['rewarded_historyR'].astype(bool)).values
+    response_mask = session_df['animal_response'].values != 2
+    left_mask = session_df['animal_response'].values == 0
+    right_mask = session_df['animal_response'].values == 1
+    goCue = session_df['goCue_start_time'].values
+    respond = session_df['reward_outcome_time'].values
 
-        # sos = butter(2, [0.1, 4], 'band', fs=20, output='sos')
-        # G_low = sosfiltfilt(sos, signal['G_tri-exp_mc'][region])
-        # Iso_low = sosfiltfilt(sos, signal['Iso_tri-exp_mc'][region])
-        # plt.subplot(2, 1, 2, sharex=ax)
-        # plt.plot(signal['time_in_beh'], G_low, label='G_tri-exp_mc')
-        # plt.plot(signal['time_in_beh'], Iso_low, label='Iso_tri-exp_mc')
-        # plt.xlim(start, 60*1000+start)
-        # plt.legend()
+    # switch vs stay on choice trials
+    choices = session_df.loc[response_mask, 'animal_response'].values
+    choice_go_cues = session_df.loc[response_mask, 'goCue_start_time'].values
+    switch_idx = np.where(choices[:-1] != choices[1:])[0] + 1
+    stay_idx = np.where(choices[:-1] == choices[1:])[0] + 1
 
-        # lm = LinearRegression()
-        # lm.fit(Iso_low.reshape(-1, 1), G_low.reshape(-1, 1))
-        # lm.fit(Iso_low.reshape(-1, 1), G_low.reshape(-1, 1))
-        # fitted_G = lm.predict(Iso_low.reshape(-1, 1))
-        # lm = LinearRegression()
-        # lm.fit(Iso_low.reshape(-1, 1), Iso_low.reshape(-1, 1))
-        # fitted_Iso = lm.predict(Iso_low.reshape(-1, 1))
-        fig.savefig(os.path.join(session_dir['saveFigFolder'], f'{session}_G_vs_Iso.pdf'))
-        
-    return fig
+    figs = []
+    should_save = save_dir is not None and '/data' not in save_dir
+    if should_save:
+        os.makedirs(save_dir, exist_ok=True)
 
-
-def plot_FP_beh_analysis(session, channel = 'G_tri-exp_mc'):
-    signal, params = get_FP_data(session)
-    regions = signal['G'].keys()
-    session_df, licks_L, licks_R = load_session_df(session)
-    session_dir = parse_session_string(session)
-    reward_mask = (session_df['rewardR']>0) | (session_df['rewardL']>0)
-    for region in regions:
+    for ch, region in pairs:
         fig = plt.figure(figsize=(20, 10))
-        gs = GridSpec(2, 5, height_ratios=[1, 1]) 
-        curr_signal = zscore(signal[channel][region])
-        # Aligned to cue
-        # go cue vs nogo cue
+        gs = GridSpec(2, 5, height_ratios=[1, 1])
+        curr_signal = zscore(signal[ch][region])
+
+        # row 0: aligned to go cue
         ax = fig.add_subplot(gs[0, 0])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSplus')&(~reward_mask), 'CSon'].values, legend = 'CSplus', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSminus')&(~reward_mask), 'CSon'].values, legend = 'CSminus', color = 'r', plot_error = False, ax=ax)
-        ax.set_xlabel('Time from go cue (ms)')
-        ax.legend()
-        # go vs no go
+        align_signal_to_events(curr_signal, time_in_beh, goCue[response_mask],
+                                legend='Go', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, goCue[~response_mask],
+                                legend='No Go', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from go cue (s)')
+
         ax = fig.add_subplot(gs[0, 1])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[~session_df['respondTime'].isna(), 'CSon'].values, legend = 'Go', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['respondTime'].isna(), 'CSon'].values, legend = 'No Go', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from go cue (ms)')
-        # go vs no go in go cue
+        align_signal_to_events(curr_signal, time_in_beh, goCue[response_mask & rewarded],
+                                legend='Go|rewarded', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, goCue[~response_mask & rewarded],
+                                legend='No Go|rewarded', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from go cue (s)')
+
         ax = fig.add_subplot(gs[0, 2])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSplus')&(~session_df['respondTime'].isna())&(~reward_mask), 'CSon'].values, legend = 'Go in CSplus', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSplus')&(session_df['respondTime'].isna())&(~reward_mask), 'CSon'].values, legend = 'No Go in CSplus', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from go cue (ms)')
-        # go vs no go in nogo cue
-        ax = fig.add_subplot(gs[0, 3])
-        
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSminus')&(~session_df['respondTime'].isna())&(~reward_mask), 'CSon'].values, legend = 'Go in CSminus', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['trialType']=='CSminus')&(session_df['respondTime'].isna())&(~reward_mask), 'CSon'].values, legend = 'No Go in CSminus', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from go cue (ms)')
-        # Aligned to response
-        # reward vs no reward
+        align_signal_to_events(curr_signal, time_in_beh, goCue[response_mask & ~rewarded],
+                                legend='Go|unrewarded', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, goCue[~response_mask & ~rewarded],
+                                legend='No Go|unrewarded', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from go cue (s)')
+
+        # row 0 col 3-4 left empty for symmetry with prior layout — reserve for future
+
+        # row 1: aligned to response (reward_outcome_time)
         ax = fig.add_subplot(gs[1, 0])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['rewardR']>0) | (session_df['rewardL']>0), 'respondTime'].values, legend = 'Reward', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[(session_df['rewardR']==0) | (session_df['rewardL']==0), 'respondTime'].values, legend = 'No Reward', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from response (ms)')
-        # left vs right
-        ax  = fig.add_subplot(gs[1, 1])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[~session_df['rewardR'].isna(), 'respondTime'].values, legend = 'Right', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[~session_df['rewardL'].isna(), 'respondTime'].values, legend = 'Left', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from response (ms)')
-        # reward vs no reward in left
+        align_signal_to_events(curr_signal, time_in_beh, respond[response_mask & rewarded],
+                                legend='Reward', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, respond[response_mask & ~rewarded],
+                                legend='No Reward', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from response (s)')
+
+        ax = fig.add_subplot(gs[1, 1])
+        align_signal_to_events(curr_signal, time_in_beh, respond[right_mask],
+                                legend='Right', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, respond[left_mask],
+                                legend='Left', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from response (s)')
+
         ax = fig.add_subplot(gs[1, 2])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['rewardL']>0, 'respondTime'].values, legend = 'Reward in Left', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['rewardL']==0, 'respondTime'].values, legend = 'No Reward in Left', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from response (ms)')
-        # reward vs no reward in right
+        align_signal_to_events(curr_signal, time_in_beh, respond[left_mask & rewarded],
+                                legend='Reward in Left', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, respond[left_mask & ~rewarded],
+                                legend='No Reward in Left', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from response (s)')
+
         ax = fig.add_subplot(gs[1, 3])
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['rewardR']>0, 'respondTime'].values, legend = 'Reward in Right', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[session_df['rewardR']==0, 'respondTime'].values, legend = 'No Reward in Right', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from response (ms)')
+        align_signal_to_events(curr_signal, time_in_beh, respond[right_mask & rewarded],
+                                legend='Reward in Right', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, respond[right_mask & ~rewarded],
+                                legend='No Reward in Right', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from response (s)')
+
         ax = fig.add_subplot(gs[1, 4])
-        choices_mask = ~session_df['rewardL'].isna().values | ~session_df['rewardR'].isna().values
-        choices = session_df.loc[choices_mask, 'rewardR'].isna().values.astype(int)
-        change_trials = np.where(choices[:-1] != choices[1:])[0] + 1
-        stay_trials = np.where(choices[:-1] == choices[1:])[0] + 1
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[choices_mask, 'CSon'].values[change_trials], legend = 'Change', color = 'b', plot_error = False, ax=ax)
-        align_signal_to_events(curr_signal, signal['time_in_beh'], session_df.loc[choices_mask, 'CSon'].values[stay_trials], legend = 'Stay', color = 'r', plot_error = False, ax=ax)
-        ax.legend()
-        ax.set_xlabel('Time from go cue (ms)')
-        plt.suptitle(f'{region} - {session}')
+        align_signal_to_events(curr_signal, time_in_beh, choice_go_cues[switch_idx],
+                                legend='Switch', color='b', plot_error=False, ax=ax, **align_kwargs)
+        align_signal_to_events(curr_signal, time_in_beh, choice_go_cues[stay_idx],
+                                legend='Stay', color='r', plot_error=False, ax=ax, **align_kwargs)
+        ax.legend(); ax.set_xlabel('Time from go cue (s)')
+
+        plt.suptitle(f'{region} - {ch} - {session}')
         plt.tight_layout()
 
-        fig.savefig(os.path.join(session_dir['saveFigFolder'], f'{region}_FP_beh_analysis_{channel}.pdf'))
+        if should_save:
+            fig.savefig(os.path.join(save_dir, f'{region}_FP_beh_analysis_{ch}.pdf'))
+        figs.append(fig)
+
+    return figs
 
 def plot_FP_beh_analysis_model(session, model, category, channels = ['G_tri-exp_mc', 'Iso_tri-exp_mc'], regions = None, focus = 'pe', num_bins = 4, pre = 2000, post = 2500):
     """
@@ -787,7 +762,7 @@ def plot_FP_peaks_behavior(session):
     lags = int(np.floor(time_len/bin_size))
     acf_lags = np.arange(0, lags+1) * bin_size
     session_dir = parse_session_string(session)
-    session_df, licks_L, licks_R = load_session_df(session)
+    licks_L, licks_R = load_licks(session)
     licks_L, licks_R, fig = clean_up_licks(licks_L, licks_R, plot=False)
     parsed_licks_L, _ = parse_lick_trains(licks_L)
     parsed_licks_R, _ = parse_lick_trains(licks_R)
@@ -999,3 +974,478 @@ def plot_FP_peaks_behavior(session):
     plt.suptitle(session)
     plt.tight_layout()
     plt.savefig(os.path.join(session_dir['saveFigFolder'], 'FP_peaks_behavior.pdf'))
+
+
+def plot_G_vs_Iso(session, zscore_flag = True, raw_session=False):
+    signal = get_FP_data(session, tar_channels=[('PL', 'G_tri-exp_mc'), ('PL', 'Iso_tri-exp_mc'), ('PL', 'G'), ('PL', 'Iso'), ('PL', 'G_tri-exp'), ('PL', 'Iso_tri-exp')])
+    session_df = get_session_tbl(session)
+    licks = load_licks(session)
+    licks_L = licks['licks_L_cleaned']
+    licks_R = licks['licks_R_cleaned']
+    session_dir = session_dirs(session)
+    regions = signal['G_tri-exp_mc'].keys()
+    start = signal['time_in_beh'][0]+100
+    fig = plt.figure(figsize=(20, 6))
+    gs = GridSpec(len(regions), 4, height_ratios=[1]*len(regions), width_ratios=[5, 1, 1, 1])
+    reward_times = session_df['reward_outcome_time'].values + session_df['reward_delay'].values
+    reward_times = reward_times[session_df['rewarded_historyL'].values | session_df['rewarded_historyR'].values]
+    for region_ind, region in enumerate(regions):
+        ax = plt.subplot(gs[region_ind, 0])
+        if zscore_flag:
+            ax.plot(signal['time_in_beh'], zscore(signal['G_tri-exp_mc'][region]), label='G_tri-exp_mc', linewidth=0.5, alpha=0.7)
+            ax.plot(signal['time_in_beh'], zscore(signal['Iso_tri-exp_mc'][region]), label='Iso_tri-exp_mc', linewidth=0.5, alpha=0.7)
+            peak = np.max(zscore(signal['G_tri-exp_mc'][region]))
+        else:
+            ax.plot(signal['time_in_beh'], signal['G_tri-exp_mc'][region], label='G_tri-exp_mc', linewidth=0.5, alpha=0.7)
+            ax.plot(signal['time_in_beh'], signal['Iso_tri-exp_mc'][region], label='Iso_tri-exp_mc', linewidth=0.5, alpha=0.7)
+            peak = np.max(signal['G_tri-exp_mc'][region])
+        offset = 112.136
+        ax.set_xlim(start + offset, 120+start + offset)
+        ax.set_xlabel('Time (s)')
+        if region_ind == 0:
+            ax.legend()
+        ax.scatter(session_df['goCue_start_time'], 1.3 * peak * np.ones_like(session_df['goCue_start_time']), c='k', s=5, label='go cue')
+        # ax.scatter(parsed_licks_L['train_starts'], 1.2 * peak *np.ones_like(parsed_licks_L['train_starts']), c='r', s=5, label='left licks')
+        # ax.scatter(parsed_licks_R['train_starts'], 1.2 * peak *np.ones_like(parsed_licks_R['train_starts']), c='b', s=5, label='right licks')
+        # change to real licks
+        ax.scatter(licks_L, 1.2 * peak * np.ones_like(licks_L), c='m', s=5, label='clean left licks', marker='|')
+        ax.scatter(licks_R, 1.2 * peak * np.ones_like(licks_R), c='c', s=5, label='clean right licks', marker='|')
+        ax.scatter(reward_times, 1.05 * peak * np.ones_like(reward_times), c='g', s=5, label='rewards', marker='D')
+        ax.set_title(region)
+        ax.legend()
+
+        from scipy.signal import welch
+
+        fs = 20  # Sampling frequency (Hz)
+        sig = signal['G'][region]
+        sig = sig[~np.isnan(sig)]  # Remove NaN values for PSD calculation
+        # Welch PSD (power per Hz)
+        # nperseg: choose based on your data length; 256–2048 are common
+        f, Pxx = welch(
+            sig,
+            fs=fs,
+            window="hann",
+            nperseg=min(256, len(sig)),
+            noverlap=None,          # default = nperseg//2
+            detrend="constant",
+            scaling="density"       # PSD units: power/Hz
+        )
+
+        # (Optional) drop 0 Hz for log-log plotting
+        mask = (f > 0) & (f < fs/2)  # Keep frequencies between 0 and Nyquist
+        f = f[mask]
+        Pxx = Pxx[mask]
+
+        ax = plt.subplot(gs[region_ind, 1])
+        ax.loglog(f, Pxx, label="Signal", linewidth=1, alpha=0.7, color='blue')
+        ax.set_xlabel("Frequency (Hz)")
+        ax.set_ylabel("Power")
+        # ax.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax.set_xlim(0.05, 8)
+
+        # Plot Power Spectrum of Iso Signal
+        sig = signal['Iso'][region]
+        sig = sig[~np.isnan(sig)]  # Remove NaN values for PSD calculation
+        f, Pxx = welch(
+            sig,
+            fs=fs,
+            window="hann",
+            nperseg=min(256, len(sig)),
+            noverlap=None,          # default = nperseg//2
+            detrend="constant",
+            scaling="density"       # PSD units: power/Hz
+        )
+        mask = (f > 0) & (f < fs/2)  # Keep frequencies between 0 and Nyquist
+
+
+        ax.loglog(f[mask], Pxx[mask], label="Iso Signal", linewidth=1, alpha=0.7, color='orange')
+        ax.set_xlabel("Frequency (Hz)")
+        ax.set_ylabel("Power")
+        ax.set_title("Power Spectrum G vs Iso")
+        if region_ind == 0:
+            ax.legend()
+        ax.set_xlim(0.05, 8)
+
+        # session_df = get_session_tbl(session, load_raw=raw_session)
+        ax = plt.subplot(gs[region_ind, 2])
+        align_signal_to_events(zscore(signal['G_tri-exp_mc'][region]), signal['time_in_beh'], session_df.loc[session_df['animal_response']==2, 'goCue_start_time'].values, ax=ax, color='r', legend='nogo')
+        align_signal_to_events(zscore(signal['G_tri-exp_mc'][region]), signal['time_in_beh'], session_df.loc[session_df['animal_response']!=2, 'goCue_start_time'].values, ax=ax, color='b', legend='go')
+        ax.set_title("G")
+        ax.set_xlabel("Time (s)")
+        ax.legend()
+
+        ax = plt.subplot(gs[region_ind, 3])
+        align_signal_to_events(zscore(signal['Iso_tri-exp_mc'][region]), signal['time_in_beh'], session_df.loc[session_df['animal_response']==2, 'goCue_start_time'].values, ax=ax, color='r', legend='nogo')
+        align_signal_to_events(zscore(signal['Iso_tri-exp_mc'][region]), signal['time_in_beh'], session_df.loc[session_df['animal_response']!=2, 'goCue_start_time'].values, ax=ax, color='b', legend='go')
+        ax.set_title("Iso")
+        ax.set_xlabel("Time (s)")
+        ax.legend()
+
+        plt.tight_layout()
+
+
+
+        # sos = butter(2, [0.1, 4], 'band', fs=20, output='sos')
+        # G_low = sosfiltfilt(sos, signal['G_tri-exp_mc'][region])
+        # Iso_low = sosfiltfilt(sos, signal['Iso_tri-exp_mc'][region])
+        # plt.subplot(2, 1, 2, sharex=ax)
+        # plt.plot(signal['time_in_beh'], G_low, label='G_tri-exp_mc')
+        # plt.plot(signal['time_in_beh'], Iso_low, label='Iso_tri-exp_mc')
+        # plt.xlim(start, 60*1000+start)
+        # plt.legend()
+
+        # lm = LinearRegression()
+        # lm.fit(Iso_low.reshape(-1, 1), G_low.reshape(-1, 1))
+        # lm.fit(Iso_low.reshape(-1, 1), G_low.reshape(-1, 1))
+        # fitted_G = lm.predict(Iso_low.reshape(-1, 1))
+        # lm = LinearRegression()
+        # lm.fit(Iso_low.reshape(-1, 1), Iso_low.reshape(-1, 1))
+        # fitted_Iso = lm.predict(Iso_low.reshape(-1, 1))
+        # fig.savefig(os.path.join(session_dir['saveFigFolder'], f'{session}_G_vs_Iso.pdf'))
+
+    return fig
+
+
+def double_exp(x, start_values, fs=20):
+    """Double exponential: a*exp(-b*x) + c*exp(-d*x) + e. Optional trailing offset."""
+    if len(start_values) == 4:
+        start_values = np.append(start_values, 0)
+    if isinstance(x, int):
+        x = np.arange(x) / fs
+    return (start_values[0] * np.exp(-start_values[1] * x)
+            + start_values[2] * np.exp(-start_values[3] * x)
+            + start_values[4])
+
+
+def triple_exp(x, params, fs=20):
+    """Triple exponential: a*exp(-b*x) + c*exp(-d*x) + f*exp(-g*x) + e."""
+    if isinstance(x, int):
+        x = np.arange(x) / fs
+    return (params[0] * np.exp(-params[1] * x)
+            + params[2] * np.exp(-params[3] * x)
+            + params[4] * np.exp(-params[5] * x)
+            + params[6])
+
+
+def bright(T, start_values, fs=20):
+    """Biphasic exponential decay (bleaching) x increasing saturating exponential."""
+    if isinstance(T, int):
+        T = -np.arange(T)
+    return (
+        start_values[0]
+        * (
+            1
+            + start_values[1] * np.exp(T / (start_values[4] * fs))
+            + start_values[2] * np.exp(T / (start_values[5] * fs))
+        )
+        * (1 - start_values[3] * np.exp(T / (start_values[6] * fs)))
+    )
+
+
+_BASELINE_FUNCS = {'exp': double_exp, 'bright': bright, 'tri-exp': triple_exp}
+
+
+def load_session_FP_params(session, params_pkl=None):
+    """Load the preprocessing fit parameters pickle for a session.
+
+    Expected structure (matches upstream ``*_combined_params.pkl``)::
+
+        {f'{channel}_{method}': {region: 1D np.ndarray, ...}, ...}
+
+    where ``channel`` ∈ {'G', 'Iso'} and ``method`` ∈ {'exp', 'bright', 'tri-exp'}.
+    Region 'mPFC' is remapped to 'PL' so keys align with ``get_FP_data``.
+
+    Parameters
+    ----------
+    session : str
+    params_pkl : str or None
+        Explicit path override. If None, resolves
+        ``{raw_dir}/fib/sorted/session/{mSESSION_TAG}_combined_params.pkl``
+        where the session tag comes from the fib metadata JSON stem.
+
+    Returns
+    -------
+    dict, or None if not found.
+    """
+    session_dir = session_dirs(session)
+    if params_pkl is None:
+        fp_dir = os.path.join(session_dir['raw_dir'], 'fib')
+        sorted_dir = os.path.join(fp_dir, 'sorted', 'session')
+        candidates = []
+        if os.path.isdir(sorted_dir):
+            candidates = [f for f in os.listdir(sorted_dir)
+                          if f.endswith('_combined_params.pkl')]
+        if not candidates:
+            return None
+        # Prefer a filename that matches the fib metadata json stem, else pick
+        # the first candidate.
+        json_stem = None
+        if os.path.isdir(fp_dir):
+            jsons = [f for f in os.listdir(fp_dir) if f.endswith('.json')]
+            if jsons:
+                json_stem = os.path.splitext(jsons[0])[0]
+        preferred = None
+        if json_stem is not None:
+            for c in candidates:
+                if c.startswith(json_stem):
+                    preferred = c
+                    break
+        params_pkl = os.path.join(sorted_dir, preferred or candidates[0])
+    if not os.path.exists(params_pkl):
+        return None
+    with open(params_pkl, 'rb') as f:
+        params = pickle.load(f)
+    # Remap region name mPFC → PL to align with get_FP_data.
+    out = {}
+    for k, region_map in params.items():
+        if isinstance(region_map, dict):
+            out[k] = {('PL' if r == 'mPFC' else r): v for r, v in region_map.items()}
+        else:
+            out[k] = region_map
+    return out
+
+
+def load_session_FP_raw(session, channels=('G', 'Iso'), plot=False):
+    """Load raw FIP CSVs (``FIP_Data<channel>_*.csv``) for a session.
+
+    Mirrors AllenNeuralDynamics/aind_su_etal_2022_conversion
+    ``utils/photometry/preprocessing.py::load_session_FP_raw``. The upstream
+    version pulls behavior-aligned timestamps from a mat file; here we grab
+    ``time_in_beh`` from the FP zarr NWB (via ``get_FP_data``) which is the same
+    quantity used by all other loaders in this repo.
+
+    Returns
+    -------
+    dict with keys:
+        'G', 'Iso': {region_name: 1D np.ndarray}   -- raw fluorescence per region
+        'time_in_beh': 1D np.ndarray               -- timestamps aligned to behavior
+    or None if the fib folder is missing.
+    """
+    session_dir = session_dirs(session)
+    fp_dir = os.path.join(session_dir['raw_dir'], 'fib')
+    if not os.path.isdir(fp_dir):
+        return None
+
+    meta_data_jsons = [f for f in os.listdir(fp_dir) if f.endswith('.json')]
+    if not meta_data_jsons:
+        return None
+    with open(os.path.join(fp_dir, meta_data_jsons[0]), 'r') as f:
+        location_info = json.load(f)
+    # match get_FP_data's remapping
+    for k in list(location_info.keys()):
+        if location_info[k] == 'mPFC':
+            location_info[k] = 'PL'
+
+    signal_region_raw = {}
+    all_files = [f for f in os.listdir(fp_dir)
+                 if os.path.isfile(os.path.join(fp_dir, f))]
+    for channel in channels:
+        curr_sig = {}
+        matches = [f for f in all_files if f.startswith(f'FIP_Data{channel}_')
+                   and f.endswith('.csv')]
+        if not matches:
+            signal_region_raw[channel] = curr_sig
+            continue
+        data = pd.read_csv(os.path.join(fp_dir, matches[0]), header=None).to_numpy()
+        # Column layout: [timestamp, fiber0, fiber1, ...]
+        for key, region in location_info.items():
+            print(f'Channel {channel}: region {region} recorded at fiber {key}')
+            curr_sig[region] = np.asarray(data[:, int(key) + 1])
+        signal_region_raw[channel] = curr_sig
+
+    # Pull time_in_beh from the zarr NWB — it's the trusted, behavior-aligned
+    # timestamp series in this repo. Lengths may differ vs. raw CSVs if the
+    # pipeline trimmed a warm-up window, in which case we truncate raw arrays
+    # to match.
+    fp = get_FP_data(session, tar_channels=None)
+    if fp is not None and 'time_in_beh' in fp:
+        t = np.asarray(fp['time_in_beh'])
+        signal_region_raw['time_in_beh'] = t
+        for channel in channels:
+            for region, arr in list(signal_region_raw[channel].items()):
+                if len(arr) != len(t):
+                    n = min(len(arr), len(t))
+                    signal_region_raw[channel][region] = arr[:n]
+        if len(t) != len(next(iter(signal_region_raw[channels[0]].values()), t)):
+            n = min(len(t), len(next(iter(signal_region_raw[channels[0]].values()))))
+            signal_region_raw['time_in_beh'] = t[:n]
+
+    if plot:
+        regions = list(location_info.values())
+        fig, axes = plt.subplots(len(regions), len(channels),
+                                  figsize=(10, 2.5 * len(regions)), squeeze=False)
+        for i, region in enumerate(regions):
+            for j, channel in enumerate(channels):
+                ax = axes[i, j]
+                arr = signal_region_raw[channel].get(region)
+                if arr is not None:
+                    ax.plot(signal_region_raw['time_in_beh'][:len(arr)], arr,
+                            linewidth=0.5, label=channel)
+                if i == 0:
+                    ax.set_title(f'{channel} {region}')
+                if j == 0:
+                    ax.set_ylabel(region)
+                if i == len(regions) - 1:
+                    ax.set_xlabel('time_in_beh (s)')
+        plt.suptitle(f'{session} raw FP alignment check')
+        plt.tight_layout()
+        return signal_region_raw, fig
+    return signal_region_raw
+
+
+def plot_FP_preprocessing(session, signal_region_prep=None, params=None,
+                          signal_region_raw=None, regions=None,
+                          methods=('tri-exp',), save=False):
+    """Port of AllenNeuralDynamics/aind_su_etal_2022_conversion `plot_FP_results`.
+
+    For each method (``exp``, ``bright``, ``tri-exp``), draws a 4-row grid with
+    one column per selected region:
+        row 0: raw G with fitted baseline
+        row 1: raw Iso with fitted baseline
+        row 2: preprocessed G with subtracted-Iso baseline; Iso preprocessed on twin axis
+        row 3: motion-corrected G (``G_{method}_mc``)
+
+    Parameters
+    ----------
+    session : str
+        Session id used by ``get_FP_data`` / ``session_dirs``.
+    signal_region_prep : dict or None
+        Nested dict ``{f'{channel}_{method}': {region: array}, 'time_in_beh': array}``.
+        If None, loaded via ``get_FP_data(..., tar_channels=None)``.
+    params : dict or None
+        Fit parameters ``{f'{channel}_{method}': {region: 1D array}}``. If None
+        (or a given method's params are missing), the analytical baseline is
+        skipped for that method (rows 0/1 draw zero lines).
+    signal_region_raw : dict or None
+        Optional raw data ``{'G': {region: array}, 'Iso': {region: array},
+        'time_in_beh': array}`` from ``load_session_FP_raw``. When provided,
+        rows 0/1 plot the RAW G/Iso instead of the preprocessed ones — matching
+        the upstream behavior where ``signal_region_prep`` gets updated by
+        ``signal_region_raw``. If None, rows 0/1 fall back to
+        ``signal_region_prep['G']`` / ``['Iso']``.
+    regions : str, iterable of str, or None
+        Brain region(s) to plot as columns. If None, plots every region in
+        ``signal_region_prep['G']``. A single string is accepted and treated as
+        one region. Unknown region names raise ``KeyError``.
+    methods : iterable of {'exp', 'bright', 'tri-exp'}
+    save : bool
+        If True, save each figure into ``session_dirs(session)['beh_fig_dir']``
+        as ``{session}_{method}_FP.pdf``.
+
+    Returns
+    -------
+    list of matplotlib.figure.Figure
+    """
+    session_dir = session_dirs(session)
+    methods = list(methods)
+
+    if signal_region_prep is None:
+        signal_region_prep = get_FP_data(session, tar_channels=None)
+        if signal_region_prep is None:
+            raise ValueError(f'No FP data available for {session}')
+
+    # Mirror upstream: overlay raw arrays onto prep so rows 0/1 pull from raw.
+    prep = dict(signal_region_prep)
+    if signal_region_raw is not None:
+        for k, v in signal_region_raw.items():
+            if k == 'time_in_beh':
+                continue
+            prep[k] = v
+
+    time_in_beh = np.asarray(prep['time_in_beh'])
+    all_regions = list(prep['G'].keys())
+    if regions is None:
+        regions = all_regions
+    elif isinstance(regions, str):
+        regions = [regions]
+    else:
+        regions = list(regions)
+    missing = [r for r in regions if r not in all_regions]
+    if missing:
+        raise KeyError(f'Region(s) {missing} not in signal_region_prep; '
+                       f'available: {all_regions}')
+
+    figs = []
+    for method in methods:
+        base_fn = _BASELINE_FUNCS.get(method)
+        fig = plt.figure(figsize=(15, 8))
+        gs = GridSpec(4, len(regions), figure=fig)
+
+        for region_index, region in enumerate(regions):
+            g_raw = np.asarray(prep['G'][region])
+            iso_raw = np.asarray(prep['Iso'][region])
+            # trim to common length with time_in_beh for the raw display
+            n_raw = min(len(time_in_beh), len(g_raw), len(iso_raw))
+            t_raw = time_in_beh[:n_raw]
+
+            baseline_G = np.zeros(n_raw)
+            baseline_Iso = np.zeros(n_raw)
+            if params is not None and base_fn is not None:
+                p_G = params.get(f'G_{method}', {}).get(region)
+                p_Iso = params.get(f'Iso_{method}', {}).get(region)
+                if p_G is not None and len(p_G) > 0:
+                    baseline_G = base_fn(n_raw, np.asarray(p_G))
+                else:
+                    print(f'Fitting missing/failed for {region} G with method {method}')
+                if p_Iso is not None and len(p_Iso) > 0:
+                    baseline_Iso = base_fn(n_raw, np.asarray(p_Iso))
+                else:
+                    print(f'Fitting missing/failed for {region} Iso with method {method}')
+
+            # x-axis limits: drop the first 1 s of the recording to hide the
+            # bleaching warm-up transient. Row-specific because rows 0/1 use
+            # raw timestamps while rows 2/3 use preprocessed timestamps.
+            xlim_raw = (t_raw[0] + 1.0, t_raw[-1]) if len(t_raw) > 1 else None
+
+            # row 0: raw G + baseline
+            ax = fig.add_subplot(gs[0, region_index])
+            ax.plot(t_raw, g_raw[:n_raw], linewidth=0.5)
+            ax.plot(t_raw, baseline_G)
+            ax.set_title(f'{region} G')
+            if xlim_raw is not None:
+                ax.set_xlim(xlim_raw)
+
+            # row 1: raw Iso + baseline
+            ax = fig.add_subplot(gs[1, region_index])
+            ax.plot(t_raw, iso_raw[:n_raw], linewidth=0.5)
+            ax.plot(t_raw, baseline_Iso)
+            ax.set_title('Iso')
+            if xlim_raw is not None:
+                ax.set_xlim(xlim_raw)
+
+            # row 2: preprocessed G / Iso; Iso baseline reconstructed as G - G_mc
+            ax = fig.add_subplot(gs[2, region_index])
+            g_pp = np.asarray(prep[f'G_{method}'][region])
+            g_mc = np.asarray(prep[f'G_{method}_mc'][region])
+            iso_pp = np.asarray(prep[f'Iso_{method}'][region])
+            n_pp = min(len(time_in_beh), len(g_pp), len(g_mc), len(iso_pp))
+            t_pp = time_in_beh[:n_pp]
+            xlim_pp = (t_pp[0] + 1.0, t_pp[-1]) if len(t_pp) > 1 else None
+            ax.plot(t_pp, g_pp[:n_pp], label='G', linewidth=0.5)
+            ax.plot(t_pp, g_pp[:n_pp] - g_mc[:n_pp], label='Iso_baseline', linewidth=0.5)
+            ax.legend()
+            ax_flip = ax.twinx()
+            ax_flip.plot(t_pp, iso_pp[:n_pp], label='Iso', color='r', linewidth=0.5)
+            ax_flip.legend()
+            ax.set_title('dFF')
+            if xlim_pp is not None:
+                ax.set_xlim(xlim_pp)
+                ax_flip.set_xlim(xlim_pp)
+
+            # row 3: motion-corrected G
+            ax = fig.add_subplot(gs[3, region_index])
+            ax.plot(t_pp, g_mc[:n_pp], label='G', linewidth=0.5)
+            ax.set_title('mc')
+            if xlim_pp is not None:
+                ax.set_xlim(xlim_pp)
+
+        plt.suptitle(f'{session}_{method}')
+        plt.tight_layout()
+        if save:
+            save_dir = session_dir.get('beh_fig_dir') or session_dir.get('saveFigFolder')
+            if save_dir is not None:
+                os.makedirs(save_dir, exist_ok=True)
+                fig.savefig(os.path.join(save_dir, f'{session}_{method}_FP.pdf'))
+        figs.append(fig)
+
+    return figs
