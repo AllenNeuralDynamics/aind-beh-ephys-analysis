@@ -13,4 +13,8 @@ F_spatial-axis-comparison.ipynb
 F_spont_choice_lick_neuron.ipynb
 F_fiber_location.ipynb
 F_lick_train_analysis.ipynb
+F_ephys_opto_examples.ipynb
+F_example_licks.ipynb
+F_photometry_examples.ipynb
+F_pupil_examples.ipynb
 
