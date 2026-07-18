@@ -55,17 +55,15 @@ def _load_mount_data_multi_assets(base_dir: Path) -> list[tuple[str, str]]:
             pairs.append((asset_id, mount))
 
     # Extra static assets from the original script.
-    pairs.extend(
-data_to_add = [
-            ("c1a35fd0-c3aa-47a8-ba40-288b1e39a86a", "alignment_fix"),
-            ("ac7c7961-9178-4bf9-9d66-0a426cf3cc24", "dorsal_edges"),
-            ("7bf4aa31-226c-4c9c-835b-ae0da5ff1ce0", "merfish_data"), # updated
-            ("299fd5aa-1454-4b7a-968c-1e7d2c570d27", "LC_percentile_meshes"), # updated
-            ("7b6e65c2-55f1-473b-95d3-9d84c5d944fb", "all_tongue_movements_16092025"), # updated
-            ("60d862b2-173a-4024-8a45-9714d40ae7e3", "scratc_data"), # updated
-            ("fcda6874-91fa-488f-bd97-f30e17dd61c3", "LC_retro") # updated
-            ]
-    )
+    pairs.extend([
+        ("c1a35fd0-c3aa-47a8-ba40-288b1e39a86a", "alignment_fix"),
+        ("ac7c7961-9178-4bf9-9d66-0a426cf3cc24", "dorsal_edges"),
+        ("7bf4aa31-226c-4c9c-835b-ae0da5ff1ce0", "merfish_data"),
+        ("299fd5aa-1454-4b7a-968c-1e7d2c570d27", "LC_percentile_meshes"),
+        ("7b6e65c2-55f1-473b-95d3-9d84c5d944fb", "all_tongue_movements_16092025"),
+        ("60d862b2-173a-4024-8a45-9714d40ae7e3", "scratc_data"),
+        ("fcda6874-91fa-488f-bd97-f30e17dd61c3", "LC_retro"),
+    ])
 
     return pairs
 
