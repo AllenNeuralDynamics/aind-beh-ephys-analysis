@@ -60,7 +60,7 @@ def _load_mount_data_multi_assets(base_dir: Path) -> list[tuple[str, str]]:
         ("ac7c7961-9178-4bf9-9d66-0a426cf3cc24", "dorsal_edges"),
         ("7bf4aa31-226c-4c9c-835b-ae0da5ff1ce0", "merfish_data"),
         ("299fd5aa-1454-4b7a-968c-1e7d2c570d27", "LC_percentile_meshes"),
-        ("7b6e65c2-55f1-473b-95d3-9d84c5d944fb", "all_tongue_movements_16092025"),
+        ("83b9beba-325e-4a67-85a9-0e8dd46dff17", "all_tongue_movements_04022026"),
         ("60d862b2-173a-4024-8a45-9714d40ae7e3", "scratch_data"),
         ("fcda6874-91fa-488f-bd97-f30e17dd61c3", "LC_retro"),
     ])
