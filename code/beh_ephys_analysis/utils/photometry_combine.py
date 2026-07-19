@@ -58,9 +58,6 @@ _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
-import numpy as np
-import pandas as pd
-from pathlib import Path
 
 from requests import session
 try:
@@ -72,8 +69,6 @@ except ImportError:
     from beh_functions import session_dirs, parseSessionID, get_session_tbl, makeSessionDF, load_model_dv
     from photometry_utils import get_FP_data, align_signal_to_events
 import platform
-import os
-from pathlib import Path
 import shutil
 # from utils.behavior.session_utils import load_session_df, parse_session_string
 # from utils.behavior.lick_analysis import clean_up_licks, parse_lick_trains
@@ -87,7 +82,6 @@ from scipy.signal import find_peaks
 # from utils.photometry.preprocessing import * 
 # from utils.photometry.plot_utils import align_signal_to_events, color_gradient, plot_FP_with_licks, plot_G_vs_Iso, plot_FP_beh_analysis,plot_FP_beh_analysis_model
 # from utils.behavior.session_utils import beh_analysis_no_plot
-import numpy as np
 # from scipy.signal import butter, filtfilt, medfilt, sosfiltfilt
 # from scipy.optimize import curve_fit
 # import json
@@ -103,11 +97,8 @@ from contextlib import redirect_stdout
 # %matplotlib widget
 import re
 import random
-from joblib import Parallel, delayed
-import os
 from scipy.stats import zscore
 from scipy.stats import mode
-from matplotlib.gridspec import GridSpec
 from matplotlib.colors import LinearSegmentedColormap
 import json
 

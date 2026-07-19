@@ -7,7 +7,6 @@ from scipy.stats import zscore
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from itertools import chain
-from scipy.stats import zscore
 from scipy.stats import mode
 
 def load_df_from_mat(file_path):

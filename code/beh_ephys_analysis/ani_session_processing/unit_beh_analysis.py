@@ -25,10 +25,8 @@ else:
     sys.path.remove(curr_path)
     sys.path.insert(0, curr_path)
 
-from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
-from open_ephys.analysis import Session
+# from open_ephys.analysis import Session
 import datetime
-from aind_ephys_rig_qc.temporal_alignment import search_harp_line
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -40,7 +38,7 @@ from scipy.stats import zscore
 import ast
 from utils.plot_utils import combine_pdf_big
 
-from open_ephys.analysis import Session
+# from open_ephys.analysis import Session
 from pathlib import Path
 import glob
 
@@ -55,7 +53,6 @@ from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from hdmf_zarr.nwb import NWBZarrIO
 from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
 from utils.ephys_functions import*
-import pandas as pd
 import pickle
 import scipy.stats as stats
 from joblib import Parallel, delayed

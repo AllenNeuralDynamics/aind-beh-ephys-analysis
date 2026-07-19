@@ -59,7 +59,6 @@ from functools import partial
 import time
 import shutil 
 from aind_ephys_utils import align
-from joblib import Parallel, delayed
 # %%
 target_folder = str(capsule_directories()['manuscript_fig_prep_dir']) + '/spontlicks'
 video = True
@@ -581,7 +580,6 @@ def analyze_animal_licks(animal_id, tb = -5, tf = 5, plot=False, video = False):
 
 
 # %%
-from joblib import Parallel, delayed
 
 animal_ids = ani_session_df['animal'].unique().tolist()
 
