@@ -4,8 +4,6 @@ import os
 import sys
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
 while _anchor != os.path.dirname(_anchor):
     _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
@@ -33,7 +31,6 @@ from utils.photometry_utils import bin_timeseries_around_align
 from utils.pupil_utils import load_pupil
 from aind_ephys_utils import align
 from matplotlib.colors import LinearSegmentedColormap
-import matplotlib.colors as mcolors
 from matplotlib import colormaps
 import pickle
 import shutil

@@ -54,15 +54,12 @@ from pathlib import Path
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
 import os
-import sys
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
 from utils.capsule_migration import CAPSULE_ROOT
 from utils.ephys_functions import fitSpikeModelG
 import platform
-import os
-from pathlib import Path
 import shutil
 from utils.beh_functions import session_dirs, get_session_tbl, makeSessionDF, parseSessionID
 from utils.photometry_utils import get_FP_data
@@ -71,7 +68,6 @@ from matplotlib import pyplot as plt
 from IPython.display import display
 from scipy.signal import find_peaks
 from harp.clock import align_timestamps_to_anchor_points
-import numpy as np
 from scipy.signal import butter, filtfilt, medfilt, sosfiltfilt
 from scipy.optimize import curve_fit
 import json
@@ -85,7 +81,6 @@ import time
 # %matplotlib widget
 import re
 import random
-from matplotlib.gridspec import GridSpec
 from utils.photometry_combine import population_GLM, plot_tuning_curve, plot_psth, population_GLM_ani
 from contextlib import redirect_stdout
 capsule_dirs = capsule_directories()
