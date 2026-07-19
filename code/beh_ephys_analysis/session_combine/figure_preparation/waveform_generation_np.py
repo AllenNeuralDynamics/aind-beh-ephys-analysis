@@ -47,8 +47,6 @@ import sys
 import os
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
@@ -68,7 +66,6 @@ from scipy.stats import zscore
 import ast
 from utils.plot_utils import combine_pdf_big
 
-from open_ephys.analysis import Session
 from pathlib import Path
 import glob
 
@@ -86,7 +83,6 @@ from utils.ephys_functions import*
 from utils.ccf_utils import ccf_pts_convert_to_mm, pir_to_lps, project_to_plane
 from utils.combine_tools import apply_qc, to_str_intlike, spatial_dependence_summary, binary_shift_P_vs_U, welch_shift_P_vs_U
 from utils.capsule_migration import capsule_directories
-import pandas as pd
 import pickle
 import scipy.stats as stats
 from joblib import Parallel, delayed
@@ -95,15 +91,11 @@ from functools import partial
 import time
 import spikeinterface as si
 import shutil 
-import seaborn as sns
 import math  
-import seaborn as sns
 from sklearn.decomposition import PCA
-from scipy.stats import zscore
 from trimesh import load_mesh
 from scipy.optimize import minimize
 from scipy.linalg import null_space
-from joblib import Parallel, delayed
 from matplotlib.colors import Normalize
 from scipy.stats import rankdata
 from matplotlib.patches import Ellipse
