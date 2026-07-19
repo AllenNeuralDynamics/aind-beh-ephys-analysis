@@ -8,7 +8,24 @@
       "Bash(python3 -c \"import json; f=open\\('/root/capsule/code/beh_ephys_analysis/session_combine/manuscript_figures/F_hit_miss.ipynb'\\); nb=json.load\\(f\\); print\\(len\\(nb['cells']\\)\\)\")",
       "Bash(python3 process_antidromic_notebook.py)",
       "Bash(python process_notebook.py)",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "Bash(git ls-tree -r --name-only pre-publication -- code/ | sort > /tmp/prepub_files.txt *)",
+      "Read(//tmp/**)",
+      "Bash(comm -12 /tmp/current_files.txt /tmp/prepub_files.txt)",
+      "Bash(xargs -a /tmp/common_files.txt -d '\\\\n' git checkout pre-publication --)",
+      "Bash(echo \"--- exit code: $? ---\")",
+      "Bash(xargs -a /tmp/common_files.txt -d '\\\\n' git checkout HEAD --)",
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(xargs -a /tmp/common_files.txt -d '\\\\n' git checkout origin/pre-publication --)",
+      "Bash(xargs -a /tmp/common_files_new.txt -d '\\\\n' git checkout origin/pre-publication --)",
+      "Bash(git diff *)",
+      "Bash(xargs -a /tmp/other_changes.txt -d '\\\\n' git reset HEAD --)",
+      "Bash(git commit -m ' *)",
+      "Bash(git check-attr *)",
+      "Bash(git update-index *)",
+      "Bash(xargs -d '\\\\n' git reset HEAD --)",
+      "Bash(xargs -a /tmp/import_only3.txt -d '\\\\n' git add --)",
+      "Bash(xxd)"
     ]
   }
 }

@@ -9,8 +9,6 @@ import os
 from pandas._libs.tslibs import timestamps
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
 while _anchor != os.path.dirname(_anchor):
     _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
@@ -28,14 +26,12 @@ from utils.hdf5_extractor import read_hdf5
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session, plot_foraging_session_nwb
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import plot_lick_analysis, cal_metrics, plot_met, load_data
-from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
 from open_ephys.analysis import Session
 import datetime
-from aind_ephys_rig_qc.temporal_alignment import search_harp_line
+# from aind_ephys_rig_qc.temporal_alignment import search_harp_line
 from matplotlib.gridspec import GridSpec
 import json
 import spikeinterface as si
-from utils.hdf5_extractor import HDF5Recording
 from utils.hdf5_extractor import HDF5Recording
 
 # %%
@@ -189,6 +185,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
                     ]
                     harp_states = harp_events.state.values
                     harp_timestamps_local = harp_events.timestamp.values
+                    from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
                     local_times, harp_times = decode_harp_clock(
                         harp_timestamps_local, harp_states
                     )
@@ -201,6 +198,7 @@ def beh_and_time_alignment(session, ephys_cut = [0, 0]):
         ephys_cut_new = [recording.continuous[0].timestamps[0]+ephys_cut[0], recording.continuous[0].timestamps[-1]-ephys_cut[1]]
         if not qm_dict['ephys_sync']:
             if '717121' not in session: # 717121 is misaligned only in events
+                from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
                 ephys_cut_new = align_timestamps_to_anchor_points(np.array(ephys_cut_new), local_times, harp_times)
                 ephys_cut_new = list(ephys_cut_new)
         qm_dict['ephys_cut'] = ephys_cut_new

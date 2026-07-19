@@ -178,10 +178,13 @@ def plot_unit_licks(session, unit_ids = None, opto_only=True, data_type='curated
         plt.tight_layout()
 
         save_path = session_dir['ephys_fig_dir_curated'] + '/lick_raster_rate/'
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        fig.savefig(save_path + f'unit_{str(unit_id).split(".0")[0]}_lick_raster_{opto_only}.pdf')
-        plt.close('all')
+        if 'data' not in save_path:
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+            fig.savefig(save_path + f'unit_{str(unit_id).split(".0")[0]}_lick_raster_{opto_only}.pdf')
+            plt.close('all')
+        else:
+            return fig
 
 
 
