@@ -9,3 +9,4 @@ response_tstats_generation.py
 outcome_window_generation_parallel.py
 beh_combined_outcome_generation.py
 photometry_generation.py
+licks_prep.py
