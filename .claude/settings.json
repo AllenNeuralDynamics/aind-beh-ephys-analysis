@@ -25,7 +25,9 @@
       "Bash(git update-index *)",
       "Bash(xargs -d '\\\\n' git reset HEAD --)",
       "Bash(xargs -a /tmp/import_only3.txt -d '\\\\n' git add --)",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "Bash(git checkout *)",
+      "Bash(git fetch *)"
     ]
   }
 }
