@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(python code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py)",
+      "Bash(python -m json.tool)",
+      "Bash(python3 -c \"import json; nb=json.load\\(open\\('/root/capsule/code/beh_ephys_analysis/session_combine/manuscript_figures/F_basic_ephys.ipynb'\\)\\); print\\('Total cells:', len\\(nb['cells']\\)\\); [print\\(f'Cell {i}: {c[\\\\\"cell_type\\\\\"]}', c.get\\('id', 'no-id'\\)[:8] if c.get\\('id'\\) else 'no-id'\\) for i, c in enumerate\\(nb['cells'][:15]\\)]\")",
+      "Bash(python3 -c \"import json; f=open\\('/root/capsule/code/beh_ephys_analysis/session_combine/manuscript_figures/F_hit_miss.ipynb'\\); nb=json.load\\(f\\); print\\(len\\(nb['cells']\\)\\)\")",
+      "Bash(python3 process_antidromic_notebook.py)",
+      "Bash(python process_notebook.py)",
+      "Bash(python3 -)",
+      "Bash(python3)",
+      "Bash(python3 /tmp/find_dup_imports.py /root/capsule/code/beh_ephys_analysis)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import nbformat; print\\(nbformat.__version__\\)\")",
+      "Bash(python3 /tmp/dedupe_imports.py /root/capsule/code/beh_ephys_analysis)",
+      "Bash(python3 /tmp/find_dup_imports.py *)",
+      "Bash(python3 -m py_compile /root/capsule/code/beh_ephys_analysis/ani_session_processing/beh_mertics.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/behavior_and_time_alignment.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/drift_analysis.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/ephys_spatial_feature.py)",
+      "Bash(git stash *)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}
