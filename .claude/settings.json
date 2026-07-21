@@ -15,7 +15,10 @@
       "Bash(python3 -c \"import nbformat; print\\(nbformat.__version__\\)\")",
       "Bash(python3 /tmp/dedupe_imports.py /root/capsule/code/beh_ephys_analysis)",
       "Bash(python3 /tmp/find_dup_imports.py *)",
-      "Bash(python3 -m py_compile /root/capsule/code/beh_ephys_analysis/ani_session_processing/beh_mertics.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/behavior_and_time_alignment.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/drift_analysis.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/ephys_spatial_feature.py)"
+      "Bash(python3 -m py_compile /root/capsule/code/beh_ephys_analysis/ani_session_processing/beh_mertics.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/behavior_and_time_alignment.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/drift_analysis.py /root/capsule/code/beh_ephys_analysis/ani_session_processing/ephys_spatial_feature.py)",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('/root/capsule/code/beh_ephys_analysis/session_combine/manuscript_figures/manuscript_figure_panel_map.json'\\)\\); print\\('OK'\\); [print\\(k, list\\(v.keys\\(\\)\\)\\) for k,v in d.items\\(\\)]\")",
+      "Bash(sed -i 's/NaN/null/g' /root/capsule/code/beh_ephys_analysis/session_combine/manuscript_figures/manuscript_figure_panel_map.json)",
+      "Bash(jupyter nbconvert *)"
     ],
     "additionalDirectories": [
       "/tmp"
