@@ -9,6 +9,7 @@ appropriate destination folder.
 
 import json
 import os
+import re
 import shutil
 import sys
 
@@ -50,6 +51,10 @@ def main():
         if os.path.isdir(os.path.join(fig_dir, d)) and d not in dest_dirs
     ]
 
+    # Match any FigureN or FigureSN prefix in a filename
+    fig_prefix_re = re.compile(r'^(Figure(?:S)?\d+)')
+
+    unlisted_figures = set()
     for subdir_name in sorted(source_subdirs):
         subdir_path = os.path.join(fig_dir, subdir_name)
         # collect files from this level and one level deeper
@@ -65,15 +70,27 @@ def main():
                         search_paths.append(fp)
         for src in search_paths:
             fname = os.path.basename(src)
-            for fig_name in figure_names:
-                if fname.startswith(fig_name):
-                    dst = os.path.join(dest_dirs[fig_name], fname)
-                    shutil.copy2(src, dst)
-                    copied[fig_name] += 1
-                    break  # a file belongs to at most one figure prefix
+            m = fig_prefix_re.match(fname)
+            if not m:
+                continue
+            fig_name = m.group(1)
+            if fig_name not in dest_dirs:
+                # figure prefix not in panel map — still transfer, create folder on the fly
+                dest = os.path.join(fig_dir, fig_name)
+                os.makedirs(dest, exist_ok=True)
+                dest_dirs[fig_name] = dest
+                copied[fig_name] = 0
+                unlisted_figures.add(fig_name)
+            dst = os.path.join(dest_dirs[fig_name], fname)
+            shutil.copy2(src, dst)
+            copied[fig_name] += 1
 
-    for fig_name, count in copied.items():
-        print(f'  {fig_name}: {count} files copied')
+    for fig_name, count in sorted(copied.items()):
+        tag = ' [not in panel map]' if fig_name in unlisted_figures else ''
+        print(f'  {fig_name}: {count} files copied{tag}')
+
+    if unlisted_figures:
+        print(f'\nFigures found on disk but missing from panel map: {sorted(unlisted_figures)}')
 
 
 if __name__ == '__main__':
