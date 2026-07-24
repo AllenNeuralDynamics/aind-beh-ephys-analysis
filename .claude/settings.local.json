@@ -18,7 +18,8 @@
       "Read(//tmp/**)",
       "Bash(# Check if a saved pkl exists that could be loaded *)",
       "Read(//scratch/results/manuscript/figures/F_waveform_space/**)",
-      "Read(//scratch/**)"
+      "Read(//scratch/**)",
+      "Bash(python /tmp/check_ids.py)"
     ]
   }
 }
