@@ -47,20 +47,23 @@ Before running any analysis notebook, the **figure preparation scripts** in [`co
 
 
 **Estimated run time for each script:**
-1. [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py) - 9.6 min
+1. [`make_combined_unit_tbl.py`](code/beh_ephys_analysis/session_combine/figure_preparation/make_combined_unit_tbl.py) - 10.3 min
 2. [`antidromic_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/antidromic_generation.py) - < 1 min
 3. [`waveform_generation_np.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_np.py) - < 1 min
 4. [`waveform_generation_tt.py`](code/beh_ephys_analysis/session_combine/figure_preparation/waveform_generation_tt.py) - < 1 min
-5. [`basic_ephys_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/basic_ephys_generation.py) - 8.3 min
-6. [`behavior_metrics_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/behavior_metrics_generation.py) - 4.3 min
-7. [`acg_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/acg_generation.py) - 1.7 min
-8. [`response_tstats_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/response_tstats_generation.py) - 3.5 min
-9. [`outcome_window_generation_parallel.py`](code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py) - 4.4 min
-10. [`beh_combined_outcome_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/beh_combined_outcome_generation.py) - 11.6 min
-11. [`photometry_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/photometry_generation.py) - 10.4 min
-12. [`licks_prep.py`](code/beh_ephys_analysis/session_combine/figure_preparation/licks_prep.py) - TBD
+5. [`basic_ephys_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/basic_ephys_generation.py) - 10.8 min
+6. [`behavior_metrics_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/behavior_metrics_generation.py) - 8.9 min
+7. [`acg_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/acg_generation.py) - 2.1 min
+8. [`response_tstats_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/response_tstats_generation.py) - 4.7 min
+9. [`outcome_window_generation_parallel.py`](code/beh_ephys_analysis/session_combine/figure_preparation/outcome_window_generation_parallel.py) - 5.6 min
+10. [`beh_combined_outcome_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/beh_combined_outcome_generation.py) - 12.9 min
+11. [`photometry_generation.py`](code/beh_ephys_analysis/session_combine/figure_preparation/photometry_generation.py) - 12.2 min
+12. [`licks_prep.py`](code/beh_ephys_analysis/session_combine/figure_preparation/licks_prep.py) - 10.7 min
 
-**Total estimated time:** ~55.5 min (excluding `licks_prep.py`)
+**Total estimated time:** ~80 min
+
+> [!NOTE]
+> These run times were measured on the current Code Ocean capsule's compute resources and will vary on other machines. Reference specs: Intel Xeon Platinum 8259CL @ 2.50 GHz, 8 cores / 16 threads, 124 GiB RAM, no GPU.
 
 
 
