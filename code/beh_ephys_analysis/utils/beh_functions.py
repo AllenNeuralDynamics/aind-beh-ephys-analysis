@@ -2,6 +2,7 @@ from utils.capsule_migration import CAPSULE_ROOT
 import numpy as np
 from scipy import stats
 import statsmodels.api as sm
+from joblib import Parallel, delayed
 import re
 from PyPDF2 import PdfMerger
 import pandas as pd
@@ -2075,3 +2076,95 @@ def fit_glm_animal(ani_focus, max_lag=5, plot=False):
         if plot:
             fig.savefig(fname=os.path.join(save_dir, f'{ani_focus}_glm_choice_history_model_results.pdf'))
     return results, fig
+
+
+def _build_hit_glm_session_df(session, t_Max, t_Max_hist):
+    """Build the per-session design matrix for the hit/miss GLM.
+
+    Returns a DataFrame with lagged reward and hit-history columns plus a
+    binary `hit` column, ready to be concatenated across sessions.
+    """
+    session_tbl = get_session_tbl(session)
+
+    hit = session_tbl['animal_response'].values != 2
+    rewards = (
+        (session_tbl['rewarded_historyL'].values == 1) |
+        (session_tbl['rewarded_historyR'].values == 1)
+    )
+
+    hit_mtx = np.full((t_Max_hist, len(hit)), np.nan, dtype=float)
+    for i in range(t_Max_hist):
+        hit_mtx[i, i + 1:] = hit[:len(hit) - (i + 1)]
+
+    rwd_mtx = np.full((t_Max, len(hit)), np.nan, dtype=float)
+    for i in range(t_Max):
+        rwd_mtx[i, i + 1:] = rewards[:len(hit) - (i + 1)]
+
+    col_list = [f'rwd_{i+1}' for i in range(t_Max)]
+    col_list += [f'hit_{i+1}' for i in range(t_Max_hist)]
+
+    matrix = np.concatenate((rwd_mtx, hit_mtx), axis=0)
+    reg_df = pd.DataFrame(matrix.T, columns=col_list)
+    reg_df['hit'] = hit
+    return reg_df
+
+
+def hit_glm_all_trial(session_list, t_Max, t_Max_hist=0, n_jobs=-1, backend='loky', verbose=0):
+    """Fit a population-level logistic GLM predicting hit vs. miss from reward history.
+
+    Parameters
+    ----------
+    session_list : array-like of str
+        Session IDs to include.
+    t_Max : int
+        Number of reward-history lags to include.
+    t_Max_hist : int
+        Number of hit-history lags to include (default 0).
+    n_jobs : int
+        Number of parallel workers (default -1 = all cores).
+    backend : str
+        joblib backend.
+    verbose : int
+        joblib verbosity.
+
+    Returns
+    -------
+    dict with keys: rwd_coeffs, hit_coeffs, rwd_CI, hit_CI, model,
+                    combined_reg_df, n_sessions, n_animals
+    """
+    reg_df_list = Parallel(n_jobs=n_jobs, backend=backend, verbose=verbose)(
+        delayed(_build_hit_glm_session_df)(session, t_Max, t_Max_hist)
+        for session in session_list
+    )
+
+    combined_reg_df = pd.concat(reg_df_list, ignore_index=True)
+
+    X = combined_reg_df.drop(columns=['hit']).values
+    y = combined_reg_df['hit'].values.astype(float)
+    X = sm.add_constant(X)
+
+    nan_mask = ~np.isnan(X).any(axis=1) & ~np.isnan(y)
+    X = X[nan_mask]
+    y = y[nan_mask]
+
+    model = sm.Logit(y, X)
+    result = model.fit()
+
+    rwd_coeffs = result.params[1:t_Max + 1]
+    hit_coeffs = result.params[t_Max + 1:t_Max + 1 + t_Max_hist]
+    rwd_CI = result.conf_int()[1:t_Max + 1]
+    hit_CI = result.conf_int()[t_Max + 1:t_Max + 1 + t_Max_hist]
+
+    n_sessions = len(session_list)
+    n_animals = len({parseSessionID(sess)[0] for sess in session_list})
+
+    return {
+        'rwd_coeffs': rwd_coeffs,
+        'hit_coeffs': hit_coeffs,
+        'rwd_CI': rwd_CI,
+        'hit_CI': hit_CI,
+        'model': result,
+        'combined_reg_df': combined_reg_df,
+        'n_sessions': n_sessions,
+        'n_animals': n_animals,
+    }
