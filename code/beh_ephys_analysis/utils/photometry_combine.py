@@ -592,7 +592,7 @@ def plot_tuning_curve(session_list, region, target_var = 'pe', channel= 'G_tri-e
 
         return curr_bin_means, curr_signal_means, session
     
-    results = Parallel(n_jobs=8)(delayed(process_session_for_tuning)(session) for session in session_list)
+    results = Parallel(n_jobs=-3)(delayed(process_session_for_tuning)(session) for session in session_list)
     # results = []
     # for session in session_list:
     #     result = process_session_for_tuning(session)
