@@ -56,8 +56,6 @@ import os
 from matplotlib.colors import LinearSegmentedColormap
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
@@ -97,7 +95,6 @@ import matplotlib.cm as cm
 from utils.ccf_utils import ccf_pts_convert_to_mm
 from trimesh import load_mesh
 from scipy.stats import pearsonr
-import statsmodels.api as sm
 from aind_ephys_utils import align
 import k3d
 from scipy.stats import rankdata
@@ -105,7 +102,6 @@ from scipy.ndimage import binary_dilation
 from scipy.optimize import least_squares
 from skimage.measure import find_contours
 from joblib import Parallel, delayed
-import seaborn as sns
 from sklearn.decomposition import PCA
 capsule_dirs = capsule_directories()
 warnings.filterwarnings('ignore')

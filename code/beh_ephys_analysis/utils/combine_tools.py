@@ -15,13 +15,10 @@ try:
     from .beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
 except ImportError:
     from beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
-import pandas as pd
 import pickle
 import scipy.stats as stats
 import shutil 
-import seaborn as sns
 import math  
-import seaborn as sns
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import r2_score
 import statsmodels.api as sm
@@ -768,9 +765,7 @@ def binary_shift_P_vs_U(
         "p_value_permutation": float(p_perm),
     }
 
-import numpy as np
 from scipy.stats import ttest_ind, fisher_exact
-from statsmodels.stats.proportion import proportions_ztest
 
 
 def welch_shift_X_vs_Y(

@@ -53,7 +53,6 @@ from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from hdmf_zarr.nwb import NWBZarrIO
 from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
 from utils.ephys_functions import*
-import pandas as pd
 import pickle
 import scipy.stats as stats
 from joblib import Parallel, delayed

@@ -35,8 +35,6 @@ import itertools
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 
-from scipy.stats import norm
-import statsmodels.api as sm
 from sklearn.metrics import r2_score
 
 import spikeinterface as si

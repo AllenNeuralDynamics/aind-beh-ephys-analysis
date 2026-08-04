@@ -46,8 +46,6 @@ import sys
 import os
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
@@ -87,7 +85,6 @@ from matplotlib import colors as mcolors
 from matplotlib import cm
 import matplotlib.colors as mcolors
 from sklearn.decomposition import PCA
-from scipy.stats import zscore
 from scipy.stats import ttest_ind
 from scipy.stats import ttest_rel
 from sklearn.cross_decomposition import CCA
@@ -96,8 +93,6 @@ from scipy.stats import pearsonr
 from aind_ephys_utils import align
 import k3d
 from joblib import Parallel, delayed
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from sklearn.mixture import GaussianMixture
 
 capsule_dirs = capsule_directories()

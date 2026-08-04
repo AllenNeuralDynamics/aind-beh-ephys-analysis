@@ -35,8 +35,6 @@ import sys
 import os
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
@@ -56,7 +54,6 @@ from scipy.stats import zscore
 import ast
 from utils.plot_utils import combine_pdf_big
 
-from open_ephys.analysis import Session
 from pathlib import Path
 import glob
 
@@ -73,7 +70,6 @@ from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, mak
 from utils.ephys_functions import*
 from utils.opto_utils import opto_metrics, load_opto_sig
 from utils.capsule_migration import capsule_directories
-import pandas as pd
 import pickle
 import scipy.stats as stats
 from joblib import Parallel, delayed
@@ -82,12 +78,8 @@ from functools import partial
 import time
 import spikeinterface as si
 import shutil 
-import seaborn as sns
 import math
-import seaborn as sns
 from sklearn.decomposition import PCA
-from scipy.stats import zscore
-from joblib import Parallel, delayed
 
 # %%
 # Make combined session-unit table

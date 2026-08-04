@@ -44,8 +44,6 @@ from pathlib import Path
 import importlib
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)

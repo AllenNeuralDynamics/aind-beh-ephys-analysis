@@ -6,8 +6,6 @@ import sys
 from scipy.sparse import data
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
 while _anchor != os.path.dirname(_anchor):
     _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
@@ -43,8 +41,6 @@ from matplotlib import colormaps
 import pickle
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
-import numpy as np
-import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
@@ -58,7 +54,6 @@ from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
 # def load_motion_info(folder):
 from spikeinterface.preprocessing.motion import load_motion_info
 from PIL import Image
-import json
 from pathlib import Path
 try:
     from spikeinterface.core.motion import Motion
@@ -829,7 +824,6 @@ def plot_session_opto_drift(session, data_type, plot=True, update_csv = False, u
         combine_pdf_big(drift_dir, os.path.join(session_dir[f'opto_dir_{data_type}'], f'{session}_drift.pdf'))
     return opto_drift_tbl
 
-import numpy as np
 
 def mode_by_bins(data, bins):
     """

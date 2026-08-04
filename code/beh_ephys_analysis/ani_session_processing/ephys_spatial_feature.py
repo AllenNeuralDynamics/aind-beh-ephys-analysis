@@ -4,8 +4,6 @@ import os
 import sys
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
-import os
-import sys
 _anchor = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.path.abspath(os.getcwd())
 while _anchor != os.path.dirname(_anchor):
     _beh_ephys_root = os.path.join(_anchor, "code", "beh_ephys_analysis")
@@ -39,18 +37,14 @@ import spikeinterface.widgets as sw
 from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_nwb
 from aind_ephys_utils import align
 from matplotlib.colors import LinearSegmentedColormap
-import matplotlib.colors as mcolors
 from matplotlib import colormaps
 from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
 from spikeinterface.core.sorting_tools import random_spikes_selection
 import pickle
 import shutil
 import datetime
-import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
-import spikeinterface.postprocessing as spost
 from tqdm import tqdm
-import spikeinterface.widgets as sw
 import seaborn as sns
 import matplotlib.cm as cm
 from matplotlib.backends.backend_pdf import PdfPages
