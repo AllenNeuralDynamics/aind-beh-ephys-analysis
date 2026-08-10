@@ -24,7 +24,7 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-def sync_directory(local_dir, destination, if_copy=False, if_dry_run=True):
+def sync_directory(local_dir, destination, if_copy=False, if_dry_run=True, if_delete=False):
     """
     Sync the local directory with the given S3 destination using aws s3 sync.
     Returns a status string based on the command output.
@@ -46,6 +46,8 @@ def sync_directory(local_dir, destination, if_copy=False, if_dry_run=True):
         else:
             # Run aws s3 sync command and capture the output
             cmd = ["aws", "s3", "sync", local_dir, destination]
+            if if_delete:
+                cmd.append("--delete")
             if if_dry_run:
                 cmd.append("--dryrun")
             result = subprocess.run(
@@ -83,7 +85,7 @@ if __name__ == "__main__":
         s3_bucket_dest += "results/"
         local_dir += "results/"
 
-    out = sync_directory(local_dir, s3_bucket_dest, if_copy=False, if_dry_run=False)
+    out = sync_directory(local_dir, s3_bucket_dest, if_copy=True, if_dry_run=False, if_delete=True)
     print(out)
 
 
