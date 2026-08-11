@@ -65,12 +65,13 @@ import sys
 import warnings
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+from matplotlib.colors import LinearSegmentedColormap
 from scipy.stats import gaussian_kde
 from sklearn.metrics import roc_auc_score
 
@@ -79,10 +80,12 @@ from sklearn.metrics import roc_auc_score
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
-from utils.capsule_migration import CAPSULE_ROOT
-
-from utils.beh_functions import makeSessionDF, get_session_tbl, get_unit_tbl, session_dirs
-from utils.capsule_migration import capsule_directories
+from utils.beh_functions import (
+    get_session_tbl,
+    get_unit_tbl,
+    makeSessionDF,
+)
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 from utils.combine_tools import apply_qc
 from utils.ephys_functions import get_spike_matrix, load_drift, load_trial_drift
 

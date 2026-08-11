@@ -43,63 +43,27 @@ Usage:
     Run after antidromic_generation.py completes. Processes NeuropixelsProbe data only.
     Extracts features from waveforms already in combined_unit_tbl.
 """
-import sys
 import os
+import sys
+
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
-from utils.capsule_migration import CAPSULE_ROOT
-from harp.clock import decode_harp_clock, align_timestamps_to_anchor_points
-from open_ephys.analysis import Session
-import datetime
-from aind_ephys_rig_qc.temporal_alignment import search_harp_line
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib.colors import LinearSegmentedColormap
-import pandas as pd
-from pynwb import NWBFile, TimeSeries, NWBHDF5IO
-from scipy.io import loadmat
-from scipy.stats import zscore
-import ast
-from utils.plot_utils import combine_pdf_big
-
-from pathlib import Path
-import glob
-
 import json
-import seaborn as sns
-from PyPDF2 import PdfMerger
-from sklearn.linear_model import LinearRegression
-import statsmodels.api as sm
-import re
-from aind_dynamic_foraging_basic_analysis.plot.plot_foraging_session import plot_foraging_session
-from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
-from hdmf_zarr.nwb import NWBZarrIO
-from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
-from utils.ephys_functions import*
-from utils.ccf_utils import ccf_pts_convert_to_mm, pir_to_lps, project_to_plane
-from utils.combine_tools import apply_qc, to_str_intlike, spatial_dependence_summary, binary_shift_P_vs_U, welch_shift_P_vs_U
-from utils.capsule_migration import capsule_directories
 import pickle
-import scipy.stats as stats
-from joblib import Parallel, delayed
-from multiprocessing import Pool
-from functools import partial
-import time
-import spikeinterface as si
-import shutil 
-import math  
+
+import numpy as np
+import pandas as pd
+from scipy.stats import zscore
 from sklearn.decomposition import PCA
-from trimesh import load_mesh
-from scipy.optimize import minimize
-from scipy.linalg import null_space
-from matplotlib.colors import Normalize
-from scipy.stats import rankdata
-from matplotlib.patches import Ellipse
-import matplotlib.cm as cm
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
+from utils.combine_tools import (
+    apply_qc,
+)
+from utils.ephys_functions import *
+
 capsule_dirs = capsule_directories()
 
 criteria_name = 'waveform_all'

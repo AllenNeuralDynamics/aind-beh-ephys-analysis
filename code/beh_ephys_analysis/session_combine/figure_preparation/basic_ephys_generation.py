@@ -42,58 +42,40 @@ Usage:
     Run after Step 1 completes. Can run in parallel with other scripts that only need Step 1.
 """
 # %%
-import sys
 import os
+import sys
+
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
-from utils.capsule_migration import CAPSULE_ROOT
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib.colors import LinearSegmentedColormap
-import pandas as pd
-from pynwb import NWBFile, TimeSeries, NWBHDF5IO
-from scipy.io import loadmat
-from scipy.stats import zscore
-import ast
-from pathlib import Path
-import glob
 import json
-import seaborn as sns
-from PyPDF2 import PdfMerger
-from sklearn.linear_model import LinearRegression
-import statsmodels.api as sm
-import re
-from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
-from utils.ephys_functions import correlate_nan, autocorrelation, load_trial_drift, load_drift, get_spike_matrix
-from utils.ccf_utils import ccf_pts_convert_to_mm, pir_to_lps
-from utils.combine_tools import apply_qc
-from utils.capsule_migration import capsule_directories
 import pickle
-import scipy.stats as stats
-import spikeinterface as si
-import shutil
-from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.metrics import r2_score
 import warnings
-from scipy.stats import gaussian_kde
+
+import numpy as np
+import pandas as pd
+from utils.beh_functions import (
+    get_session_tbl,
+    get_unit_tbl,
+    makeSessionDF,
+    session_dirs,
+)
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
+from utils.combine_tools import apply_qc
+from utils.ephys_functions import (
+    autocorrelation,
+    correlate_nan,
+    get_spike_matrix,
+    load_drift,
+)
+
 warnings.filterwarnings('ignore')
-from matplotlib import colors as mcolors
-from matplotlib import cm
-import matplotlib.colors as mcolors
-from sklearn.decomposition import PCA
-from scipy.stats import ttest_ind
-from scipy.stats import ttest_rel
-from sklearn.cross_decomposition import CCA
-from trimesh import load_mesh
-from scipy.stats import pearsonr
 from aind_ephys_utils import align
-import k3d
 from joblib import Parallel, delayed
-from sklearn.mixture import GaussianMixture
+from scipy.stats import ttest_rel
+from sklearn.decomposition import PCA
 
 capsule_dirs = capsule_directories()
 

@@ -32,78 +32,32 @@ Usage:
 
 # %%
 # Standard library
-import os
-import sys
-import re
 import json
+import os
 import pickle
-import glob
-import ast
-import warnings
-from pathlib import Path
-import importlib
+import sys
+
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
-from utils.capsule_migration import CAPSULE_ROOT
+
+# Plotting
 
 # Scientific libraries
 import numpy as np
 import pandas as pd
-import xarray as xr
-import scipy.signal as signal
-from scipy import stats
-from statsmodels.stats.multitest import multipletests
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
-
-# Plotting
-import matplotlib
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import matplotlib.patches as patches
-from matplotlib.lines import Line2D
-from matplotlib.colors import LinearSegmentedColormap
-from matplotlib import colormaps
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 # SpikeInterface
-import spikeinterface.full as si
-import spikeinterface.extractors as se
-import spikeinterface.preprocessing as spre
-import spikeinterface.postprocessing as spost
-import spikeinterface.widgets as sw
-
-# Progress bar
-from tqdm import tqdm
-import seaborn as sns
-from trimesh import load_mesh
-
-# IPython display
-from IPython.display import clear_output
-
-# Open Ephys
-from open_ephys.analysis import Session
-
-# AIND analysis and utils
-from aind_dynamic_foraging_basic_analysis.licks.lick_analysis import load_nwb
-from aind_dynamic_foraging_data_utils.nwb_utils import load_nwb_from_filename
-from aind_ephys_utils import align, sort
-
 # Local utilities
-import utils.analysis_funcs as af
-import utils.plotting_funcs as pf
+# AIND analysis and utils
+# IPython display
+# Open Ephys
+# Progress bar
 from utils.beh_functions import session_dirs
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
 from utils.combine_tools import apply_qc
-from utils.ccf_utils import pir_to_lps
-from utils.plot_utils import combine_pdf_big
-from utils.capsule_migration import capsule_directories
-
-import k3d
-from scipy.stats import pearsonr
-
 
 # %% [markdown]
 # # Pack data

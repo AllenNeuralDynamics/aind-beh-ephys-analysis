@@ -50,59 +50,33 @@ Usage:
 
 # %%
 
-from scipy.optimize import curve_fit
-import sys
 import os
-from matplotlib.colors import LinearSegmentedColormap
+import sys
+
 # Resolve code/beh_ephys_analysis (the folder containing `utils`) relative to this
 # file's location, so imports work no matter where the repo is checked out.
 _beh_ephys_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 if _beh_ephys_root not in sys.path:
     sys.path.insert(0, _beh_ephys_root)
-from utils.capsule_migration import CAPSULE_ROOT
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import pandas as pd
-from pynwb import NWBFile, TimeSeries, NWBHDF5IO
-from scipy.io import loadmat
-from scipy.stats import zscore
-from pathlib import Path
-import glob
 import json
-import seaborn as sns
-from PyPDF2 import PdfMerger
-from sklearn.linear_model import LinearRegression
-import statsmodels.api as sm
-import re
-from utils.beh_functions import session_dirs, parseSessionID, load_model_dv, makeSessionDF, get_session_tbl, get_unit_tbl, get_history_from_nwb
-from utils.ephys_functions import*
-from utils.ccf_utils import ccf_pts_convert_to_mm, pir_to_lps, project_to_plane
-from utils.combine_tools import apply_qc, to_str_intlike, spatial_dependence_summary, binary_shift_P_vs_U, welch_shift_P_vs_U
-from utils.plot_utils import combine_pdf_big
-from utils.capsule_migration import capsule_directories
 import pickle
-import scipy.stats as stats
-import spikeinterface as si
-import shutil
-from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.metrics import r2_score
 import warnings
-from scipy.stats import gaussian_kde
-import trimesh
-from mpl_toolkits.mplot3d import Axes3D
+
 import matplotlib.cm as cm
-from utils.ccf_utils import ccf_pts_convert_to_mm
-from trimesh import load_mesh
-from scipy.stats import pearsonr
-from aind_ephys_utils import align
-import k3d
-from scipy.stats import rankdata
-from scipy.ndimage import binary_dilation
-from scipy.optimize import least_squares
-from skimage.measure import find_contours
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from joblib import Parallel, delayed
+from scipy.optimize import least_squares
 from sklearn.decomposition import PCA
+from utils.capsule_migration import CAPSULE_ROOT, capsule_directories
+from utils.combine_tools import (
+    apply_qc,
+    to_str_intlike,
+)
+from utils.ephys_functions import *
+
 capsule_dirs = capsule_directories()
 warnings.filterwarnings('ignore')
 
