@@ -519,10 +519,6 @@ all_params = Parallel(n_jobs=-1, prefer="processes", verbose=verbose)(
 
 
 # %%
-# # combine single pdfs into a big one
-# combine_pdf_big(fit_folder, os.path.join(target_folder, 'combined_fitting.pdf'))
-
-# %%
 unit_session_included = features_combined[features_combined['be_filter']][['unit_id','session']]
 all_params_df = pd.DataFrame(all_params)
 # reorder rows so that unit and session for each row matches features_combined

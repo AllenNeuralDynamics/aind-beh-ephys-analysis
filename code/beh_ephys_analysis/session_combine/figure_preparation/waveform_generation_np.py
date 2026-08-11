@@ -125,7 +125,6 @@ slope_sum = []  # Combined slope metric: post_slope + pre_slope
 
 
 wf_norm = combined_tagged_units_filtered[f'wf{waveform_version}']/np.abs(combined_tagged_units_filtered[f'peak{waveform_version}'])
-# wf_2D_norm = combined_tagged_units_filtered[f'wf_2d{waveform_version}']/np.abs(combined_tagged_units_filtered[f'peak{waveform_version}'])
 for rows in combined_tagged_units_filtered.iterrows():
     wf = rows[1][f'wf{waveform_version}']
     wf_bl = np.nanmean(wf[:5])

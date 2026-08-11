@@ -66,8 +66,6 @@ df = pd.concat(dfs).reset_index(drop=True)
 # remove those are not strings
 df = df[df['session_id'].apply(lambda x: isinstance(x, str))]
 df = df.reset_index(drop=True)
-# session_ids = list(session_ids)
-# behs = list(behs)
 # %%
 def process_session(session, beh, rec_side, probe, sex, target='soma'):
     """
@@ -272,7 +270,6 @@ def process_session(session, beh, rec_side, probe, sex, target='soma'):
                 if np.nanmean(spike_counts_slow) > 0:
                     sd = np.std(spike_counts_slow[np.where(~np.isnan(spike_counts_slow))[0]])/np.nanmean(spike_counts_slow)
                 else:
-                    # print(f'{session}_{unit_id} spike_count_slow weird.\n')
                     sd = np.nan
 
 

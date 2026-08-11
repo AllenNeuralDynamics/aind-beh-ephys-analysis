@@ -191,9 +191,6 @@ combined_all_focus_df = pd.concat(all_focus_dfs, ignore_index=True)
 
 # --- Clean up tier columns ---
 tier_cols = ['tier_1', 'tier_2', 'tier_1_long', 'tier_2_long', 'short']
-# for c in tier_cols:
-#     if c in combined_all_focus_df.columns:
-#         combined_all_focus_df[c] = combined_all_focus_df[c].fillna(0).astype(float)
 
 # --- Find the best (highest t_collision) per session/unit ---
 combined_all_focus_df['_tcol'] = combined_all_focus_df['t_collision'].fillna(-np.inf)

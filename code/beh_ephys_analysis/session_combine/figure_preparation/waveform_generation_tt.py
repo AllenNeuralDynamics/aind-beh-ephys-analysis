@@ -158,7 +158,6 @@ trough_sum = []  # Combined trough metric: (pre_space_raw + post_space_raw) / pe
 slope_sum = []  # Combined slope metric: post_slope + pre_slope
 
 wf_norm = combined_tagged_units_filtered[f'wf{waveform_version}']/np.abs(combined_tagged_units_filtered[f'peak{waveform_version}'])
-# wf_2D_norm = combined_tagged_units_filtered['wf_2d']/np.abs(combined_tagged_units_filtered['peak'])
 
 # Progress tracking
 total_units = len(combined_tagged_units_filtered)
