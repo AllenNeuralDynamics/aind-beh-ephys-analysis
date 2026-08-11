@@ -92,8 +92,6 @@ with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combined_unit_t
 combined_tagged_units['unit_id'] = combined_tagged_units['unit'].apply(to_str_intlike)
 with open(os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'combined_session_tbl', 'combined_beh_sessions.pkl'), 'rb') as f:
     combined_session_qc = pickle.load(f)
-# combined_session_qc.drop(columns=['probe'], inplace=True, errors='ignore')
-# combined_tagged_units = combined_tagged_units.merge(combined_session_qc, on='session', how='left')
 
 # antidromic data
 antidromic_file = os.path.join(capsule_dirs["manuscript_fig_prep_dir"], 'antidromic_analysis', version, 'combined_antidromic_results.pkl')
@@ -164,22 +162,18 @@ if overview:
         session_df_curr = session_df.copy()
         spike_times_curr = spike_times.copy()
         unit_trial_drift_curr = drift_data.load_unit(unit_id)
-        # tblTrials_curr = tblTrials.copy()
         if unit_drift is not None:
             if unit_drift['ephys_cut'][0] is not None:
                 spike_times_curr = spike_times_curr[spike_times_curr >= unit_drift['ephys_cut'][0]]
                 session_df_curr = session_df_curr[session_df_curr['go_cue_time'] >= unit_drift['ephys_cut'][0]]
-                # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
             if unit_drift['ephys_cut'][1] is not None:
                 spike_times_curr = spike_times_curr[spike_times_curr <= unit_drift['ephys_cut'][1]]
                 session_df_curr = session_df_curr[session_df_curr['go_cue_time'] <= unit_drift['ephys_cut'][1]]
-                # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
         if 'amp_abs' in all_regressors or 'amp' in all_regressors:
             # get unit_trial_drift_curr's rows corresponding to the ones in session_df_curr
             session_df_curr = session_df_curr.merge(unit_trial_drift_curr, on='trial_ind', how='left').copy()
         if align_name == 'go_cue':
             align_time = session_df_curr['go_cue_time'].values
-            # align_time_all = tblTrials_curr['goCue_start_time'].values
         elif align_name == 'response':
             align_time = session_df_curr['choice_time'].values
 
@@ -231,7 +225,6 @@ if overview:
                 ax.set_ylabel(f'{regressor}', fontsize=12)
             # turn off y-ticks and x-ticks
             ax.set_yticks([])
-            # ax.set_xticks([])
 
         curr_Ps = np.squeeze(all_pm[:, :, reg_ind])
         curr_Ts = all_Tm[:, :, reg_ind]
@@ -372,16 +365,13 @@ for ind, row in combined_tagged_units_filtered.iterrows():
     session_df_curr = session_df.copy()
     spike_times_curr = spike_times.copy()
     unit_trial_drift_curr = drift_data.load_unit(unit_id)
-    # tblTrials_curr = tblTrials.copy()
     if unit_drift is not None:
         if unit_drift['ephys_cut'][0] is not None:
             spike_times_curr = spike_times_curr[spike_times_curr >= unit_drift['ephys_cut'][0]]
             session_df_curr = session_df_curr[session_df_curr['go_cue_time'] >= unit_drift['ephys_cut'][0]]
-            # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
         if unit_drift['ephys_cut'][1] is not None:
             spike_times_curr = spike_times_curr[spike_times_curr <= unit_drift['ephys_cut'][1]]
             session_df_curr = session_df_curr[session_df_curr['go_cue_time'] <= unit_drift['ephys_cut'][1]]
-            # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
     if 'amp_abs' in all_regressors or 'amp' in all_regressors:
         # get unit_trial_drift_curr's rows corresponding to the ones in session_df_curr
         session_df_curr = session_df_curr.merge(unit_trial_drift_curr, on='trial_ind', how='left').copy()
@@ -402,7 +392,6 @@ for ind, row in combined_tagged_units_filtered.iterrows():
     spike_df = align.to_events(spike_times_curr, align_time + align_time_max, [-0.5*binSize, 0.5*binSize], return_df=True)
     counts = spike_df.groupby('event_index').size()
     counts = [counts.get(i, 0) for i in range(len(session_df_curr))]
-    # counts = np.array(counts) - np.array(counts_bl)
     spike_matrix_LM = np.reshape(np.array([counts]), (-1, 1))
     spike_matrix_LM = zscore(spike_matrix_LM, axis=0)  
         
@@ -414,7 +403,6 @@ for ind, row in combined_tagged_units_filtered.iterrows():
     spike_df = align.to_events(spike_times_curr, align_time + align_time_max, [-0.5*binSize, 0.5*binSize], return_df=True)
     counts = spike_df.groupby('event_index').size()
     counts = [counts.get(i, 0) for i in range(len(session_df_curr))]
-    # counts = np.array(counts) - np.array(counts_bl)
     spike_matrix_LM = np.reshape(np.array([counts]), (-1, 1))
     spike_matrix_LM = zscore(spike_matrix_LM, axis=0)
 

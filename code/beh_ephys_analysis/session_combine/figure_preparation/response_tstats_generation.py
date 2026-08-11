@@ -147,16 +147,13 @@ def process(session, unit_id, rec_side, formula_all, formula_hit, focus_all, foc
     session_df_curr = session_df.copy()
     spike_times_curr = spike_times.copy()
     unit_trial_drift_curr = drift_data.load_unit(unit_id)
-    # tblTrials_curr = tblTrials.copy()
     if unit_drift is not None:
         if unit_drift['ephys_cut'][0] is not None:
             spike_times_curr = spike_times_curr[spike_times_curr >= unit_drift['ephys_cut'][0]]
             session_df_curr = session_df_curr[session_df_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
-            # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
         if unit_drift['ephys_cut'][1] is not None:
             spike_times_curr = spike_times_curr[spike_times_curr <= unit_drift['ephys_cut'][1]]
             session_df_curr = session_df_curr[session_df_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
-            # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
     if 'amp_abs' in formula_hit or 'amp' in formula_hit or 'amp_abs' in formula_all or 'amp' in formula_all:
         # get unit_trial_drift_curr's rows corresponding to the ones in session_df_curr
         session_df_curr = session_df_curr.merge(unit_trial_drift_curr, on='trial_ind', how='left').copy()
@@ -165,16 +162,11 @@ def process(session, unit_id, rec_side, formula_all, formula_hit, focus_all, foc
             align_time = session_df_curr['go_cue'].values
         else:
             align_time = session_df_curr['goCue_start_time'].values
-        # align_time_all = tblTrials_curr['goCue_start_time'].values
     elif align_name == 'response':
         if 'choice_time' in session_df_curr.columns:
             align_time = session_df_curr['choice_time'].values
         else:
             align_time = session_df_curr['reward_outcome_time'].values
-        # align_time_all = tblTrials_curr['reward_outcome_time'].values
-    # spike_matrix, slide_times = get_spike_matrix(spike_times_curr, align_time, 
-    #                                             pre_event=pre_event, post_event=post_event, 
-    #                                             binSize=binSize, stepSize=stepSize)
     spikes_bl = align.to_events(spike_times_curr, align_time, (pre_event, -0.01), return_df=True)
     spikes_bl_count = spikes_bl.groupby('event_index').size()
     spikes_bl_rate = [spikes_bl_count.get(i, 0) for i in range(len(align_time))]/np.abs(pre_event)
@@ -186,10 +178,6 @@ def process(session, unit_id, rec_side, formula_all, formula_hit, focus_all, foc
     response_ratio = np.full(len(response_rate), np.nan)
     non_zero_bl = np.array(spikes_bl_rate) > 0 # only compute ratio for trials with non-zero baseline firing to avoid inf values
     response_ratio[non_zero_bl] = (np.array(response_rate)[non_zero_bl] - np.array(spikes_bl_rate)[non_zero_bl])/ np.array(spikes_bl_rate)[non_zero_bl]
-    # spike_matrix_all, slide_times = get_spike_matrix(spike_times_curr, align_time_all, 
-    #                                             pre_event=pre_event, post_event=post_event, 
-    #                                             binSize=binSize, stepSize=stepSize)
-    # spike_matrix_LM = zscore(response_ratio)  
     if np.sum(1-session_df_curr['hit'].values) < 2:
         formula_all = re.sub(r"\s*\+\s*hit", "", formula_all)
     # try:
@@ -349,7 +337,6 @@ target = 'soma'
 align_name = 'go_cue'
 regressors_focus_all = ['hit', 'amp', 'Intercept','svs']
 regressors_focus_hit = ['amp', 'svs', 'ipsi', 'Intercept', 'ipsi:svs']
-# all_regressors = regressors_focus + regressors_sup
 formula_all = regressors_to_formula('spikes', regressors_focus_all)
 formula_hit = regressors_to_formula('spikes', regressors_focus_hit)
 pre_event = -2
@@ -366,19 +353,6 @@ def safe_process(row, formula_all, formula_hit, regressors_focus_all, regressors
     """Wrapper to safely call process() and catch errors."""
     # try:
     return process(row['session'], row['unit'], row['rec_side'], formula_all, formula_hit, regressors_focus_all, regressors_focus_hit, align_name='go_cue')
-    # except Exception as e:
-    #     print(f"[Error] session {row['session']}, unit {row['unit']}: {e}")
-    #     return {'session': row['session'],
-    #             'unit': row['unit'],
-    #             'coefs_ratio': np.full(n_regressors, np.nan),
-    #             'T_ratio': np.full(n_regressors, np.nan),
-    #             'p_ratio': np.full(n_regressors, np.nan),
-    #             'coefs_baseline': np.full(n_regressors, np.nan),
-    #             'T_baseline': np.full(n_regressors, np.nan),
-    #             'p_baseline': np.full(n_regressors, np.nan),
-    #             'coefs_response': np.full(n_regressors, np.nan),
-    #             'T_response': np.full(n_regressors, np.nan),
-    #             'p_response': np.full(n_regressors, np.nan)}
 
 
 # %%
@@ -490,7 +464,6 @@ for reg_ind, regressor in enumerate(regressors_common):
 
         ax.set_xlabel(f'All trials')
         ax.set_ylabel(f'Hit trials')
-        # limit = np.max([np.nanmax(np.abs(curr_T_all)), np.nanmax(np.abs(curr_T_hit))])/0.9
         ax.set_xlim(lims[0], lims[1])
         ax.set_ylim(lims[0], lims[1])
         ax.set_title(f'{regressor} - {period}')
@@ -518,7 +491,6 @@ for period_ind, period in enumerate(periods):
 
     ax.set_xlabel(f'All trials')
     ax.set_ylabel(f'Hit trials')
-    # limit = np.max([np.nanmax(np.abs(curr_T_all)), np.nanmax(np.abs(curr_T_hit))])/0.9
     ax.set_xlim(lims[0], lims[1])
     ax.set_ylim(lims[0], lims[1])
     ax.set_title(f'R² - {period}')

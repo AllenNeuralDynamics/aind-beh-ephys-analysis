@@ -121,7 +121,6 @@ def process(session, unit_id, in_df):
     if in_df:
         session_df = makeSessionDF(session)
         session_df_go_cue = get_session_tbl(session)
-        # session_df['ipsi'] = 2*(session_df['choice'].values - 0.5) * row['rec_side']
         in_df = True
     else:
         # if session_df exists, delete it to free memory
@@ -149,21 +148,16 @@ def process(session, unit_id, in_df):
     if in_df:
         session_df_curr = session_df.copy()
         session_df_go_cue_curr = session_df_go_cue.copy()
-        # tblTrials_curr = tblTrials.copy()
         if unit_drift is not None:
             if unit_drift['ephys_cut'][0] is not None:
                 spike_times_curr = spike_times_curr[spike_times_curr >= unit_drift['ephys_cut'][0]]
                 session_df_curr = session_df_curr[session_df_curr['go_cue_time'] >= unit_drift['ephys_cut'][0]]
                 session_df_go_cue_curr = session_df_go_cue_curr[session_df_go_cue_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
-                # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
             if unit_drift['ephys_cut'][1] is not None:
                 spike_times_curr = spike_times_curr[spike_times_curr <= unit_drift['ephys_cut'][1]]
                 session_df_curr = session_df_curr[session_df_curr['go_cue_time'] <= unit_drift['ephys_cut'][1]]
                 session_df_go_cue_curr = session_df_go_cue_curr[session_df_go_cue_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
-                # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
         if len(session_df_curr) >2:
-            # if session == 'behavior_716325_2024-05-31_10-31-14' and unit_id == 377:
-            #     print('Fount it!')
             align_time_cue = session_df_go_cue_curr['goCue_start_time'].values
             align_time_cue_sham = np.random.uniform(np.min(align_time_cue), np.max(align_time_cue), size=max(len(align_time_cue), 20))
             align_time_response = session_df_curr['choice_time'].values
@@ -194,7 +188,6 @@ def process(session, unit_id, in_df):
                                             binSize=binSize, stepSize=0.1)
             spike_response_mean = np.mean(spike_matrix_response, axis=0)
             response_max_ind = np.argmax(spike_response_mean)
-            # response = spike_matrix_response[:, response_max_ind]
         
             response = align.to_events(spike_times_curr, align_time_cue, [0.01, post_cue_len], return_df=True)
             response_sham = align.to_events(spike_times_curr, align_time_cue_sham, [0.01, post_cue_len], return_df=True)
@@ -239,8 +232,6 @@ def process(session, unit_id, in_df):
             zero_mask = (fr_bl == 0)
             response_rate_all = np.full_like(response, np.nan)
             response_rate_all[~zero_mask] = (response[~zero_mask] - fr_bl[~zero_mask]) / fr_bl[~zero_mask]
-            # print(f'Processing unit {unit_id} in session {session}')
-            # print(f'{np.sum(np.isinf(response_rate_all))} out of {len(response_rate_all)} trials have inf')
             response_increase = response-fr_bl
             response_increase = np.nanmean(response_increase)
 
@@ -254,7 +245,6 @@ def process(session, unit_id, in_df):
             mask_short = np.isnan(response) | np.isnan(fr_bl_short)
             curr_corr_short = np.corrcoef(response[~mask_short], fr_bl_short[~mask_short])[0, 1]
             t_stat_bl_response_short, p_value_bl_response_short = ttest_rel(response[~mask_short], fr_bl_short[~mask_short])
-            # response_rate = np.nanmean(response_rate_all) # verions 1
             response_rate = (np.mean(response) - np.mean(fr_bl))/np.mean(fr_bl)  # version 2
             response_fr = np.mean(response)
             # if both sides more than 2
@@ -269,8 +259,6 @@ def process(session, unit_id, in_df):
             if np.sum(session_df_go_cue_curr['animal_response'].values != 2) > 2 and \
             np.sum(session_df_go_cue_curr['animal_response'].values == 2) > 2:
                 # response bias in go vs no-go trials
-                # response_diff = np.nanmean(response_rate_all[session_df_go_cue_curr['animal_response'].values != 2]) - \
-                #                 np.nanmean(response_rate_all[session_df_go_cue_curr['animal_response'].values == 2]) # version 1
                 go_inds = session_df_go_cue_curr['animal_response'].values != 2
                 no_go_inds = session_df_go_cue_curr['animal_response'].values == 2
                 response_diff = (np.mean(response[go_inds]) - np.mean(fr_bl[go_inds]))/np.mean(fr_bl[go_inds]) - \
@@ -515,7 +503,6 @@ def auto_corr_train(spike_times, auto_inhi_bin, window_length, rec_start, rec_en
     lag=int(window_length/auto_inhi_bin)
     n = len(counts)
     counts = counts - np.nanmean(counts)
-    # result = np.correlate(x, x, mode='full')
     result = correlate_nan(counts, counts, lag = lag)  # only valid correlations
     return result/result[0]  # normalize
 
@@ -536,13 +523,10 @@ def process_acf(session, unit_id, in_df):
         opto_times = opto_tbl['time'].values
     else:
         opto_times = np.array([])
-    # opto_tbl = pd.read_csv(opto_file)
-    # opto_times = opto_tbl['time'].values
 
     if in_df:
         session_df = makeSessionDF(session)
         session_df_go_cue = get_session_tbl(session)
-        # session_df['ipsi'] = 2*(session_df['choice'].values - 0.5) * row['rec_side']
         in_df = True
     else:
         # if session_df exists, delete it to free memory
@@ -595,18 +579,15 @@ def process_acf(session, unit_id, in_df):
     if in_df:
         session_df_curr = session_df.copy()
         session_df_go_cue_curr = session_df_go_cue.copy()
-        # tblTrials_curr = tblTrials.copy()
         if unit_drift is not None:
             if unit_drift['ephys_cut'][0] is not None:
                 spike_times_curr = spike_times_curr[spike_times_curr >= unit_drift['ephys_cut'][0]]
                 session_df_curr = session_df_curr[session_df_curr['go_cue_time'] >= unit_drift['ephys_cut'][0]]
                 session_df_go_cue_curr = session_df_go_cue_curr[session_df_go_cue_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
-                # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] >= unit_drift['ephys_cut'][0]]
             if unit_drift['ephys_cut'][1] is not None:
                 spike_times_curr = spike_times_curr[spike_times_curr <= unit_drift['ephys_cut'][1]]
                 session_df_curr = session_df_curr[session_df_curr['go_cue_time'] <= unit_drift['ephys_cut'][1]]
                 session_df_go_cue_curr = session_df_go_cue_curr[session_df_go_cue_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
-                # tblTrials_curr = tblTrials_curr[tblTrials_curr['goCue_start_time'] <= unit_drift['ephys_cut'][1]]
         # calculate auto-inhibition
         if len(session_df_go_cue_curr) > 5:
             session_start = session_df_go_cue_curr['goCue_start_time'].values[0]-10
@@ -741,10 +722,8 @@ filter = (acf_df_probe['acg_last']<=cut_dict['acg_last']) & (acf_df_probe['sd_lo
 acf_df_probe['be_filter'] = filter
 
 # %%
-# acf_df_probe[~filter][['session', 'unit_id', 'isi_violations']+filter_list].to_csv('excluded_units_acf.csv')
 
 # %%
-# plt.plot(all_acf[filter, 1:].T, color='k', alpha=0.1);
 
 # %%
 # PCA on acg
