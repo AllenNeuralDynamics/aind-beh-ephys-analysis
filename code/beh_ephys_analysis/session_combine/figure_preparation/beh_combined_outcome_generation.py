@@ -202,16 +202,11 @@ if overview:
             # align_time_all = tblTrials_curr['goCue_start_time'].values
         elif align_name == 'response':
             align_time = session_df_curr['choice_time'].values
-            # align_time_all = tblTrials_curr['reward_outcome_time'].values
-        # spike_matrix, slide_times = get_spike_matrix(spike_times_curr, align_time, 
-        #                                             pre_event=pre_event, post_event=post_event, 
-        #                                             binSize=binSize, stepSize=stepSize)
+
         spike_matrix_LM, slide_times_LM = get_spike_matrix(spike_times_curr, align_time, 
                                                     pre_event=pre_event, post_event=post_event, 
                                                     binSize=binSize, stepSize=0.25)
-        # spike_matrix_all, slide_times = get_spike_matrix(spike_times_curr, align_time_all, 
-        #                                             pre_event=pre_event, post_event=post_event, 
-        #                                             binSize=binSize, stepSize=stepSize)
+
         spike_matrix_LM = zscore(spike_matrix_LM, axis=0)  
         
             
@@ -304,25 +299,10 @@ if overview:
     plt.savefig(os.path.join(beh_folder, f'Regression_in_time_{criteria_name}_{align_name}.pdf'), bbox_inches='tight')
 
 
-# %% [markdown]
-# # Regresssion in outcome focused window
-
-# %%
-# regressors_focus = ['Qchosen', 'outcome', 'ipsi', 'outcome:ipsi', 'Intercept', 'amp_abs']
-# regressors_sup = []
-
-# sig_regressors = pd.DataFrame(columns=['session', 'unit_id']+regressors_focus+regressors_sup)
-# sig_regressors['session'] = combined_tagged_units_filtered['session']
-# sig_regressors['unit_id'] = combined_tagged_units_filtered['unit']
-# sig_regressors[regressors_focus] = 1
-# sig_regressors[regressors_sup] = 1
-
-# %%
-# regression for outcome focus window
+# %% 
+# Regresssion in outcome focused window
 regressors_focus = ['Qchosen', 'outcome','ipsi', 'outcome:ipsi', 'amp_abs']
 regressors_sup = [] 
-# regressors_focus = regressors_focus + regressors_sup
-# regressors_sup = []
 
 sig_regressors = pd.DataFrame(columns=['session', 'unit_id']+regressors_focus+regressors_sup)
 sig_regressors['session'] = combined_tagged_units_filtered['session']
@@ -543,15 +523,6 @@ axes[1].set_xlabel('Outcome')
 axes[1].set_ylabel('Count')
 axes[1].legend(['Early', 'Late']) 
 
-# axes[2].scatter(auc_max[:, labels.index('outcome')]-0.5, np.abs(all_outcome_e) - np.abs(all_outcome_l), alpha=0.5, color='k', edgecolors='none', s=20)
-# axes[2].legend(['T(Early-Late)'])
-# axes[2].set_xlabel('Max(AUC) - 0.5')
-
-# axes[3].hist(np.array(max_T)[np.array(max_time)==mode_p], bins=20, color='k', alpha=0.7, edgecolor='none', density=True)
-# axes[3].hist(np.array(max_T)[np.array(max_time)==mode_n], bins=20, color='gray', alpha=0.7, edgecolor='none', density=True)
-# axes[3].set_xlabel('Max_T')
-# axes[3].set_ylabel('Count')
-# axes[3].legend(['Early', 'Late'])
 fig.suptitle('Outcome regressor comparison between early and late windows')
 fig.savefig(os.path.join(beh_folder, f'Outcome_regressor_comparison_{criteria_name}.pdf'), bbox_inches='tight')
 
@@ -626,24 +597,7 @@ plt.xlabel('R2_final-forced')
 
 plt.xlim(0, 0.7)
 plt.savefig(os.path.join(beh_folder, f'R2_comparison_{criteria_name}_motion.pdf'), bbox_inches='tight')
-# %%
-# sig_regressors_abs = pd.read_csv(os.path.join(beh_folder, f'sig_regressors_{criteria_name}_abs.csv'))
-# sig_regressors['R2_final_abs'] = sig_regressors_abs['R2_final']
 
-# %%
-# plt.subplot(121)
-# plt.scatter(sig_regressors['R2_final_abs'], sig_regressors['R2_final'], alpha=0.5, color='k', edgecolors='none', s=20)
-# plt.xlabel('R2_final_abs')
-# plt.ylabel('R2_final')
-# plt.plot([0, 1], [0, 1], color='r', linestyle='--')
-# title = f'{np.sum(sig_regressors["R2_final_abs"] > sig_regressors["R2_final"])/len(sig_regressors):.2f} units improved by abs'
-# plt.title(title)
-
-# plt.subplot(122)
-# bins = np.arange(0, 0.7, 0.02)
-# plt.hist(sig_regressors['R2_final_abs']-sig_regressors['R2_final'], bins=bins, alpha=0.5, color='k', edgecolor='none')
-# plt.xlabel('R2_final_abs-final')
-# plt.xlim(0, 0.7)
 
 # %%
 # compare t-values
@@ -715,11 +669,6 @@ curr_coefs_q = all_coeff_regressors[f'Qchosen_{period}_{verion}'].values
 curr_T_outcome = all_t_regressors[f'outcome_{period}_{verion}'].values  # get the T-statistics for the reward outcome
 curr_T_q = all_t_regressors[f'Qchosen_{period}_{verion}'].values  # get the T-statistics for the Qchosen
 curr_p_outcome = all_p_regressors[f'outcome_{period}_{verion}'].values  # get the p-values for the reward outcome
-
-# curr_T_outcome = all_Tm[:, outcome_ind]  # get the T-statistics for the reward outcome
-# curr_T_q = all_Tm[:, q_ind]  # get the T-statistics for the Qchosen
-# curr_p_outcome = all_pm[:, outcome_ind]  # get the p-values for the reward outcome
-
 
 # %%
 all_vec = np.column_stack((curr_coefs_outcome, curr_coefs_q))  # combine the coefficients for the reward outcome and Qchosen

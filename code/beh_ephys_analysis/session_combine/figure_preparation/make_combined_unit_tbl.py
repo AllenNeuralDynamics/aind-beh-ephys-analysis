@@ -90,16 +90,6 @@ dfs = [pd.read_csv(CAPSULE_ROOT + '/code/data_management/session_assets.csv', dt
         pd.read_csv(CAPSULE_ROOT + '/code/data_management/hopkins_session_assets.csv', dtype={'probe': str})]
 df = pd.concat(dfs).reset_index(drop=True)
 
-# session_exclude_file = CAPSULE_ROOT + '/code/data_management/sessions_to_exclude.txt'
-# with open(session_exclude_file, 'r') as f:
-#     exclude = [line.strip() for line in f.readlines()]
-# session_ids, behs = zip(*[
-#     (session, beh)
-#     for session, beh in zip(session_ids, behs)
-#     if isinstance(session, str) and session not in exclude
-# ])
-# exclude sessions
-# df = df[~df['session_id'].isin(exclude)]
 # remove those are not strings
 df = df[df['session_id'].apply(lambda x: isinstance(x, str))]
 df = df.reset_index(drop=True)
@@ -381,12 +371,6 @@ def safe_process(session, beh, rec_side, probe, sex):
     except Exception as e:
         print(f'Error processing {session}: {e}')
         return None
-
-# results = []
-# for index, row in df.iterrows():
-#     result = safe_process(row['session_id'], row['behavior'], row['side'], row['probe'], row['sex'])
-#     if result is not None:
-#         results.append(result)
 
 print(f"Processing {len(df)} sessions with parallelization...", flush=True)
 results = Parallel(n_jobs=-1)(

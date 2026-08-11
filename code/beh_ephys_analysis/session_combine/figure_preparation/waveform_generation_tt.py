@@ -195,9 +195,6 @@ symmetry_trough_dis = []  # Trough distance: post_trough_ind - pre_trough_ind (m
 trough_sum = []  # Combined trough metric: (pre_space_raw + post_space_raw) / peak
 slope_sum = []  # Combined slope metric: post_slope + pre_slope
 
-# wf_norm = combined_tagged_units_filtered['wf']/np.abs(combined_tagged_units_filtered['peak'])
-# wf_2D_norm = combined_tagged_units_filtered['wf_2d']/np.abs(combined_tagged_units_filtered['peak'])
-
 wf_norm = combined_tagged_units_filtered[f'wf{waveform_version}']/np.abs(combined_tagged_units_filtered[f'peak{waveform_version}'])
 # wf_2D_norm = combined_tagged_units_filtered['wf_2d']/np.abs(combined_tagged_units_filtered['peak'])
 
@@ -216,10 +213,6 @@ for rows in combined_tagged_units_filtered.iterrows():
         last_reported_pct = (current_pct // 10) * 10
         print(f"  Progress: {last_reported_pct}% ({processed_count}/{total_units} units)", flush=True)
 
-    # wf = rows[1]['wf']
-    # peak = rows[1]['peak']
-    # print(rows[1]['session'])
-    # print(rows[1]['unit'])
     wf = rows[1][f'wf{waveform_version}'][:32*5]
     wf_bl = np.nanmean(wf[:5])
     peak = rows[1][f'peak{waveform_version}'] - wf_bl
@@ -286,7 +279,6 @@ for rows in combined_tagged_units_filtered.iterrows():
 
     # find samples where the waveform crosses the half peak threshold to infer half width
     half_peak = peak / 2
-    # wf_half_crossings = np.where(np.diff(np.sign(wf - half_peak))!=0)[0]+1  # indices where waveform crosses half peak
     wf_half_crossings = zero_crossings_linear(np.arange(len(wf)), wf - half_peak)
     if len(wf_half_crossings) < 2:
         post_crossing = np.nan
