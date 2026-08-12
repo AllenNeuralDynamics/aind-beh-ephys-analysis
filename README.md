@@ -43,7 +43,7 @@ The code is organized into two sections, a data preparation pipeline, and then d
 Before running any analysis notebook, the **figure preparation scripts** in [`code/beh_ephys_analysis/session_combine/figure_preparation`](code/beh_ephys_analysis/session_combine/figure_preparation) must be executed first. These scripts aggregate and preprocess data across all sessions and animals, generating combined tables and derived metrics that the analysis notebooks depend on. 
 
 > [!CAUTION] 
-> The scripts must be run **in the exact order** specified in the [`sequence`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence) file, as later steps depend on outputs from earlier ones. These scripts must be run before any analysis notebook. 
+> The scripts must be run **in the exact order** specified in the [`sequence.txt`](code/beh_ephys_analysis/session_combine/figure_preparation/sequence.txt) file, as later steps depend on outputs from earlier ones. These scripts must be run before any analysis notebook. 
 
 
 **Estimated run time for each script:**
@@ -304,7 +304,7 @@ To run this analysis pipeline on your local machine:
    python antidromic_generation.py
    # ... continue with remaining scripts
    ```
-   See the [preparation scripts section](#generated-files-used-across-the-manuscript-notebooks-and-figure-preparation-dependency) for the complete list and estimated run times (~55 min total).
+   See the [preparation scripts section](#generated-files-used-across-the-manuscript-notebooks-and-figure-preparation-dependency) for the complete list and estimated run times (~80 min total).
 
 5. **Run the analysis notebooks:**
    - Open any notebook in [`code/beh_ephys_analysis/session_combine/manuscript_figures/`](code/beh_ephys_analysis/session_combine/manuscript_figures/)
