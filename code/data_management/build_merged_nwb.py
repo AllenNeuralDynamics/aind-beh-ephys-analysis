@@ -30,9 +30,9 @@ from aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys import loa
 logger = logging.getLogger(__name__)
 
 # Lick/tongue movement data
-LICK_DATA_DIR = Path('/root/capsule/data/all_tongue_movements_04022026')
-LICK_PARQUET = LICK_DATA_DIR / 'all_tongue_movements_04022026.parquet'
-KEYPOINT_TRACKING_DIR = Path('/root/capsule/data/keypoint_tracking_bottomview_LCrecordings_20260403')
+LICK_DATA_DIR = Path('/root/capsule/data/all_tongue_movements')
+LICK_PARQUET = LICK_DATA_DIR / 'all_tongue_movements.parquet'
+KEYPOINT_TRACKING_DIR = Path('/root/capsule/data/keypoint_tracking_bottomview_LCrecordings_20260126')
 
 # Load column mappings and descriptions
 COLUMN_MAP_PATH = '/root/capsule/code/data_management/column_names_map.json'
