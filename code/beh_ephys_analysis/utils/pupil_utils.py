@@ -77,13 +77,23 @@ def linreg_remove_outliers(A, B, default_m, z=3.5):
 
 def load_pupil(session, dia_thresh = 0.9): # = 'behavior_ZS062_2021-04-02_19-08-52'
     session_dir = session_dirs(session)
-    raw_nwb_file = [f for f in os.listdir(session_dir['raw_dir']) if f.endswith('.nwb.zarr')][0]
+    if not os.path.exists(session_dir['raw_dir']):
+        print('No pupil file found.')
+        return None
+    raw_nwb_files = [f for f in os.listdir(session_dir['raw_dir']) if f.endswith('.nwb.zarr')]
+    if len(raw_nwb_files) == 0:
+        print('No pupil file found')
+        return None
+    raw_nwb_file = raw_nwb_files[0]
     raw_nwb = load_nwb_from_filename(os.path.join(session_dir['raw_dir'], raw_nwb_file))
     raw_df = raw_nwb.intervals['trials'].to_dataframe()
+    if not os.path.exists(os.path.join(session_dir['sorted_dir_curated'], 'session')):
+        print('No pupil file found.')
+        return None  
     pupil_files = os.listdir(os.path.join(session_dir['sorted_dir_curated'], 'session'))
     pupil_file = [f for f in pupil_files if f.endswith('_pupil.mat')]
     if len(pupil_file)==0:
-        print('No pupil file found')
+        print('No pupil file found.')
         return None
     elif len(pupil_file)>1:
         print('Multiple pupil files found')
