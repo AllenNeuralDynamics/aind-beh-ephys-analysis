@@ -19,7 +19,29 @@
       "Bash(# Check if a saved pkl exists that could be loaded *)",
       "Read(//scratch/results/manuscript/figures/F_waveform_space/**)",
       "Read(//scratch/**)",
-      "Bash(python /tmp/check_ids.py)"
+      "Bash(python /tmp/check_ids.py)",
+      "Bash(python -c \"from pynwb.file import LabMetaData; import inspect; print\\(inspect.getsource\\(LabMetaData\\)\\)\")",
+      "Bash(python)",
+      "Bash(grep -rn \"right_lick_time\\\\|left_lick_time\\\\|add_acquisition.*lick\" /opt/conda/lib/python3.12/site-packages/aind_dynamic_foraging_* 2>/dev/null | head -20)",
+      "Read(//opt/conda/lib/python3.12/site-packages/**)",
+      "Bash(grep -rn 'name=.left_lick_time\\\\|name=.right_lick_time\\\\|name=\"left_lick_time\"\\\\|name=\"right_lick_time\"' /opt/conda/lib/python3.12/site-packages/ 2>/dev/null | head -20)",
+      "Bash(grep -rn 'name=.left_lick_time\\\\|name=.right_lick_time\\\\|name=\"left_lick_time\"\\\\|name=\"right_lick_time\"' /root/capsule /root/.cache 2>/dev/null | head)",
+      "Read(//root/.cache/**)",
+      "Bash(kill %1)",
+      "Bash(grep -rn \"df_events\\\\|right_lick_time\\\\|left_lick_time\" /opt/conda/lib/python3.12/site-packages/aind_dynamic_foraging_data_utils/ 2>/dev/null | head -20)",
+      "Read(//opt/conda/lib/python3.12/site-packages/aind_dynamic_foraging_data_utils/**)",
+      "Bash(grep -rn \"'right_lick_time'\\\\|\\\\\"right_lick_time\\\\\"\" /opt/conda/lib/python3.12/site-packages/aind_dynamic_foraging_data_utils/nwb_utils.py)",
+      "Bash(grep -n \"def file\\\\|@property\\\\|self\\\\.__file\\\\s*=\\\\|_ZarrIO__file\" /opt/conda/lib/python3.12/site-packages/hdmf_zarr/backend.py | head -30)",
+      "Read(//opt/conda/lib/python3.12/site-packages/hdmf_zarr/**)",
+      "Bash(python -c ' *)",
+      "Bash(grep -n \"add_namespace\\\\|register_spec\\\\|def __init__\" /opt/conda/lib/python3.12/site-packages/hdmf/spec/namespace.py | head -30)",
+      "Read(//opt/conda/lib/python3.12/site-packages/hdmf/spec/**)",
+      "Bash(grep -n \"def register_container_type\" /opt/conda/lib/python3.12/site-packages/hdmf/build/*.py /opt/conda/lib/python3.12/site-packages/pynwb/*.py)",
+      "Read(//opt/conda/lib/python3.12/site-packages/hdmf/build/**)",
+      "Bash(grep -n \"__TYPE_MAP\\\\|def get_type_map\\\\|TypeMap\\(\\)\" /opt/conda/lib/python3.12/site-packages/pynwb/__init__.py | head -20)",
+      "Read(//opt/conda/lib/python3.12/site-packages/pynwb/**)",
+      "Bash(ls /data/behavior_ZS062_2021-05-01_19-48-01_raw_data/*.json 2>&1 | head -20)",
+      "Read(//data/behavior_ZS062_2021-05-01_19-48-01_raw_data/**)"
     ]
   }
 }

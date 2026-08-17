@@ -1490,12 +1490,13 @@ for pc_ind in range(3):
 
 # %%
 basic_ephys_df.rename(columns={'probe_x': 'probe'}, inplace=True)
+# drop probe_y if exists
+if 'probe_y' in basic_ephys_df.columns:
+    basic_ephys_df.drop(columns=['probe_y'], inplace=True)
 
 # %%
 # save basic ephys data
 with open(os.path.join(target_folder, f'basic_ephys.pkl'), 'wb') as f:
     pickle.dump(basic_ephys_df, f)
 print(f'Saved basic ephys data to {os.path.join(target_folder, f"basic_ephys.pkl")}')
-
-
 

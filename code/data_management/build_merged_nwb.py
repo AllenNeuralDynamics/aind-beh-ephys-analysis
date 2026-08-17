@@ -30,9 +30,9 @@ from aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys import loa
 logger = logging.getLogger(__name__)
 
 # Lick/tongue movement data
-LICK_DATA_DIR = Path('/root/capsule/data/all_tongue_movements_04022026')
-LICK_PARQUET = LICK_DATA_DIR / 'all_tongue_movements_04022026.parquet'
-KEYPOINT_TRACKING_DIR = Path('/root/capsule/data/keypoint_tracking_bottomview_LCrecordings_20260403')
+LICK_DATA_DIR = Path('/root/capsule/data/all_tongue_movements')
+LICK_PARQUET = LICK_DATA_DIR / 'all_tongue_movements.parquet'
+KEYPOINT_TRACKING_DIR = Path('/root/capsule/data/keypoint_tracking_bottomview_LCrecordings_20260126')
 
 # Load column mappings and descriptions
 COLUMN_MAP_PATH = '/root/capsule/code/data_management/column_names_map.json'
@@ -479,9 +479,14 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
         trial_cols = [col for col in trial_df.columns if col not in ('start_time', 'stop_time')]
         trial_descriptions = COLUMN_DESCRIPTIONS.get('behavior_trial_columns', {})
 
+    ragged_trial_cols = set()
     for col in trial_cols:
         description = trial_descriptions.get(col, f'Trial column: {col}')
-        new_nwb.add_trial_column(name=col, description=description)
+        non_null = trial_df[col].dropna()
+        is_ragged = len(non_null) > 0 and isinstance(non_null.iloc[0], (list, np.ndarray))
+        if is_ragged:
+            ragged_trial_cols.add(col)
+        new_nwb.add_trial_column(name=col, description=description, index=is_ragged)
 
     for _, row in trial_df.iterrows():
         start_time = float(row.get('start_time', 0.0))
@@ -497,18 +502,9 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
 
             # Convert Python None to appropriate type (like reference behavior NWB)
             if val is None or (isinstance(val, float) and pd.isna(val)):
-                # Check a non-null value in this column to determine type
-                non_null_vals = trial_df[col].dropna()
-                if len(non_null_vals) > 0:
-                    sample_val = non_null_vals.iloc[0]
-                    if isinstance(sample_val, np.ndarray):
-                        # Array column - use empty array
-                        val = np.array([])
-                    else:
-                        # Scalar column - use np.nan
-                        val = np.nan
+                if col in ragged_trial_cols:
+                    val = np.array([])
                 else:
-                    # All values are None - default to np.nan
                     val = np.nan
 
             trial_kwargs[col] = val
@@ -528,8 +524,8 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
                 from pynwb import TimeSeries
                 new_ts = TimeSeries(
                     name=acq_name,
-                    data=acq_data.data[:],
-                    timestamps=acq_data.timestamps[:],
+                    data=acq_data.data[:].astype(np.float64),
+                    timestamps=acq_data.timestamps[:].astype(np.float64),
                     unit=acq_data.unit if hasattr(acq_data, 'unit') else 'N/A',
                     description=acq_data.description if hasattr(acq_data, 'description') else ''
                 )
@@ -572,13 +568,23 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
                 mapped_to_original[mapped_name] = orig_col
 
         # Only add custom columns (not predefined ones)
+        ragged_unit_cols = set()
         for col in unit_cols:
             # Look up description using original column name
             orig_col = mapped_to_original.get(col, col)
             description = unit_descriptions.get(orig_col, col)
             if description == 'to be filled':
                 description = col
-            new_nwb.add_unit_column(name=col, description=description)
+
+            non_null = unit_df[col].dropna()
+            is_ragged = False
+            if len(non_null) > 0 and isinstance(non_null.iloc[0], (list, np.ndarray)):
+                if getattr(non_null.iloc[0], 'ndim', 1) == 1:
+                    lens = {len(v) for v in non_null}
+                    is_ragged = len(lens) > 1
+            if is_ragged:
+                ragged_unit_cols.add(col)
+            new_nwb.add_unit_column(name=col, description=description, index=is_ragged)
 
         for idx, row in unit_df.iterrows():
             unit_kwargs = {}
@@ -606,31 +612,21 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
             for col in unit_cols:
                 val = row[col]
 
-                # Convert Python None to np.nan for numeric types, empty array for array types
+                # Convert Python None to np.nan for scalars, or a NaN-filled array
+                # of the same shape as a non-null sample for array columns.
                 if val is None or (isinstance(val, float) and pd.isna(val)):
-                    # Check if this is a known array column
-                    if col in KNOWN_ARRAY_COLUMNS:
-                        val = np.array([])  # Empty array for known array columns
-                    else:
-                        # Check a non-null value in this column to determine type
-                        non_null_vals = unit_df[col].dropna()
-                        if len(non_null_vals) > 0:
-                            sample_val = non_null_vals.iloc[0]
-                            if isinstance(sample_val, np.ndarray):
-                                # Array column - use empty array with same ndim
-                                if sample_val.ndim == 1:
-                                    val = np.array([])
-                                else:
-                                    # For 2D arrays, need to match shape
-                                    shape = list(sample_val.shape)
-                                    shape[0] = 0  # Empty in first dimension
-                                    val = np.empty(shape)
-                            else:
-                                # Scalar column - use np.nan
-                                val = np.nan
+                    non_null_vals = unit_df[col].dropna()
+                    if len(non_null_vals) > 0:
+                        sample_val = non_null_vals.iloc[0]
+                        if isinstance(sample_val, np.ndarray):
+                            dtype = sample_val.dtype if sample_val.dtype.kind in 'fc' else np.float64
+                            val = np.full(sample_val.shape, np.nan, dtype=dtype)
+                        elif isinstance(sample_val, list):
+                            val = []
                         else:
-                            # All values are None and not a known array - default to np.nan
                             val = np.nan
+                    else:
+                        val = np.nan
 
                 unit_kwargs[col] = val
 
@@ -670,6 +666,7 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
 
     # 7c. Add keypoint tracking tables to behavior processing module (if available)
     movs_table, kins_table = load_keypoint_tracking(session_id)
+    movs_table = None
     if movs_table is not None and kins_table is not None:
         if 'behavior' not in new_nwb.processing:
             new_nwb.create_processing_module(

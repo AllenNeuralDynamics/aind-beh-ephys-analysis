@@ -195,8 +195,14 @@ def save_timing_csv(timings: list[tuple[str, float]], output_path: Path, categor
         ])
 
 
-def run(check_only: bool = False) -> int:
-    """Run figure-preparation scripts, then manuscript notebooks, in their listed order."""
+def run(check_only: bool = False, update_timing: bool = False) -> int:
+    """Run figure-preparation scripts, then manuscript notebooks, in their listed order.
+
+    Args:
+        check_only: Validate file existence without executing anything.
+        update_timing: Write timing CSVs after each step. Disabled by default so that
+            reproducible capsule runs do not modify files under code/.
+    """
     scripts = load_sequence(FIG_PREP_SEQUENCE_FILE)
     notebooks = load_sequence(FIG_NOTEBOOK_LIST)
     print(f"Loaded {len(scripts)} scripts from {FIG_PREP_SEQUENCE_FILE}", flush=True)
@@ -232,7 +238,7 @@ def run(check_only: bool = False) -> int:
         notebook_timings.append((notebook_name, duration))
     
         # Save timing after each notebook completes
-        if not check_only:
+        if not check_only and update_timing:
             save_timing_csv(notebook_timings, notebook_csv_path, "manuscript_figure")
             print(f"  → Updated timing report: {notebook_csv_path}", flush=True)
 
@@ -252,8 +258,8 @@ def run(check_only: bool = False) -> int:
             print("-" * 80, flush=True)
             print(f"  {'TOTAL PREP TIME':60s} {total_script_time:8.2f}s", flush=True)
 
-            # Final save already done after each script
-            print(f"\n  → Final timing report: {prep_csv_path}", flush=True)
+            if update_timing:
+                print(f"\n  → Final timing report: {prep_csv_path}", flush=True)
 
         if notebook_timings:
             print("\nManuscript Figure Notebooks:", flush=True)
@@ -265,8 +271,8 @@ def run(check_only: bool = False) -> int:
             print("-" * 80, flush=True)
             print(f"  {'TOTAL NOTEBOOK TIME':60s} {total_notebook_time:8.2f}s", flush=True)
 
-            # Final save already done after each notebook
-            print(f"\n  → Final timing report: {notebook_csv_path}", flush=True)
+            if update_timing:
+                print(f"\n  → Final timing report: {notebook_csv_path}", flush=True)
 
         total_time = sum(d for _, d in script_timings) + sum(d for _, d in notebook_timings)
         print("\n" + "="*80, flush=True)
@@ -301,10 +307,16 @@ def main() -> int:
         action="store_true",
         help="Validate the sequence and file existence without executing the scripts.",
     )
+    parser.add_argument(
+        "--update-timing",
+        action="store_true",
+        help="Write timing CSVs after each step. Omit this flag for reproducible capsule runs "
+             "so that files under code/ are not modified.",
+    )
     args = parser.parse_args()
 
     try:
-        return run(check_only=args.check_only)
+        return run(check_only=args.check_only, update_timing=args.update_timing)
     except (FileNotFoundError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr, flush=True)
         return 1

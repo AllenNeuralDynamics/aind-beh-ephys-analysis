@@ -43,20 +43,14 @@ for curr_col in col_to_attach:
     all_ids.extend(curr_ids)
     all_mounts.extend(curr_mount)
 #%%
-# all_ids = all_ids + ['f908dd4d-d7ed-4d52-97cf-ccd0e167c659']
-# all_mounts = all_mounts + ['all_behavior']
-data_to_add = [
-            ("c1a35fd0-c3aa-47a8-ba40-288b1e39a86a", "alignment_fix"),
-            ("ac7c7961-9178-4bf9-9d66-0a426cf3cc24", "dorsal_edges"),
-            ("7bf4aa31-226c-4c9c-835b-ae0da5ff1ce0", "merfish_data"), # updated
-            ("299fd5aa-1454-4b7a-968c-1e7d2c570d27", "LC_percentile_meshes"), # updated
-            ("7b6e65c2-55f1-473b-95d3-9d84c5d944fb", "all_tongue_movements"), # updated
-            ("60d862b2-173a-4024-8a45-9714d40ae7e3", "scratch_data"), # updated
-            ("fcda6874-91fa-488f-bd97-f30e17dd61c3", "LC_retro"), # updated
-            ("66668438-3b32-4160-b571-037e117d8568", "fiber_ccf"), # updated
-            ]
-all_ids.extend([item[0] for item in data_to_add])
-all_mounts.extend([item[1] for item in data_to_add])
+
+combined_assets_path = os.path.join(script_dir, 'combined_assets.csv')
+combined_df = pd.read_csv(combined_assets_path)
+combined_df.columns = combined_df.columns.str.strip()
+combined_df['id'] = combined_df['id'].str.strip().str.strip('"')
+combined_df['mount_name'] = combined_df['mount_name'].str.strip().str.strip('"')
+all_ids.extend(combined_df['id'].tolist())
+all_mounts.extend(combined_df['mount_name'].tolist())
 
 # Generate the list of DataAssetAttachParams objects
 all_mounts_new = []
