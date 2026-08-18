@@ -435,7 +435,7 @@ def plot_licks_from_video(session, plot=True, cutoff_percentile=0.95):
             - 'filter': Boolean mask for quality-filtered segments
         Returns None if session not found in video data or NWB file missing.
     """
-    video_data_file = str(capsule_directories()['data_dir']) + '/all_tongue_movements/all_tongue_movements.parquet'
+    video_data_file = str(capsule_directories()['data_dir']) + '/all_tongue_movements_16092025/all_tongue_movements_16092025.parquet'
     all_lick_df = pd.read_parquet(video_data_file)
     session_video_list = all_lick_df['session'].unique().tolist()
     # load data
@@ -693,5 +693,5 @@ if __name__ == "__main__":
     # for session in session_list:
     #     print(f"Processing session {session}...")
     #     plot_licks_from_video(session)
-    plot_licks_from_video('behavior_751769_2025-01-17_11-37-39')
+    plot_licks_from_video('behavior_754897_2025-03-13_11-20-42')
 

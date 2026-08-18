@@ -7,15 +7,20 @@ This module provides a function to build an NWB file with units from both:
 
 The columns are merged using the mappings defined in column_names_map.json.
 """
+import functools
+import glob
 import json
 import logging
 import os
+import tempfile
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from uuid import uuid4
 from dateutil.tz import tzlocal
-from pynwb import NWBHDF5IO, NWBFile, TimeSeries
+from hdmf.spec import DatasetSpec, GroupSpec, NamespaceBuilder
+from pynwb import NWBFile, TimeSeries, get_class, load_namespaces
+from hdmf_zarr import NWBZarrIO
 from pynwb.file import Subject
 
 import sys
@@ -29,10 +34,18 @@ from aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys import loa
 
 logger = logging.getLogger(__name__)
 
-# Lick/tongue movement data
-LICK_DATA_DIR = Path('/root/capsule/data/all_tongue_movements')
-LICK_PARQUET = LICK_DATA_DIR / 'all_tongue_movements.parquet'
-KEYPOINT_TRACKING_DIR = Path('/root/capsule/data/keypoint_tracking_bottomview_LCrecordings_20260126')
+# Tongue movement data
+TONGUE_MOVEMENT_DATA_DIR = Path('/root/capsule/data/all_tongue_movements_04022026')
+TONGUE_MOVEMENT_PARQUET = TONGUE_MOVEMENT_DATA_DIR / 'all_tongue_movements_04022026.parquet'
+KEYPOINT_TRACKING_DIR = Path('/root/capsule/data/keypoint_tracking_bottomview_LCrecordings_20260403')
+
+# AIND metadata extension: the raw metadata JSON files are bundled as a single JSON
+# blob in a LabMetaData container. Placeholder for now — expected to be replaced by
+# properly typed metadata later.
+AIND_NAMESPACE = 'aind_beh_ephys'
+AIND_NAMESPACE_VERSION = '0.1.0'
+AIND_NEURODATA_TYPE = 'AindMetadata'
+AIND_LAB_META_DATA_KEY = 'aind_metadata'
 
 # Load column mappings and descriptions
 COLUMN_MAP_PATH = '/root/capsule/code/data_management/column_names_map.json'
@@ -55,6 +68,95 @@ KNOWN_ARRAY_COLUMNS = {
     'peak_waveform_fake_raw', 'peak_waveform_aligned_fake_raw',
 }
 
+@functools.cache
+def aind_metadata_type():
+    """
+    Return the AindMetadata container class, registering its namespace on first call.
+
+    In-code NWB extension, following the pattern in
+    aind_behavior_vr_foraging_packaging.provenance:
+      * build a NamespaceBuilder + GroupSpec at runtime
+      * export the YAMLs to a temp directory (registration only, not persistent)
+      * load_namespaces() reads them back into pynwb
+      * get_class() returns the auto-generated container class
+
+    Cached so the namespace is only registered once per Python process.
+    """
+    spec = GroupSpec(
+        doc='AIND raw metadata files bundled as one JSON blob keyed by filename stem.',
+        data_type_def=AIND_NEURODATA_TYPE,
+        data_type_inc='LabMetaData',
+        datasets=[
+            DatasetSpec(name='json_data', doc='JSON metadata (all files, keyed by stem)', dtype='text'),
+        ],
+    )
+
+    builder = NamespaceBuilder(
+        doc=f'In-code extension for {AIND_NAMESPACE}',
+        name=AIND_NAMESPACE,
+        version=AIND_NAMESPACE_VERSION,
+    )
+    builder.include_namespace('core')
+    builder.add_spec(f'{AIND_NAMESPACE}.extensions.yaml', spec)
+
+    outdir = Path(tempfile.mkdtemp(prefix='aind-beh-ephys-spec-'))
+    namespace_name = f'{AIND_NAMESPACE}.namespace.yaml'
+    builder.export(namespace_name, outdir=str(outdir))
+    load_namespaces(str(outdir / namespace_name))
+
+    return get_class(AIND_NEURODATA_TYPE, AIND_NAMESPACE)
+
+
+def load_aind_metadata(session_id):
+    """
+    Load the raw AIND metadata JSON files for a session.
+
+    Reads every *.json in the session's raw data directory into one dict keyed by
+    filename stem (e.g. {'subject': {...}, 'procedures': {...}, 'rig': {...}}).
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        dict keyed by filename stem, or None if no metadata files were found.
+    """
+    raw_dir = session_dirs(session_id).get('raw_dir')
+    if raw_dir is None or not os.path.exists(raw_dir):
+        logger.warning(f"Raw data directory not found for {session_id}")
+        return None
+
+    meta_files = sorted(glob.glob(os.path.join(raw_dir, '*.json')))
+    if not meta_files:
+        logger.info(f"No metadata JSON files found in {raw_dir}")
+        return None
+
+    meta_dict = {}
+    for path in meta_files:
+        key = os.path.splitext(os.path.basename(path))[0]
+        try:
+            with open(path, 'r') as f:
+                meta_dict[key] = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Could not read metadata file {path}: {e}")
+
+    if not meta_dict:
+        return None
+
+    logger.info(f"Loaded {len(meta_dict)} metadata files: {', '.join(meta_dict)}")
+    return meta_dict
+
+
+def add_aind_metadata(nwb_file, meta_dict):
+    """Attach the combined JSON metadata to nwb_file under lab_meta_data[AIND_LAB_META_DATA_KEY]."""
+    nwb_file.add_lab_meta_data(
+        aind_metadata_type()(
+            name=AIND_LAB_META_DATA_KEY,
+            json_data=json.dumps(meta_dict),
+        )
+    )
+    return nwb_file
+
+
 def pupil_data_to_timeseries(pupil_data):
     """
     Convert a pupil data dict to a pynwb TimeSeries.
@@ -75,25 +177,28 @@ def pupil_data_to_timeseries(pupil_data):
     )
 
 
-def load_licks(session_id):
+def load_tongue_movements(session_id):
     """
-    Load tongue/lick movements for a session from the parquet data asset.
+    Load tongue movements for a session from the pooled parquet data asset.
 
     Matches session_id to the video session by animal ID and closest datetime,
-    then returns only rows where has_lick=True as a pynwb DynamicTable.
+    then returns all tongue movements for that session as a pynwb DynamicTable.
+    The has_lick column flags which movements contain a lick contact.
 
     Args:
         session_id: session identifier string, e.g. 'behavior_791691_2025-06-27_13-54-30'
 
     Returns:
-        hdmf DynamicTable with one row per lick, or None if no match found.
+        hdmf DynamicTable named 'tongue_movements' with one row per tongue movement,
+        or None if no match found. Same table name as the movs table built by
+        load_keypoint_tracking, since the two are interchangeable sources.
     """
-    if not LICK_PARQUET.exists():
-        logger.warning(f"Lick parquet not found at {LICK_PARQUET}")
+    if not TONGUE_MOVEMENT_PARQUET.exists():
+        logger.warning(f"Tongue movement parquet not found at {TONGUE_MOVEMENT_PARQUET}")
         return None
 
-    all_lick_df = pd.read_parquet(LICK_PARQUET)
-    session_video_list = all_lick_df['session'].unique().tolist()
+    all_movements_df = pd.read_parquet(TONGUE_MOVEMENT_PARQUET)
+    session_video_list = all_movements_df['session'].unique().tolist()
 
     animal_id, session_time, _ = parseSessionID(session_id)
     if animal_id is None:
@@ -102,86 +207,114 @@ def load_licks(session_id):
 
     candidate_sessions = [s for s in session_video_list if str(s).startswith(f'behavior_{animal_id}')]
     if not candidate_sessions:
-        logger.info(f"No lick data found for animal {animal_id}")
+        logger.info(f"No tongue movement data found for animal {animal_id}")
         return None
 
     time_diffs = [abs((parseSessionID(s)[1] - session_time).total_seconds()) for s in candidate_sessions]
     best_idx = int(np.argmin(time_diffs))
     if time_diffs[best_idx] > 60:
-        logger.info(f"Closest lick session is {time_diffs[best_idx]:.0f}s away — skipping")
+        logger.info(f"Closest tongue movement session is {time_diffs[best_idx]:.0f}s away — skipping")
         return None
 
     matched_session = candidate_sessions[best_idx]
-    logger.info(f"Matched lick session: {matched_session}")
+    logger.info(f"Matched tongue movement session: {matched_session}")
 
-    licks = all_lick_df[(all_lick_df['session'] == matched_session) & (all_lick_df['has_lick'])].copy().reset_index(drop=True)
-    if len(licks) == 0:
-        logger.info("No lick rows found after filtering has_lick=True")
+    movements = all_movements_df[all_movements_df['session'] == matched_session].copy().reset_index(drop=True)
+    if len(movements) == 0:
+        logger.info("No tongue movement rows found for matched session")
         return None
 
-    # Columns to include in the DynamicTable (drop session identifier and redundant flags)
-    exclude_cols = {'session', 'has_lick'}
-    col_descriptions = {
-        'movement_id': 'Unique tongue movement identifier',
-        'start_time': 'Movement onset time relative to session start (s)',
-        'end_time': 'Movement offset time relative to session start (s)',
-        'duration': 'Movement duration (s)',
-        'lick_time': 'Time of lick contact relative to session start (s)',
-        'lick_count': 'Number of lick contacts within this movement',
-        'lick_latency': 'Latency from go cue to lick contact (s)',
-        'trial': 'Trial number',
-        'cue_response': 'Whether the animal responded to the cue',
-        'rewarded': 'Whether the trial was rewarded',
-        'event': 'Lick event type (left_lick_time / right_lick_time)',
-        'peak_velocity': 'Peak tongue velocity (px/s)',
-        'mean_velocity': 'Mean tongue velocity (px/s)',
-        'total_distance': 'Total tongue path distance (px)',
-        'excursion_angle_deg': 'Tongue excursion angle (degrees)',
-        'goCue_start_time_in_session': 'Go cue time for this trial relative to session start (s)',
-        'movement_latency_from_go': 'Latency from go cue to movement onset (s)',
-        'movement_number_in_trial': 'Index of this movement within the trial',
-    }
+    # Columns to include in the DynamicTable (drop session identifier)
+    exclude_cols = {'session'}
+    col_descriptions = COLUMN_DESCRIPTIONS.get('tongue_movement_columns', {})
 
-    keep_cols = [c for c in licks.columns if c not in exclude_cols]
+    keep_cols = [c for c in movements.columns if c not in exclude_cols]
 
     table = DynamicTable(
-        name='licks',
-        description='Tongue lick movements detected from video DLC tracking, one row per lick.',
+        id=np.array(range(len(movements))),
+        name='tongue_movements',
+        description=('Tongue movements detected from video DLC tracking, one row per movement. '
+                     'has_lick flags movements containing a lick contact.'),
     )
 
     for col in keep_cols:
-        series = licks[col]
-        # Normalise nullable integer / boolean dtypes to plain numpy
-        if hasattr(series, 'to_numpy'):
-            arr = series.to_numpy(dtype=object, na_value=np.nan)
-            # Cast to float if numeric, keeping NaN for missing values
-            try:
-                arr = arr.astype(np.float64)
-            except (ValueError, TypeError):
-                arr = arr.astype(object)
-        else:
-            arr = np.array(series, dtype=object)
-
+        # Normalise nullable integer / boolean dtypes, string columns with
+        # missing values, and ragged array columns
+        data, index = _prepare_column_data(movements[col])
         table.add_column(
             name=col,
-            description=col_descriptions.get(col, col),
-            data=arr.tolist(),
+            description=_lookup_description(col_descriptions, col),
+            data=data,
+            index=index,
         )
 
-    logger.info(f"Built lick DynamicTable with {len(licks)} rows and {len(keep_cols)} columns")
+    logger.info(f"Built tongue_movements DynamicTable with {len(movements)} rows "
+                f"and {len(keep_cols)} columns")
     return table
 
 
-def _df_to_dynamic_table(df, name, description):
-    """Convert a DataFrame to an hdmf DynamicTable, coercing nullable dtypes to plain numpy."""
+def _prepare_column_data(series):
+    """
+    Coerce a DataFrame column into data hdmf/zarr can write.
+
+    Handles the same two problem cases as the trials and units tables:
+      - array-valued cells with varying lengths (ragged), which need a VectorIndex
+      - mixed string / missing columns, where zarr infers the dataset dtype from
+        the first element and then fails on later values
+        (e.g. ValueError: could not convert string to float: 'right_lick_time')
+
+    Args:
+        series: pandas Series (one table column)
+
+    Returns:
+        Tuple (data, index) where data is a list of per-row values and index is
+        True when the column must be written as a ragged/indexed column.
+    """
+    non_null = series.dropna()
+
+    # Array-valued columns: index=True when lengths vary, same as trials/units
+    if len(non_null) > 0 and isinstance(non_null.iloc[0], (list, np.ndarray)):
+        sample_val = np.asarray(non_null.iloc[0])
+        is_ragged = sample_val.ndim == 1 and len({len(v) for v in non_null}) > 1
+        data = []
+        for val in series:
+            if isinstance(val, (list, np.ndarray)):
+                data.append(np.asarray(val))
+            elif is_ragged:
+                data.append(np.array([]))
+            else:
+                # Keep a rectangular column rectangular: NaN-fill missing rows
+                dtype = sample_val.dtype if sample_val.dtype.kind in 'fc' else np.float64
+                data.append(np.full(sample_val.shape, np.nan, dtype=dtype))
+        return data, is_ragged
+
+    arr = series.to_numpy(dtype=object, na_value=np.nan)
+
+    # Numeric (incl. bool -> 1.0/0.0) columns, keeping NaN for missing values
+    try:
+        return arr.astype(np.float64).tolist(), False
+    except (ValueError, TypeError):
+        pass
+
+    # Anything else (strings, mixed types): write as strings, '' for missing
+    return ['' if (val is None or (isinstance(val, float) and np.isnan(val))) else str(val)
+            for val in arr], False
+
+
+def _lookup_description(col_descriptions, col):
+    """Look up a column description, falling back to the column name when unfilled."""
+    description = col_descriptions.get(col, col)
+    return col if description == 'to be filled' else description
+
+
+def _df_to_dynamic_table(df, name, description, col_descriptions=None):
+    """Convert a DataFrame to an hdmf DynamicTable, coercing nullable/ragged columns."""
+    col_descriptions = col_descriptions or {}
     table = DynamicTable(id=np.array(range(len(df))), name=name, description=description)
     for col in df.columns:
-        arr = df[col].to_numpy(dtype=object, na_value=np.nan)
-        try:
-            arr = arr.astype(np.float64)
-        except (ValueError, TypeError):
-            arr = arr.astype(object)
-        table.add_column(name=col, description=col, data=arr.tolist())
+        data, index = _prepare_column_data(df[col])
+        table.add_column(name=col, description=_lookup_description(col_descriptions, col),
+                         data=data, index=index)
     return table
 
 
@@ -233,11 +366,13 @@ def load_keypoint_tracking(session_id):
         data['movs'],
         name='tongue_movements',
         description='Tongue movement summary table from DLC keypoint tracking (one row per movement).',
+        col_descriptions=COLUMN_DESCRIPTIONS.get('tongue_movement_columns', {}),
     )
     kins_table = _df_to_dynamic_table(
         data['kins'],
         name='tongue_kinematics',
         description='Per-frame tongue kinematics from DLC keypoint tracking (x, y, velocity, confidence).',
+        col_descriptions=COLUMN_DESCRIPTIONS.get('tongue_kinematics_columns', {}),
     )
 
     logger.info(f"Built tongue_movements ({len(data['movs'])} rows) and tongue_kinematics ({len(data['kins'])} rows) tables")
@@ -356,7 +491,7 @@ def merge_unit_tables(session_id, data_type='curated', return_nwb=False):
         return merged_df
 
 
-def build_combined_nwb(session_id, data_type='curated', save_file=None):
+def build_combined_nwb(session_id, data_type='curated', save_file=None, add_metadata=False):
     """
     Build a complete NWB file with available data modalities.
 
@@ -369,6 +504,9 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
         session_id: Session identifier
         data_type: 'curated' or 'raw'
         save_file: Path to save NWB file (if None, returns in-memory only)
+        add_metadata: If True, bundle the raw AIND metadata JSON files into a
+            LabMetaData container (see add_aind_metadata). Placeholder metadata,
+            expected to be replaced by properly typed metadata later.
 
     Returns:
         Tuple of (save_path, nwb_object, data_modalities_dict)
@@ -378,6 +516,10 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
             'lick_times': bool - whether lick acquisition is included
             'reward_times': bool - whether reward acquisition is included
             'FP': bool - whether fiber photometry is included
+            'pupil': bool - whether pupil diameter is included
+            'tongue_movements': bool - whether the tongue_movements table is included
+            'keypoint_tracking': bool - whether the tongue_kinematics table is included
+            'aind_metadata': bool - whether the AIND metadata blob is included
             'beh_version': str - 'raw', 'processed', or 'none'
             'nwb_created': str - ISO timestamp when NWB object was created
             'nwb_saved': str or None - ISO timestamp when NWB was saved to file (None if not saved)
@@ -392,8 +534,9 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
         'reward_times': False,
         'FP': False,  # Fiber photometry
         'pupil': False,
-        'lick_video': False,
+        'tongue_movements': False,
         'keypoint_tracking': False,
+        'aind_metadata': False,
         'beh_version': 'none',  # 'raw', 'processed', or 'none'
         'nwb_created': None,  # Timestamp when NWB object was created
         'nwb_saved': None,  # Timestamp when NWB file was saved (if save_file provided)
@@ -479,37 +622,37 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
         trial_cols = [col for col in trial_df.columns if col not in ('start_time', 'stop_time')]
         trial_descriptions = COLUMN_DESCRIPTIONS.get('behavior_trial_columns', {})
 
-    ragged_trial_cols = set()
-    for col in trial_cols:
-        description = trial_descriptions.get(col, f'Trial column: {col}')
-        non_null = trial_df[col].dropna()
-        is_ragged = len(non_null) > 0 and isinstance(non_null.iloc[0], (list, np.ndarray))
-        if is_ragged:
-            ragged_trial_cols.add(col)
-        new_nwb.add_trial_column(name=col, description=description, index=is_ragged)
-
-    for _, row in trial_df.iterrows():
-        start_time = float(row.get('start_time', 0.0))
-        stop_time = float(row.get('stop_time', start_time))
-        if stop_time < start_time:
-            stop_time = start_time
-
-        trial_kwargs = {}
+        ragged_trial_cols = set()
         for col in trial_cols:
-            if col not in row.index:
-                continue
-            val = row[col]
+            description = trial_descriptions.get(col, f'Trial column: {col}')
+            non_null = trial_df[col].dropna()
+            is_ragged = len(non_null) > 0 and isinstance(non_null.iloc[0], (list, np.ndarray))
+            if is_ragged:
+                ragged_trial_cols.add(col)
+            new_nwb.add_trial_column(name=col, description=description, index=is_ragged)
 
-            # Convert Python None to appropriate type (like reference behavior NWB)
-            if val is None or (isinstance(val, float) and pd.isna(val)):
-                if col in ragged_trial_cols:
-                    val = np.array([])
-                else:
-                    val = np.nan
+        for _, row in trial_df.iterrows():
+            start_time = float(row.get('start_time', 0.0))
+            stop_time = float(row.get('stop_time', start_time))
+            if stop_time < start_time:
+                stop_time = start_time
 
-            trial_kwargs[col] = val
+            trial_kwargs = {}
+            for col in trial_cols:
+                if col not in row.index:
+                    continue
+                val = row[col]
 
-        new_nwb.add_trial(start_time=start_time, stop_time=stop_time, **trial_kwargs)
+                # Convert Python None to appropriate type (like reference behavior NWB)
+                if val is None or (isinstance(val, float) and pd.isna(val)):
+                    if col in ragged_trial_cols:
+                        val = np.array([])
+                    else:
+                        val = np.nan
+
+                trial_kwargs[col] = val
+
+            new_nwb.add_trial(start_time=start_time, stop_time=stop_time, **trial_kwargs)
 
         logger.info(f"Added {len(trial_df)} trials with {len(trial_cols)} columns")
         data_modalities['behavior_trials'] = True
@@ -625,6 +768,12 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
                             val = []
                         else:
                             val = np.nan
+                    elif col in KNOWN_ARRAY_COLUMNS:
+                        # No non-null sample to copy a shape from, but these columns
+                        # must still be array-like (pynwb type-checks waveform_mean /
+                        # waveform_sd, and zarr/hdf5 need a consistent dtype), so
+                        # write an empty 1D float array for every unit.
+                        val = np.array([], dtype=np.float64)
                     else:
                         val = np.nan
 
@@ -650,45 +799,61 @@ def build_combined_nwb(session_id, data_type='curated', save_file=None):
     else:
         logger.info("No pupil data available for this session")
 
-    # 7b. Add lick DynamicTable to behavior processing module (if available)
-    lick_table = load_licks(session_id)
-    if lick_table is not None:
-        if 'behavior' not in new_nwb.processing:
-            new_nwb.create_processing_module(
-                name='behavior',
-                description='Processed behavioral data',
-            )
-        new_nwb.processing['behavior'].add(lick_table)
-        data_modalities['lick_video'] = True
-        logger.info(f"Added lick DynamicTable to behavior processing module")
-    else:
-        logger.info("No lick video data available for this session")
+    # 7b/7c. Add tongue movement and kinematics tables to behavior processing module.
+    # The movement table only comes from the pooled parquet asset; sessions missing from
+    # that asset simply get no movement table. The keypoint asset's own movs table is
+    # deliberately ignored (it duplicates the parquet one, minus the out_* columns).
+    movement_table = load_tongue_movements(session_id)
+    _, kins_table = load_keypoint_tracking(session_id)
 
-    # 7c. Add keypoint tracking tables to behavior processing module (if available)
-    movs_table, kins_table = load_keypoint_tracking(session_id)
-    movs_table = None
-    if movs_table is not None and kins_table is not None:
+    if movement_table is not None or kins_table is not None:
         if 'behavior' not in new_nwb.processing:
             new_nwb.create_processing_module(
                 name='behavior',
                 description='Processed behavioral data',
             )
-        new_nwb.processing['behavior'].add(movs_table)
+
+    if movement_table is not None:
+        new_nwb.processing['behavior'].add(movement_table)
+        data_modalities['tongue_movements'] = True
+        logger.info(f"Added {movement_table.name} DynamicTable to behavior processing module")
+    else:
+        logger.info("No tongue movement data available for this session")
+
+    if kins_table is not None:
         new_nwb.processing['behavior'].add(kins_table)
         data_modalities['keypoint_tracking'] = True
-        logger.info("Added tongue_movements and tongue_kinematics tables to behavior processing module")
+        logger.info("Added tongue_kinematics table to behavior processing module")
     else:
         logger.info("No keypoint tracking data available for this session")
+
+    # 7d. Attach the raw AIND metadata JSON files (if requested)
+    if add_metadata:
+        meta_dict = load_aind_metadata(session_id)
+        if meta_dict is not None:
+            add_aind_metadata(new_nwb, meta_dict)
+            data_modalities['aind_metadata'] = True
+            logger.info(f"Added AIND metadata to lab_meta_data['{AIND_LAB_META_DATA_KEY}']")
+        else:
+            logger.info("No AIND metadata available for this session")
 
     # 8. Log data modalities included
     included_modalities = [k for k, v in data_modalities.items() if v]
     logger.info(f"Data modalities included: {', '.join(included_modalities) if included_modalities else 'none'}")
 
-    # 9. Save if requested
+    # 9. Save if requested (zarr backend; the store is a directory, so make sure
+    # the path carries the .zarr suffix rather than collide with an .nwb file)
     if save_file is not None:
+        if not save_file.endswith('.zarr'):
+            save_file = save_file + '.zarr'
         os.makedirs(os.path.dirname(save_file), exist_ok=True)
+        # mode='w' overwrites, but a zarr store has to be a directory: drop any
+        # regular file sitting at this path (e.g. left by the HDF5 backend).
+        if os.path.exists(save_file) and not os.path.isdir(save_file):
+            logger.warning(f"Removing non-directory file at {save_file} to make room for the zarr store")
+            os.remove(save_file)
         save_time = datetime.now(tzlocal())
-        with NWBHDF5IO(save_file, mode='w') as io:
+        with NWBZarrIO(save_file, mode='w') as io:
             io.write(new_nwb)
         data_modalities['nwb_saved'] = save_time.isoformat()
         logger.info(f"Saved combined NWB to {save_file}")
@@ -713,16 +878,19 @@ if __name__ == '__main__':
 
 
         # Test the full build_combined_nwb function
-        save_path, nwb = build_combined_nwb(session, data_type='curated', save_file=None)
+        save_path, nwb, modalities = build_combined_nwb(session, data_type='curated', save_file=None)
         if nwb is not None:
             print(f"\n✓ Success! Combined NWB created")
-            print(f"  Trials: {len(nwb.trials)} rows")
-            print(f"  Units: {len(nwb.units)} rows")
+            print(f"  Trials: {len(nwb.trials) if nwb.trials is not None else 0} rows")
+            print(f"  Units: {len(nwb.units) if nwb.units is not None else 0} rows")
+            print(f"  Modalities: {', '.join(k for k, v in modalities.items() if v)}")
 
             # Show sample columns
-            trials_df = nwb.trials.to_dataframe()
-            units_df = nwb.units.to_dataframe()
-            print(f"\n  Trial columns ({len(trials_df.columns)}): {list(trials_df.columns)[:5]}...")
-            print(f"  Unit columns ({len(units_df.columns)}): {list(units_df.columns)[:5]}...")
+            if nwb.trials is not None:
+                trials_df = nwb.trials.to_dataframe()
+                print(f"\n  Trial columns ({len(trials_df.columns)}): {list(trials_df.columns)[:5]}...")
+            if nwb.units is not None:
+                units_df = nwb.units.to_dataframe()
+                print(f"  Unit columns ({len(units_df.columns)}): {list(units_df.columns)[:5]}...")
         else:
             print("\n✗ Build failed")

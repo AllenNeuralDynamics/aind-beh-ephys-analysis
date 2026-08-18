@@ -41,7 +41,11 @@
       "Bash(grep -n \"__TYPE_MAP\\\\|def get_type_map\\\\|TypeMap\\(\\)\" /opt/conda/lib/python3.12/site-packages/pynwb/__init__.py | head -20)",
       "Read(//opt/conda/lib/python3.12/site-packages/pynwb/**)",
       "Bash(ls /data/behavior_ZS062_2021-05-01_19-48-01_raw_data/*.json 2>&1 | head -20)",
-      "Read(//data/behavior_ZS062_2021-05-01_19-48-01_raw_data/**)"
+      "Read(//data/behavior_ZS062_2021-05-01_19-48-01_raw_data/**)",
+      "Bash(python -)",
+      "Bash(sed -n 1560,1600p /code/beh_ephys_analysis/utils/beh_functions.py)",
+      "Read(//code/beh_ephys_analysis/utils/**)",
+      "Bash(sed -n 745,800p /opt/conda/lib/python3.12/site-packages/hdmf_zarr/backend.py)"
     ]
   }
 }
