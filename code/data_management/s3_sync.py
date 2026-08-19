@@ -85,7 +85,7 @@ if __name__ == "__main__":
         s3_bucket_dest += "results/"
         local_dir += "results/"
 
-    out = sync_directory(local_dir, s3_bucket_dest, if_copy=True, if_dry_run=False, if_delete=True)
+    out = sync_directory(local_dir, s3_bucket_dest, if_copy=False, if_dry_run=False, if_delete=True)
     print(out)
 
 
