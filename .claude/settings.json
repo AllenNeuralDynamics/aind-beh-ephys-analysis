@@ -50,7 +50,19 @@
       "Bash(sed -n 840,865p /root/capsule/code/data_management/build_merged_nwb.py; echo ---; grep -rn \"path exists but is not a directory\" /opt/conda/lib/python3.12/site-packages/zarr/ /opt/conda/lib/python3.12/site-packages/hdmf_zarr/ 2>/dev/null)",
       "Read(//opt/conda/lib/python3.12/site-packages/zarr/**)",
       "Read(//scratch/nwb_testing_folder/**)",
-      "Bash(python /tmp/test_stale.py)"
+      "Bash(python /tmp/test_stale.py)",
+      "Bash(ls -la /root/capsule/scratch/combined/nwb_testing_folder/ 2>/dev/null | head; echo ---; ls /root/capsule/scratch/combined/ 2>/dev/null | head)",
+      "Read(//scratch/combined/nwb_testing_folder/**)",
+      "Read(//scratch/combined/**)",
+      "Bash(python /tmp/check_unit_desc.py)",
+      "Bash(python /tmp/desc_report.py)",
+      "Bash([ -d \"$P\" ])",
+      "Bash(python /tmp/check_sorted_nwb.py)",
+      "Bash(python -c \"import spikeinterface; print\\(spikeinterface.__version__, spikeinterface.__file__\\)\")",
+      "Read(//opt/conda/lib/python3.12/site-packages/spikeinterface/**)",
+      "Read(//opt/conda/lib/python3.12/site-packages/spikeinterface/qualitymetrics/**)",
+      "Bash(cd /opt/conda/lib/python3.12/site-packages/spikeinterface *)",
+      "Bash(ls -d /root/capsule/scratch/combined/nwb_testing_folder/*.zarr 2>/dev/null | head)"
     ],
     "additionalDirectories": [
       "/tmp"
